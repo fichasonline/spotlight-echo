@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navbar } from "@/components/Navbar";
+import { AutoHeight } from "@/components/animate-ui/primitives/effects/auto-height";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,8 +29,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
+  ArrowUpRight,
   CalendarDays,
+  Clock3,
   Flag,
+  Flame,
   Hash,
   Heart,
   Home,
@@ -41,9 +45,11 @@ import {
   Shield,
   Sparkles,
   Trash2,
+  X,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
+import { AnimatePresence, motion } from "framer-motion";
 
 interface PostWithDetails {
   id: string;
@@ -85,6 +91,13 @@ interface FeedProfileRow {
   avatar_url: string | null;
 }
 
+interface TrendingTopic {
+  tag: string;
+  mentions: number;
+  posts: number;
+  lastSeenAt: number;
+}
+
 type FeedSort = "recent" | "most-liked";
 type FetchPostsOptions = { showLoading?: boolean; showErrorToast?: boolean };
 
@@ -93,6 +106,8 @@ const FEED_SELECT = `
   post_likes(user_id),
   comments(id, content, created_at, is_deleted, author_id)
 `;
+const HASHTAG_SPLIT_REGEX = /(#[\p{L}\p{N}_]{2,40})/gu;
+const HASHTAG_ONLY_REGEX = /^#[\p{L}\p{N}_]{2,40}$/u;
 
 function displayHandle(name: string | null | undefined) {
   if (!name?.trim()) return "usuario";
@@ -107,6 +122,25 @@ function getInitial(name: string | null | undefined) {
 
 function timeAgo(date: string) {
   return formatDistanceToNow(new Date(date), { addSuffix: true, locale: es });
+}
+
+function extractHashtags(content: string) {
+  return Array.from(content.matchAll(/#([\p{L}\p{N}_]{2,40})/gu), (match) =>
+    match[1].toLowerCase()
+  );
+}
+
+function normalizeTag(rawTag: string) {
+  return rawTag.replace(/^#/, "").trim().toLowerCase();
+}
+
+function appendHashtag(content: string, rawTag: string) {
+  const tag = normalizeTag(rawTag);
+  if (!tag) return content;
+  const nextTag = `#${tag}`;
+  if (content.toLowerCase().includes(nextTag.toLowerCase())) return content;
+  const needsSpace = content.length > 0 && !content.endsWith(" ");
+  return `${content}${needsSpace ? " " : ""}${nextTag} `;
 }
 
 function isMissingHiddenColumnError(error: { message: string; code?: string | null }) {
@@ -431,10 +465,18 @@ export default function FeedPage() {
     const filtered = posts.filter((post) => {
       if (!normalizedSearch) return true;
       const authorName = post.profiles?.display_name?.toLowerCase() ?? "";
+      const postTags = extractHashtags(post.content);
+
+      if (normalizedSearch.startsWith("#")) {
+        const normalizedTag = normalizeTag(normalizedSearch);
+        return postTags.some((tag) => tag.startsWith(normalizedTag));
+      }
+
       return (
         post.content.toLowerCase().includes(normalizedSearch) ||
         authorName.includes(normalizedSearch) ||
-        displayHandle(post.profiles?.display_name).includes(normalizedSearch)
+        displayHandle(post.profiles?.display_name).includes(normalizedSearch) ||
+        postTags.some((tag) => tag.includes(normalizedSearch))
       );
     });
 
@@ -452,6 +494,89 @@ export default function FeedPage() {
     const comments = visiblePosts.reduce((acc, p) => acc + p.comments.length, 0);
     return { posts: visiblePosts.length, likes, comments };
   }, [visiblePosts]);
+
+  const trendingTopics = useMemo<TrendingTopic[]>(() => {
+    const topicMap = new Map<string, { mentions: number; posts: number; lastSeenAt: number }>();
+
+    posts.forEach((post) => {
+      if (post.is_deleted && !isAdmin) return;
+      const postTags = extractHashtags(post.content);
+      if (postTags.length === 0) return;
+
+      const seenInPost = new Set<string>();
+      const postTimestamp = new Date(post.created_at).getTime();
+
+      postTags.forEach((tag) => {
+        const current = topicMap.get(tag) ?? { mentions: 0, posts: 0, lastSeenAt: 0 };
+        current.mentions += 1;
+        current.lastSeenAt = Math.max(current.lastSeenAt, postTimestamp);
+        topicMap.set(tag, current);
+        seenInPost.add(tag);
+      });
+
+      seenInPost.forEach((tag) => {
+        const topic = topicMap.get(tag);
+        if (topic) {
+          topic.posts += 1;
+          topicMap.set(tag, topic);
+        }
+      });
+    });
+
+    return Array.from(topicMap.entries())
+      .map(([tag, stats]) => ({
+        tag,
+        mentions: stats.mentions,
+        posts: stats.posts,
+        lastSeenAt: stats.lastSeenAt,
+      }))
+      .sort((a, b) => {
+        if (b.mentions !== a.mentions) return b.mentions - a.mentions;
+        if (b.posts !== a.posts) return b.posts - a.posts;
+        return b.lastSeenAt - a.lastSeenAt;
+      })
+      .slice(0, 6);
+  }, [isAdmin, posts]);
+
+  const activeHashtagFilter = useMemo(() => {
+    const match = searchText.trim().toLowerCase().match(/^#([\p{L}\p{N}_]{2,40})$/u);
+    return match?.[1] ?? null;
+  }, [searchText]);
+
+  const suggestedComposerTags = useMemo(() => trendingTopics.slice(0, 4), [trendingTopics]);
+
+  const applyTagFilter = useCallback((rawTag: string) => {
+    const normalizedTag = normalizeTag(rawTag);
+    if (!normalizedTag) return;
+    setSearchText(`#${normalizedTag}`);
+  }, []);
+
+  const renderContentWithHashtags = useCallback(
+    (content: string) =>
+      content.split(HASHTAG_SPLIT_REGEX).map((chunk, index) => {
+        if (!HASHTAG_ONLY_REGEX.test(chunk)) {
+          return <span key={`${chunk}-${index}`}>{chunk}</span>;
+        }
+
+        const tag = normalizeTag(chunk);
+        const isActive = activeHashtagFilter === tag;
+        return (
+          <button
+            key={`${chunk}-${index}`}
+            type="button"
+            onClick={() => applyTagFilter(tag)}
+            className={`inline rounded px-0.5 font-semibold transition-colors ${
+              isActive
+                ? "bg-primary/20 text-primary"
+                : "text-primary/90 hover:bg-primary/15 hover:text-primary"
+            }`}
+          >
+            {chunk}
+          </button>
+        );
+      }),
+    [activeHashtagFilter, applyTagFilter]
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -520,7 +645,12 @@ export default function FeedPage() {
           <main className="min-w-0 border-x border-border/60 bg-background">
             <div className="sticky top-14 z-20 border-b border-border/60 bg-background/85 px-4 py-3 backdrop-blur">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h1 className="font-display text-xl font-bold text-foreground">Feed</h1>
+                <div>
+                  <h1 className="font-display text-xl font-bold text-foreground">Feed</h1>
+                  <p className="text-xs text-muted-foreground">
+                    {timelineStats.posts} publicaciones visibles
+                  </p>
+                </div>
                 <div className="flex items-center gap-2">
                   <Select
                     value={sortBy}
@@ -534,9 +664,32 @@ export default function FeedPage() {
                       <SelectItem value="most-liked">Mas likes</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Badge variant="outline" className="gap-1 rounded-full px-3 py-1">
-                    <Sparkles className="h-3.5 w-3.5 text-primary" /> Para ti
-                  </Badge>
+                  {activeHashtagFilter ? (
+                    <button
+                      type="button"
+                      onClick={() => setSearchText("")}
+                      className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+                    >
+                      <Hash className="h-3.5 w-3.5" />
+                      {activeHashtagFilter}
+                      <X className="h-3 w-3" />
+                    </button>
+                  ) : (
+                    <Badge variant="outline" className="gap-1 rounded-full px-3 py-1">
+                      <Sparkles className="h-3.5 w-3.5 text-primary" /> Para ti
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <div className="mt-3 lg:hidden">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    placeholder="Buscar en el feed"
+                    className="rounded-full pl-9"
+                  />
                 </div>
               </div>
             </div>
@@ -555,6 +708,23 @@ export default function FeedPage() {
                     rows={3}
                     className="resize-none border-none bg-transparent px-0 text-base placeholder:text-muted-foreground/80 focus-visible:ring-0"
                   />
+                  {suggestedComposerTags.length > 0 && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Temas en tendencia:</span>
+                      {suggestedComposerTags.map((topic) => (
+                        <button
+                          key={topic.tag}
+                          type="button"
+                          onClick={() =>
+                            setNewPost((prev) => appendHashtag(prev, topic.tag).slice(0, 500))
+                          }
+                          className="rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+                        >
+                          #{topic.tag}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-3">
                     <span
                       className={`text-xs ${
@@ -575,6 +745,28 @@ export default function FeedPage() {
                 </div>
               </div>
             </div>
+
+            {trendingTopics.length > 0 && (
+              <div className="border-b border-border/60 px-4 py-3 lg:hidden">
+                <p className="text-xs font-medium text-muted-foreground">Tendencias</p>
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                  {trendingTopics.map((topic) => (
+                    <button
+                      key={topic.tag}
+                      type="button"
+                      onClick={() => applyTagFilter(topic.tag)}
+                      className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                        activeHashtagFilter === topic.tag
+                          ? "bg-primary/20 text-primary"
+                          : "bg-muted/45 text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                      }`}
+                    >
+                      #{topic.tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
               {loadingPosts && (
@@ -607,213 +799,233 @@ export default function FeedPage() {
                 </div>
               )}
 
-              {!loadingPosts &&
-                !feedError &&
-                visiblePosts.map((post) => {
-                  const liked = post.post_likes.some((l) => l.user_id === user?.id);
-                  const isOwner = post.author_id === user?.id;
-                  const canDeletePost = isOwner || isAdmin;
-                  const showComments = expandedComments.has(post.id);
-                  const comments = post.comments.filter((comment) => !comment.is_deleted || isAdmin);
+              {!loadingPosts && !feedError && (
+                <AnimatePresence initial={false} mode="popLayout">
+                  {visiblePosts.map((post) => {
+                    const liked = post.post_likes.some((l) => l.user_id === user?.id);
+                    const isOwner = post.author_id === user?.id;
+                    const canDeletePost = isOwner || isAdmin;
+                    const showComments = expandedComments.has(post.id);
+                    const comments = post.comments.filter((comment) => !comment.is_deleted || isAdmin);
 
-                  if (post.is_deleted && !isAdmin) return null;
+                    if (post.is_deleted && !isAdmin) return null;
 
-                  if (post.is_deleted) {
+                    if (post.is_deleted) {
+                      return (
+                        <motion.div
+                          layout
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ duration: 0.2 }}
+                          key={post.id}
+                          className="border-b border-border/60 px-4 py-5 text-sm italic text-muted-foreground"
+                        >
+                          Contenido eliminado
+                        </motion.div>
+                      );
+                    }
+
                     return (
-                      <div
+                      <motion.article
+                        layout
+                        initial={{ opacity: 0, y: 14 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                        whileHover={{ backgroundColor: "hsl(var(--muted) / 0.22)" }}
                         key={post.id}
-                        className="border-b border-border/60 px-4 py-5 text-sm italic text-muted-foreground"
+                        className="border-b border-border/60 px-4 py-4"
                       >
-                        Contenido eliminado
-                      </div>
-                    );
-                  }
+                        <div className="flex gap-3">
+                          <Avatar className="mt-0.5 h-10 w-10">
+                            <AvatarImage src={post.profiles?.avatar_url ?? undefined} />
+                            <AvatarFallback>{getInitial(post.profiles?.display_name)}</AvatarFallback>
+                          </Avatar>
 
-                  return (
-                    <article
-                      key={post.id}
-                      className="border-b border-border/60 px-4 py-4 transition-colors hover:bg-muted/25"
-                    >
-                      <div className="flex gap-3">
-                        <Avatar className="mt-0.5 h-10 w-10">
-                          <AvatarImage src={post.profiles?.avatar_url ?? undefined} />
-                          <AvatarFallback>{getInitial(post.profiles?.display_name)}</AvatarFallback>
-                        </Avatar>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 text-sm">
-                            <span className="font-semibold text-foreground">
-                              {post.profiles?.display_name ?? "Usuario"}
-                            </span>
-                            <span className="text-muted-foreground">
-                              @{displayHandle(post.profiles?.display_name)}
-                            </span>
-                            <span className="text-muted-foreground">· {timeAgo(post.created_at)}</span>
-                          </div>
-
-                          <p className="mt-1 whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/95">
-                            {post.content}
-                          </p>
-
-                          <div className="mt-3 flex items-center gap-1 text-muted-foreground">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                setExpandedComments((prev) => {
-                                  const next = new Set(prev);
-                                  if (next.has(post.id)) next.delete(post.id);
-                                  else next.add(post.id);
-                                  return next;
-                                })
-                              }
-                              className="h-8 rounded-full px-3 text-muted-foreground hover:bg-sky-500/15 hover:text-sky-500"
-                            >
-                              <MessageSquare className="mr-1 h-4 w-4" />
-                              {comments.length}
-                            </Button>
-
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => void toggleLike(post.id, liked)}
-                              className={`h-8 rounded-full px-3 ${
-                                liked
-                                  ? "text-rose-500 hover:bg-rose-500/15 hover:text-rose-500"
-                                  : "text-muted-foreground hover:bg-rose-500/15 hover:text-rose-500"
-                              }`}
-                            >
-                              <Heart
-                                className={`mr-1 h-4 w-4 ${
-                                  liked ? "fill-rose-500 text-rose-500" : ""
-                                }`}
-                              />
-                              {post.post_likes.length}
-                            </Button>
-
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="ml-auto h-8 w-8 rounded-full text-muted-foreground"
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-44">
-                                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setReportTarget({ type: "post", id: post.id })}>
-                                  <Flag className="mr-2 h-4 w-4" />
-                                  Reportar
-                                </DropdownMenuItem>
-                                {canDeletePost && (
-                                  <DropdownMenuItem
-                                    onClick={() => void handleDeletePost(post.id)}
-                                    className="text-destructive focus:text-destructive"
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Eliminar
-                                  </DropdownMenuItem>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-
-                          {showComments && (
-                            <div className="mt-4 space-y-3 border-t border-border/60 pt-3">
-                              {comments.map((c) => {
-                                const canDeleteComment = c.author_id === user?.id || isAdmin;
-                                return (
-                                  <div
-                                    key={c.id}
-                                    className="rounded-xl border border-border/60 bg-card/50 p-3"
-                                  >
-                                    <div className="flex items-start justify-between gap-3">
-                                      <div className="min-w-0">
-                                        <div className="text-xs text-muted-foreground">
-                                          <span className="font-semibold text-foreground">
-                                            {c.profiles?.display_name ?? "Usuario"}
-                                          </span>{" "}
-                                          · {timeAgo(c.created_at)}
-                                        </div>
-                                        {c.is_deleted ? (
-                                          <p className="mt-1 text-sm italic text-muted-foreground">
-                                            Contenido eliminado
-                                          </p>
-                                        ) : (
-                                          <p className="mt-1 text-sm text-foreground/90">{c.content}</p>
-                                        )}
-                                      </div>
-
-                                      {!c.is_deleted && (
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-7 w-7 rounded-full text-muted-foreground"
-                                            >
-                                              <MoreHorizontal className="h-3.5 w-3.5" />
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="end" className="w-40">
-                                            <DropdownMenuItem
-                                              onClick={() =>
-                                                setReportTarget({ type: "comment", id: c.id })
-                                              }
-                                            >
-                                              <Flag className="mr-2 h-4 w-4" />
-                                              Reportar
-                                            </DropdownMenuItem>
-                                            {canDeleteComment && (
-                                              <DropdownMenuItem
-                                                onClick={() => void handleDeleteComment(c.id)}
-                                                className="text-destructive focus:text-destructive"
-                                              >
-                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                Eliminar
-                                              </DropdownMenuItem>
-                                            )}
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-
-                              <div className="flex gap-2">
-                                <Input
-                                  type="text"
-                                  placeholder="Publica tu respuesta"
-                                  value={commentTexts[post.id] ?? ""}
-                                  onChange={(e) =>
-                                    setCommentTexts((prev) => ({
-                                      ...prev,
-                                      [post.id]: e.target.value.slice(0, 280),
-                                    }))
-                                  }
-                                  onKeyDown={(e) => e.key === "Enter" && void handleComment(post.id)}
-                                  className="h-9 rounded-full bg-muted/40"
-                                />
-                                <Button
-                                  size="sm"
-                                  onClick={() => void handleComment(post.id)}
-                                  className="rounded-full px-4"
-                                  disabled={!commentTexts[post.id]?.trim()}
-                                >
-                                  <Send className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="font-semibold text-foreground">
+                                {post.profiles?.display_name ?? "Usuario"}
+                              </span>
+                              <span className="text-muted-foreground">
+                                @{displayHandle(post.profiles?.display_name)}
+                              </span>
+                              <span className="text-muted-foreground">· {timeAgo(post.created_at)}</span>
                             </div>
-                          )}
+
+                            <p className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-relaxed text-foreground/95">
+                              {renderContentWithHashtags(post.content)}
+                            </p>
+
+                            <div className="mt-3 flex items-center gap-1 text-muted-foreground">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  setExpandedComments((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(post.id)) next.delete(post.id);
+                                    else next.add(post.id);
+                                    return next;
+                                  })
+                                }
+                                className="h-8 rounded-full px-3 text-muted-foreground hover:bg-sky-500/15 hover:text-sky-500"
+                              >
+                                <MessageSquare className="mr-1 h-4 w-4" />
+                                {comments.length}
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => void toggleLike(post.id, liked)}
+                                className={`h-8 rounded-full px-3 ${
+                                  liked
+                                    ? "text-rose-500 hover:bg-rose-500/15 hover:text-rose-500"
+                                    : "text-muted-foreground hover:bg-rose-500/15 hover:text-rose-500"
+                                }`}
+                              >
+                                <Heart
+                                  className={`mr-1 h-4 w-4 ${
+                                    liked ? "fill-rose-500 text-rose-500" : ""
+                                  }`}
+                                />
+                                {post.post_likes.length}
+                              </Button>
+
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="ml-auto h-8 w-8 rounded-full text-muted-foreground"
+                                  >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-44">
+                                  <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => setReportTarget({ type: "post", id: post.id })}>
+                                    <Flag className="mr-2 h-4 w-4" />
+                                    Reportar
+                                  </DropdownMenuItem>
+                                  {canDeletePost && (
+                                    <DropdownMenuItem
+                                      onClick={() => void handleDeletePost(post.id)}
+                                      className="text-destructive focus:text-destructive"
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Eliminar
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+
+                            <AutoHeight
+                              deps={[showComments, comments.length, commentTexts[post.id] ?? ""]}
+                              transition={{ type: "spring", stiffness: 320, damping: 30, bounce: 0 }}
+                            >
+                              {showComments ? (
+                                <div className="mt-4 space-y-3 border-t border-border/60 pt-3">
+                                  {comments.map((c) => {
+                                    const canDeleteComment = c.author_id === user?.id || isAdmin;
+                                    return (
+                                      <div
+                                        key={c.id}
+                                        className="rounded-xl border border-border/60 bg-card/50 p-3"
+                                      >
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="min-w-0">
+                                            <div className="text-xs text-muted-foreground">
+                                              <span className="font-semibold text-foreground">
+                                                {c.profiles?.display_name ?? "Usuario"}
+                                              </span>{" "}
+                                              · {timeAgo(c.created_at)}
+                                            </div>
+                                            {c.is_deleted ? (
+                                              <p className="mt-1 text-sm italic text-muted-foreground">
+                                                Contenido eliminado
+                                              </p>
+                                            ) : (
+                                              <p className="mt-1 whitespace-pre-wrap break-words text-sm text-foreground/90">
+                                                {renderContentWithHashtags(c.content)}
+                                              </p>
+                                            )}
+                                          </div>
+
+                                          {!c.is_deleted && (
+                                            <DropdownMenu>
+                                              <DropdownMenuTrigger asChild>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  className="h-7 w-7 rounded-full text-muted-foreground"
+                                                >
+                                                  <MoreHorizontal className="h-3.5 w-3.5" />
+                                                </Button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuContent align="end" className="w-40">
+                                                <DropdownMenuItem
+                                                  onClick={() =>
+                                                    setReportTarget({ type: "comment", id: c.id })
+                                                  }
+                                                >
+                                                  <Flag className="mr-2 h-4 w-4" />
+                                                  Reportar
+                                                </DropdownMenuItem>
+                                                {canDeleteComment && (
+                                                  <DropdownMenuItem
+                                                    onClick={() => void handleDeleteComment(c.id)}
+                                                    className="text-destructive focus:text-destructive"
+                                                  >
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    Eliminar
+                                                  </DropdownMenuItem>
+                                                )}
+                                              </DropdownMenuContent>
+                                            </DropdownMenu>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+
+                                  <div className="flex gap-2">
+                                    <Input
+                                      type="text"
+                                      placeholder="Publica tu respuesta"
+                                      value={commentTexts[post.id] ?? ""}
+                                      onChange={(e) =>
+                                        setCommentTexts((prev) => ({
+                                          ...prev,
+                                          [post.id]: e.target.value.slice(0, 280),
+                                        }))
+                                      }
+                                      onKeyDown={(e) => e.key === "Enter" && void handleComment(post.id)}
+                                      className="h-9 rounded-full bg-muted/40"
+                                    />
+                                    <Button
+                                      size="sm"
+                                      onClick={() => void handleComment(post.id)}
+                                      className="rounded-full px-4"
+                                      disabled={!commentTexts[post.id]?.trim()}
+                                    >
+                                      <Send className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </AutoHeight>
+                          </div>
                         </div>
-                      </div>
-                    </article>
-                  );
-                })}
+                      </motion.article>
+                    );
+                  })}
+                </AnimatePresence>
+              )}
 
               {!loadingPosts && !feedError && visiblePosts.length === 0 && (
                 <div className="px-6 py-16 text-center">
@@ -840,32 +1052,79 @@ export default function FeedPage() {
                       className="rounded-full pl-9"
                     />
                   </div>
+                  <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <p className="line-clamp-1">Tip: filtra por hashtag, por ejemplo `#eventos`.</p>
+                    {searchText.trim() && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSearchText("")}
+                        className="h-7 rounded-full px-2 text-xs"
+                      >
+                        <X className="mr-1 h-3.5 w-3.5" />
+                        Limpiar
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
               <Card className="rounded-2xl border-border bg-card/70">
                 <CardHeader className="pb-3">
-                  <CardTitle className="font-display text-lg">Que esta pasando</CardTitle>
+                  <CardTitle className="flex items-center justify-between gap-2 font-display text-lg">
+                    Que esta pasando
+                    <Badge variant="secondary" className="rounded-full">
+                      {trendingTopics.length}
+                    </Badge>
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 pt-0">
-                  <div className="rounded-xl bg-muted/35 p-3">
-                    <p className="text-xs text-muted-foreground">Tendencia · Comunidad</p>
-                    <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <Hash className="h-3.5 w-3.5 text-primary" /> EventosDelMes
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-muted/35 p-3">
-                    <p className="text-xs text-muted-foreground">Cobertura en vivo</p>
-                    <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <Newspaper className="h-3.5 w-3.5 text-accent" /> Noticias destacadas
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-muted/35 p-3">
-                    <p className="text-xs text-muted-foreground">Proximo foco</p>
-                    <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <CalendarDays className="h-3.5 w-3.5 text-primary" /> Calendario semanal
-                    </p>
-                  </div>
+                  {trendingTopics.length === 0 && (
+                    <div className="rounded-xl border border-dashed border-border/80 bg-muted/25 p-3 text-sm text-muted-foreground">
+                      Aun no hay hashtags en publicaciones. Usa `#` en tus posts para arrancar
+                      tendencias.
+                    </div>
+                  )}
+
+                  {trendingTopics.map((topic, index) => {
+                    const isActive = activeHashtagFilter === topic.tag;
+                    return (
+                      <motion.button
+                        key={topic.tag}
+                        type="button"
+                        onClick={() => applyTagFilter(topic.tag)}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.04, duration: 0.2 }}
+                        whileHover={{ y: -2 }}
+                        className={`w-full rounded-xl border p-3 text-left transition-colors ${
+                          isActive
+                            ? "border-primary/40 bg-primary/10"
+                            : "border-transparent bg-muted/35 hover:border-primary/25 hover:bg-muted/55"
+                        }`}
+                      >
+                        <p className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span className="inline-flex items-center gap-1">
+                            <Flame className="h-3.5 w-3.5 text-orange-400" />
+                            Tendencia #{index + 1}
+                          </span>
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </p>
+                        <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-foreground">
+                          <Hash className="h-3.5 w-3.5 text-primary" />
+                          {topic.tag}
+                        </p>
+                        <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
+                          <span>{topic.mentions} menciones</span>
+                          <span>{topic.posts} posts</span>
+                          <span className="inline-flex items-center gap-1">
+                            <Clock3 className="h-3 w-3" />
+                            {formatDistanceToNow(topic.lastSeenAt, { addSuffix: true, locale: es })}
+                          </span>
+                        </div>
+                      </motion.button>
+                    );
+                  })}
                 </CardContent>
               </Card>
             </div>

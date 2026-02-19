@@ -240,55 +240,57 @@ export function SupportChatWidget() {
 
     if (!hasActiveThread) {
       return (
-        <form onSubmit={handleCreateThread} className="space-y-4 p-4">
-          <div className="space-y-2">
-            <Label htmlFor="support-name">Nombre</Label>
-            <Input
-              id="support-name"
-              placeholder="Tu nombre"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              required
-            />
+        <form onSubmit={handleCreateThread} className="flex h-full min-h-0 flex-col overflow-y-auto p-4">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="support-name">Nombre</Label>
+              <Input
+                id="support-name"
+                placeholder="Tu nombre"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="support-email">Email</Label>
+              <Input
+                id="support-email"
+                type="email"
+                placeholder="tu@email.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="support-phone">Telefono</Label>
+              <Input
+                id="support-phone"
+                type="tel"
+                placeholder="+56 9 0000 0000"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="support-first-message">Mensaje</Label>
+              <Textarea
+                id="support-first-message"
+                value={firstMessage}
+                onChange={(event) => setFirstMessage(event.target.value.slice(0, 800))}
+                placeholder="Cuentanos en que te ayudamos"
+                rows={4}
+                required
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="support-email">Email</Label>
-            <Input
-              id="support-email"
-              type="email"
-              placeholder="tu@email.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="support-phone">Telefono</Label>
-            <Input
-              id="support-phone"
-              type="tel"
-              placeholder="+56 9 0000 0000"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="support-first-message">Mensaje</Label>
-            <Textarea
-              id="support-first-message"
-              value={firstMessage}
-              onChange={(event) => setFirstMessage(event.target.value.slice(0, 800))}
-              placeholder="Cuentanos en que te ayudamos"
-              rows={4}
-              required
-            />
-          </div>
-
-          <Button type="submit" className="w-full" disabled={sending || !canCreateThread}>
+          <Button type="submit" className="mt-4 w-full shrink-0" disabled={sending || !canCreateThread}>
             {sending ? "Abriendo chat..." : "Iniciar chat"}
           </Button>
         </form>
@@ -380,13 +382,13 @@ export function SupportChatWidget() {
       </Button>
 
       {isMobile ? (
-        <Drawer open={open} onOpenChange={setOpen}>
-          <DrawerContent className="max-h-[90dvh]">
-            <DrawerHeader>
+        <Drawer open={open} onOpenChange={setOpen} fixed repositionInputs={false}>
+          <DrawerContent className="flex h-[90dvh] max-h-[90dvh] flex-col overflow-hidden pb-[env(safe-area-inset-bottom)]">
+            <DrawerHeader className="shrink-0">
               <DrawerTitle className="font-display">Chat rapido</DrawerTitle>
               <DrawerDescription>Habla con moderadores y administradores</DrawerDescription>
             </DrawerHeader>
-            <div className="min-h-0 flex-1">{renderBody()}</div>
+            <div className="min-h-0 flex-1 overflow-hidden">{renderBody()}</div>
           </DrawerContent>
         </Drawer>
       ) : (
