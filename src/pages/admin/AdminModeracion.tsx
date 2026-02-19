@@ -52,10 +52,12 @@ interface SupportMessage {
 }
 
 interface RealtimeSupportMessageRow {
+  id: string;
   thread_id: string;
   sender_type: "visitor" | "staff";
   sender_name: string | null;
   body: string;
+  created_at: string;
 }
 
 function isMissingRpcError(error: { message?: string; code?: string } | null, functionName: string) {
@@ -115,10 +117,51 @@ export default function AdminModeracion() {
   const [threadScope, setThreadScope] = useState<"open" | "all">("open");
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const notifiedMessageIdsRef = useRef<Set<string>>(new Set());
+  const previousThreadMessageAtRef = useRef<Record<string, string>>({});
+  const hasThreadsBaselineRef = useRef(false);
 
   const selectedThread = useMemo(
     () => threads.find((thread) => thread.id === selectedThreadId) ?? null,
     [selectedThreadId, threads],
+  );
+
+  const notifyIncomingVisitorMessage = useCallback(
+    (message: Pick<SupportMessage, "id" | "sender_type" | "sender_name" | "body">) => {
+      if (message.sender_type !== "visitor") return;
+      if (notifiedMessageIdsRef.current.has(message.id)) return;
+      notifiedMessageIdsRef.current.add(message.id);
+
+      const senderName = message.sender_name?.trim() || "Visitante";
+      const preview = message.body.replace(/\s+/g, " ").trim().slice(0, 90);
+
+      toast({
+        title: "Nuevo mensaje de chat",
+        description: preview ? `${senderName}: ${preview}` : `${senderName} envio un mensaje`,
+      });
+
+      if (soundEnabled) {
+        playIncomingChatTone();
+      }
+    },
+    [soundEnabled, toast],
+  );
+
+  const checkLatestThreadMessageForNotification = useCallback(
+    async (threadId: string) => {
+      const { data, error } = await (supabase as any)
+        .from("support_messages")
+        .select("id, sender_type, sender_name, body")
+        .eq("thread_id", threadId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !data) return;
+
+      notifyIncomingVisitorMessage(data as Pick<SupportMessage, "id" | "sender_type" | "sender_name" | "body">);
+    },
+    [notifyIncomingVisitorMessage],
   );
 
   const fetchReports = async () => {
@@ -177,6 +220,22 @@ export default function AdminModeracion() {
     }
     setThreads(rows);
 
+    if (hasThreadsBaselineRef.current) {
+      const changedThreadIds = rows
+        .filter((thread) => previousThreadMessageAtRef.current[thread.id] !== thread.last_message_at)
+        .map((thread) => thread.id);
+
+      if (changedThreadIds.length > 0) {
+        void Promise.all(changedThreadIds.slice(0, 20).map((threadId) => checkLatestThreadMessageForNotification(threadId)));
+      }
+    }
+
+    previousThreadMessageAtRef.current = rows.reduce<Record<string, string>>((acc, thread) => {
+      acc[thread.id] = thread.last_message_at;
+      return acc;
+    }, {});
+    hasThreadsBaselineRef.current = true;
+
     if (!selectedThreadId && rows.length > 0) {
       setSelectedThreadId(rows[0].id);
       return;
@@ -185,7 +244,7 @@ export default function AdminModeracion() {
     if (selectedThreadId && !rows.some((thread) => thread.id === selectedThreadId)) {
       setSelectedThreadId(rows[0]?.id ?? null);
     }
-  }, [selectedThreadId, threadScope]);
+  }, [checkLatestThreadMessageForNotification, selectedThreadId, threadScope]);
 
   const fetchMessages = useCallback(async (threadId: string) => {
     setLoadingMessages(true);
@@ -237,6 +296,11 @@ export default function AdminModeracion() {
   }, [fetchThreads]);
 
   useEffect(() => {
+    previousThreadMessageAtRef.current = {};
+    hasThreadsBaselineRef.current = false;
+  }, [threadScope]);
+
+  useEffect(() => {
     if (!user) return;
 
     const channel = supabase
@@ -250,19 +314,14 @@ export default function AdminModeracion() {
         },
         (payload) => {
           const incoming = payload.new as Partial<RealtimeSupportMessageRow>;
-          if (incoming.sender_type !== "visitor" || !incoming.thread_id) return;
+          if (!incoming.id || !incoming.thread_id || !incoming.sender_type || typeof incoming.body !== "string") return;
 
-          const senderName = incoming.sender_name?.trim() || "Visitante";
-          const preview = (incoming.body ?? "").replace(/\s+/g, " ").trim().slice(0, 90);
-
-          toast({
-            title: "Nuevo mensaje de chat",
-            description: preview ? `${senderName}: ${preview}` : `${senderName} envio un mensaje`,
+          notifyIncomingVisitorMessage({
+            id: incoming.id,
+            sender_type: incoming.sender_type,
+            sender_name: incoming.sender_name ?? null,
+            body: incoming.body,
           });
-
-          if (soundEnabled) {
-            playIncomingChatTone();
-          }
 
           void fetchThreads();
 
@@ -271,12 +330,16 @@ export default function AdminModeracion() {
           }
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR") {
+          console.error("[AdminModeracion] Realtime channel error on support_messages");
+        }
+      });
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [fetchMessages, fetchThreads, selectedThreadId, soundEnabled, toast, user]);
+  }, [fetchMessages, fetchThreads, notifyIncomingVisitorMessage, selectedThreadId, user]);
 
   useEffect(() => {
     if (!selectedThreadId) {
