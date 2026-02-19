@@ -85,10 +85,11 @@
   }
 
   html,
-  body {
-    /* Prevent gesture-based zoom on touch devices where supported. */
-    touch-action: manipulation;
-    -ms-touch-action: manipulation;
+  body,
+  #root {
+    /* Keep touch scrolling, but block pinch-zoom gestures on mobile. */
+    touch-action: pan-x pan-y;
+    -ms-touch-action: pan-x pan-y;
   }
 
   body {

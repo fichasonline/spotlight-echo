@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
+  Bell,
+  BellOff,
   EyeOff,
   Lock,
   Mail,
@@ -49,6 +51,13 @@ interface SupportMessage {
   created_at: string;
 }
 
+interface RealtimeSupportMessageRow {
+  thread_id: string;
+  sender_type: "visitor" | "staff";
+  sender_name: string | null;
+  body: string;
+}
+
 function isMissingRpcError(error: { message?: string; code?: string } | null, functionName: string) {
   if (!error) return false;
   const message = (error.message ?? "").toLowerCase();
@@ -57,6 +66,35 @@ function isMissingRpcError(error: { message?: string; code?: string } | null, fu
 
 function formatDateTime(value: string) {
   return format(new Date(value), "d MMM yyyy HH:mm", { locale: es });
+}
+
+function playIncomingChatTone() {
+  if (typeof window === "undefined" || typeof window.AudioContext === "undefined") return;
+
+  try {
+    const context = new window.AudioContext();
+    const oscillator = context.createOscillator();
+    const gainNode = context.createGain();
+
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(880, context.currentTime);
+
+    gainNode.gain.setValueAtTime(0.0001, context.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.08, context.currentTime + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.24);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(context.destination);
+
+    oscillator.start(context.currentTime);
+    oscillator.stop(context.currentTime + 0.24);
+
+    oscillator.onended = () => {
+      void context.close();
+    };
+  } catch {
+    // Ignora bloqueos de autoplay o errores de audio del navegador.
+  }
 }
 
 export default function AdminModeracion() {
@@ -73,6 +111,7 @@ export default function AdminModeracion() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [threadScope, setThreadScope] = useState<"open" | "all">("open");
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -196,6 +235,48 @@ export default function AdminModeracion() {
       window.clearInterval(intervalId);
     };
   }, [fetchThreads]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`support-messages-staff-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "support_messages",
+        },
+        (payload) => {
+          const incoming = payload.new as Partial<RealtimeSupportMessageRow>;
+          if (incoming.sender_type !== "visitor" || !incoming.thread_id) return;
+
+          const senderName = incoming.sender_name?.trim() || "Visitante";
+          const preview = (incoming.body ?? "").replace(/\s+/g, " ").trim().slice(0, 90);
+
+          toast({
+            title: "Nuevo mensaje de chat",
+            description: preview ? `${senderName}: ${preview}` : `${senderName} envio un mensaje`,
+          });
+
+          if (soundEnabled) {
+            playIncomingChatTone();
+          }
+
+          void fetchThreads();
+
+          if (selectedThreadId === incoming.thread_id) {
+            void fetchMessages(incoming.thread_id);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [fetchMessages, fetchThreads, selectedThreadId, soundEnabled, toast, user]);
 
   useEffect(() => {
     if (!selectedThreadId) {
@@ -322,7 +403,7 @@ export default function AdminModeracion() {
               <div className="border-b border-border px-4 py-3">
                 <h2 className="font-display text-lg font-semibold">Chats</h2>
                 <p className="text-xs text-muted-foreground">Conversaciones con visitantes</p>
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     size="sm"
                     variant={threadScope === "open" ? "default" : "outline"}
@@ -338,6 +419,16 @@ export default function AdminModeracion() {
                     className="h-7 px-2 text-xs"
                   >
                     Todos
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={soundEnabled ? "secondary" : "outline"}
+                    onClick={() => setSoundEnabled((current) => !current)}
+                    className="h-7 px-2 text-xs"
+                    title={soundEnabled ? "Desactivar sonido de aviso" : "Activar sonido de aviso"}
+                  >
+                    {soundEnabled ? <Bell className="mr-1 h-3.5 w-3.5" /> : <BellOff className="mr-1 h-3.5 w-3.5" />}
+                    {soundEnabled ? "Sonido on" : "Sonido off"}
                   </Button>
                 </div>
               </div>
