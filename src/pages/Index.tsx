@@ -70,7 +70,7 @@ export default function HomePage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
-  const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL?.trim() || "https://instagram.com";
+  const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL?.trim() || "https://instagram.com/fichasonlineuy";
   const telegramUrl = import.meta.env.VITE_TELEGRAM_URL?.trim() || "https://t.me";
   const whatsappUrl = import.meta.env.VITE_WHATSAPP_URL?.trim() || "https://wa.me";
   const socialLinks = [

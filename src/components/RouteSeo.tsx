@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 
 const SITE_NAME = "Fichas Online";
 const DEFAULT_DESCRIPTION = "Noticias, calendario y comunidad de Fichas Online.";
-const SHARE_IMAGE_PATH = "/social-share.png";
+const SHARE_IMAGE_PATH = "/og-cover-1200x630.png?v=2";
 const SHARE_IMAGE_ALT = "Fichas Online";
 const SHARE_IMAGE_TYPE = "image/png";
 const SHARE_IMAGE_WIDTH = "1200";
