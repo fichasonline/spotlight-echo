@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { motion } from "framer-motion";
-import { Calendar, Newspaper, MessageSquare, ArrowRight } from "lucide-react";
+import { Calendar, Newspaper, MessageSquare, ArrowRight, Instagram, Send } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getLocalDateISO, parseDateValue } from "@/lib/date";
@@ -70,6 +70,29 @@ export default function HomePage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
+  const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL?.trim() || "https://instagram.com";
+  const telegramUrl = import.meta.env.VITE_TELEGRAM_URL?.trim() || "https://t.me";
+  const whatsappUrl = import.meta.env.VITE_WHATSAPP_URL?.trim() || "https://wa.me";
+  const socialLinks = [
+    {
+      label: "Instagram",
+      href: instagramUrl,
+      description: "Fotos, clips y anuncios",
+      icon: Instagram,
+    },
+    {
+      label: "Telegram",
+      href: telegramUrl,
+      description: "Canal de novedades",
+      icon: Send,
+    },
+    {
+      label: "WhatsApp",
+      href: whatsappUrl,
+      description: "Contacto directo",
+      icon: MessageSquare,
+    },
+  ];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -222,7 +245,43 @@ export default function HomePage() {
           </div>
         </section>
 
-   
+        <section>
+          <div className="mb-6">
+            <h2 className="text-2xl font-display font-bold">Seguinos en redes</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Enterate de novedades y eventos en Instagram, Telegram y WhatsApp.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {socialLinks.map((social, i) => {
+              const Icon = social.icon;
+              return (
+                <motion.a
+                  key={social.label}
+                  href={social.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Abrir ${social.label}`}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.06 }}
+                  className="group flex items-center justify-between rounded-xl border border-border bg-card px-4 py-4 transition-colors hover:border-primary/45"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <div>
+                      <p className="font-semibold text-foreground">{social.label}</p>
+                      <p className="text-xs text-muted-foreground">{social.description}</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+                </motion.a>
+              );
+            })}
+          </div>
+        </section>
       </div>
     </div>
   );
