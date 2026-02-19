@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Calendar, Newspaper, MessageSquare, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { getLocalDateISO, parseDateValue } from "@/lib/date";
 
 interface Article {
   id: string;
@@ -31,6 +32,40 @@ interface Post {
   profiles: { display_name: string | null; avatar_url: string | null } | null;
 }
 
+interface PostRow {
+  id: string;
+  content: string;
+  created_at: string;
+  author_id: string;
+}
+
+async function attachPostProfiles(rows: PostRow[]): Promise<Post[]> {
+  const authorIds = Array.from(new Set(rows.map((post) => post.author_id)));
+  if (authorIds.length === 0) {
+    return rows.map(({ author_id: _authorId, ...rest }) => ({ ...rest, profiles: null }));
+  }
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, display_name, avatar_url")
+    .in("id", authorIds);
+
+  const profileMap = new Map((data ?? []).map((profile) => [profile.id, profile]));
+
+  return rows.map(({ author_id, ...rest }) => {
+    const profile = profileMap.get(author_id);
+    return {
+      ...rest,
+      profiles: profile
+        ? {
+            display_name: profile.display_name,
+            avatar_url: profile.avatar_url,
+          }
+        : null,
+    };
+  });
+}
+
 export default function HomePage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -48,20 +83,23 @@ export default function HomePage() {
         supabase
           .from("events")
           .select("id, name, start_date, city, country, venue")
-          .gte("start_date", new Date().toISOString().split("T")[0])
+          .gte("start_date", getLocalDateISO())
           .order("start_date")
           .limit(5),
         supabase
           .from("posts")
-          .select("id, content, created_at, profiles(display_name, avatar_url)")
+          .select("id, content, created_at, author_id")
           .eq("is_hidden", false)
           .eq("is_deleted", false)
           .order("created_at", { ascending: false })
           .limit(5),
       ]);
+      if (artRes.error) console.error("[Index] articles load error:", artRes.error);
+      if (evtRes.error) console.error("[Index] events load error:", evtRes.error);
+      if (postRes.error) console.error("[Index] posts load error:", postRes.error);
       if (artRes.data) setArticles(artRes.data);
       if (evtRes.data) setEvents(evtRes.data);
-      if (postRes.data) setPosts(postRes.data as any);
+      if (postRes.data) setPosts(await attachPostProfiles(postRes.data as PostRow[]));
     };
     fetchData();
   }, []);
@@ -72,20 +110,25 @@ export default function HomePage() {
 
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent" />
-        <div className="container mx-auto px-4 py-16 md:py-24 relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/15 via-transparent to-transparent" />
+        <div className="absolute -top-24 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-primary/30 blur-[120px]" />
+        <div className="container mx-auto px-4 py-16 md:py-24 relative ">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             className="text-center max-w-3xl mx-auto"
           >
-            <h1 className="text-4xl md:text-6xl font-display font-bold mb-4">
-              Tu portal de <span className="text-gradient-primary">noticias</span> y{" "}
-              <span className="text-gradient-accent">eventos</span>
+            <img
+              src="/logo_fichas.png"
+              alt="Fichas Online"
+              className="mx-auto mb-6 h-14 w-auto object-contain  drop-shadow-[0_0_24px_hsl(273_66%_66%_/_0.35)] md:h-16"
+            />
+            <h1 className="text-4xl md:text-6xl font-display font-bold mb-4 ">
+              Noticias, <span className="text-gradient-primary">eventos</span> y comunidad en un solo lugar
             </h1>
             <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-              Mantente al día con las últimas novedades, calendario de eventos y la comunidad.
+              Todo el ecosistema de Fichas Online en un solo lugar
             </p>
           </motion.div>
         </div>
@@ -122,7 +165,7 @@ export default function HomePage() {
                   )}
                   {a.published_at && (
                     <span className="text-xs text-muted-foreground">
-                      {format(new Date(a.published_at), "d MMM yyyy", { locale: es })}
+                      {format(parseDateValue(a.published_at), "d MMM yyyy", { locale: es })}
                     </span>
                   )}
                 </Link>
@@ -158,10 +201,10 @@ export default function HomePage() {
                 >
                   <div className="flex-shrink-0 w-14 h-14 bg-accent/10 rounded-lg flex flex-col items-center justify-center">
                     <span className="text-xs text-accent font-semibold uppercase">
-                      {format(new Date(e.start_date), "MMM", { locale: es })}
+                      {format(parseDateValue(e.start_date), "MMM", { locale: es })}
                     </span>
                     <span className="text-lg font-bold text-accent">
-                      {format(new Date(e.start_date), "d")}
+                      {format(parseDateValue(e.start_date), "d")}
                     </span>
                   </div>
                   <div>
@@ -179,36 +222,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Recent posts */}
-        <section>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-display font-bold flex items-center gap-2">
-              <MessageSquare className="h-6 w-6 text-primary" /> Comunidad
-            </h2>
-            <Link to="/feed" className="text-sm text-primary hover:underline flex items-center gap-1">
-              Ir al feed <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {posts.map((p) => (
-              <div key={p.id} className="bg-card border border-border rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="h-7 w-7 rounded-full bg-secondary flex items-center justify-center text-xs font-semibold text-secondary-foreground">
-                    {(p.profiles?.display_name ?? "U")[0].toUpperCase()}
-                  </div>
-                  <span className="text-sm font-medium text-foreground">{p.profiles?.display_name ?? "Usuario"}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {format(new Date(p.created_at), "d MMM HH:mm", { locale: es })}
-                  </span>
-                </div>
-                <p className="text-sm text-foreground/90 line-clamp-3">{p.content}</p>
-              </div>
-            ))}
-            {posts.length === 0 && (
-              <p className="text-muted-foreground text-center py-8">No hay publicaciones aún.</p>
-            )}
-          </div>
-        </section>
+   
       </div>
     </div>
   );

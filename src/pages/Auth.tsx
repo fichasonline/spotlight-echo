@@ -38,6 +38,11 @@ export default function AuthPage() {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="max-w-md w-full text-center space-y-4">
+          <img
+            src="/logo_fichas.png"
+            alt="Fichas Online"
+            className="mx-auto h-10 w-auto object-contain drop-shadow-[0_0_14px_hsl(273_66%_66%_/_0.3)]"
+          />
           <Mail className="mx-auto h-12 w-12 text-primary" />
           <h1 className="text-2xl font-display font-bold">Revisa tu email</h1>
           <p className="text-muted-foreground">
@@ -52,7 +57,11 @@ export default function AuthPage() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-display font-bold text-gradient-primary">ARENA</h1>
+          <img
+            src="/logo_fichas.png"
+            alt="Fichas Online"
+            className="mx-auto h-12 w-auto object-contain drop-shadow-[0_0_20px_hsl(273_66%_66%_/_0.32)]"
+          />
           <p className="text-muted-foreground mt-2">Iniciá sesión para continuar</p>
         </div>
 

@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MapPin, Calendar as CalIcon } from "lucide-react";
+import { parseDateValue } from "@/lib/date";
 
 interface Event {
   id: string;
@@ -101,10 +102,10 @@ export default function CalendarioPage() {
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-12 h-12 bg-accent/10 rounded-lg flex flex-col items-center justify-center">
                   <span className="text-[10px] text-accent font-semibold uppercase">
-                    {format(new Date(e.start_date), "MMM", { locale: es })}
+                    {format(parseDateValue(e.start_date), "MMM", { locale: es })}
                   </span>
                   <span className="text-base font-bold text-accent">
-                    {format(new Date(e.start_date), "d")}
+                    {format(parseDateValue(e.start_date), "d")}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -118,7 +119,7 @@ export default function CalendarioPage() {
                   {e.end_date && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                       <CalIcon className="h-3 w-3" />
-                      Hasta {format(new Date(e.end_date), "d MMM", { locale: es })}
+                      Hasta {format(parseDateValue(e.end_date), "d MMM", { locale: es })}
                     </div>
                   )}
                 </div>

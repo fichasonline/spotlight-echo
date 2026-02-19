@@ -5,6 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
+import { parseDateValue } from "@/lib/date";
 
 interface Article {
   id: string;
@@ -58,7 +59,7 @@ export default function NoticiasPage() {
               </h3>
               {a.summary && <p className="text-sm text-muted-foreground line-clamp-3 mb-3">{a.summary}</p>}
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                {a.published_at && <span>{format(new Date(a.published_at), "d MMM yyyy", { locale: es })}</span>}
+                {a.published_at && <span>{format(parseDateValue(a.published_at), "d MMM yyyy", { locale: es })}</span>}
                 {a.source_name && <span>· {a.source_name}</span>}
               </div>
             </Link>

@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
+import ReactMarkdown from "react-markdown";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { MapPin, Calendar, ExternalLink, ArrowLeft } from "lucide-react";
+import { parseDateValue } from "@/lib/date";
 
 interface Event {
   id: string;
@@ -15,36 +17,22 @@ interface Event {
   country: string | null;
   venue: string | null;
   description: string | null;
-  links: any;
-}
-
-interface Post {
-  id: string;
-  content: string;
-  created_at: string;
-  profiles: { display_name: string | null } | null;
+  details: string | null;
+  hero_image_url: string | null;
+  links: unknown;
+  gallery: unknown;
 }
 
 export default function EventoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [event, setEvent] = useState<Event | null>(null);
-  const [posts, setPosts] = useState<Post[]>([]);
 
   useEffect(() => {
     if (!id) return;
-    supabase.from("events").select("*").eq("id", id).single().then(({ data }) => {
+    supabase.from("events").select("*").eq("id", id).single().then(({ data, error }) => {
+      if (error) console.error("[EventoDetail] event load error:", error);
       if (data) setEvent(data);
     });
-    supabase
-      .from("posts")
-      .select("id, content, created_at, profiles(display_name)")
-      .eq("event_id", id)
-      .eq("is_hidden", false)
-      .eq("is_deleted", false)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => {
-        if (data) setPosts(data as any);
-      });
   }, [id]);
 
   if (!event) {
@@ -56,7 +44,36 @@ export default function EventoDetailPage() {
     );
   }
 
-  const links = Array.isArray(event.links) ? event.links : [];
+  const links = Array.isArray(event.links)
+    ? event.links
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          const maybeLink = item as { label?: unknown; url?: unknown };
+          const url = typeof maybeLink.url === "string" ? maybeLink.url.trim() : "";
+          if (!url) return null;
+          const label = typeof maybeLink.label === "string" ? maybeLink.label.trim() : "";
+          return { label, url };
+        })
+        .filter((item): item is { label: string; url: string } => item !== null)
+    : [];
+
+  const gallery = Array.isArray(event.gallery)
+    ? event.gallery
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
+
+  const markdownClassName = `
+    prose prose-invert prose-base max-w-none
+    prose-headings:font-display prose-headings:tracking-tight
+    prose-p:leading-7 prose-p:text-foreground/90
+    prose-li:leading-7
+    prose-a:text-primary hover:prose-a:text-accent
+    prose-strong:text-foreground
+    prose-blockquote:border-primary/40 prose-blockquote:text-foreground/80
+    prose-hr:border-border
+  `;
 
   return (
     <div className="min-h-screen bg-background">
@@ -71,8 +88,8 @@ export default function EventoDetailPage() {
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-6">
           <span className="flex items-center gap-1">
             <Calendar className="h-4 w-4 text-accent" />
-            {format(new Date(event.start_date), "d MMMM yyyy", { locale: es })}
-            {event.end_date && ` — ${format(new Date(event.end_date), "d MMMM yyyy", { locale: es })}`}
+            {format(parseDateValue(event.start_date), "d MMMM yyyy", { locale: es })}
+            {event.end_date && ` — ${format(parseDateValue(event.end_date), "d MMMM yyyy", { locale: es })}`}
           </span>
           {(event.venue || event.city) && (
             <span className="flex items-center gap-1">
@@ -82,45 +99,74 @@ export default function EventoDetailPage() {
           )}
         </div>
 
+        {event.hero_image_url && (
+          <div className="mb-6 overflow-hidden rounded-xl border border-border">
+            <img
+              src={event.hero_image_url}
+              alt={event.name}
+              className="block w-full h-auto"
+              loading="lazy"
+            />
+          </div>
+        )}
+
         {event.description && (
-          <p className="text-foreground/90 mb-6 whitespace-pre-wrap">{event.description}</p>
+          <div className={`mb-4 ${markdownClassName}`}>
+            <ReactMarkdown>{event.description}</ReactMarkdown>
+          </div>
+        )}
+
+        {event.details && (
+          <div className="mb-6">
+            <h2 className="text-xl font-display font-bold mb-2">Información del evento</h2>
+            <div className={markdownClassName}>
+              <ReactMarkdown>{event.details}</ReactMarkdown>
+            </div>
+          </div>
         )}
 
         {links.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-8">
-            {links.map((link: any, i: number) => (
-              <a
-                key={i}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-              >
-                <ExternalLink className="h-3 w-3" />
-                {link.label || link.url}
-              </a>
-            ))}
+          <div className="mb-6">
+            <h2 className="text-xl font-display font-bold mb-3">Links útiles</h2>
+            <div className="flex flex-wrap gap-2">
+              {links.map((link, i) => (
+                <a
+                  key={`${link.url}-${i}`}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  {link.label || link.url}
+                </a>
+              ))}
+            </div>
           </div>
         )}
 
-        <h2 className="text-xl font-display font-bold mb-4">Posts del evento</h2>
-        {posts.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No hay posts para este evento.</p>
-        ) : (
-          <div className="space-y-3">
-            {posts.map((p) => (
-              <div key={p.id} className="bg-card border border-border rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm font-medium text-foreground">{p.profiles?.display_name ?? "Usuario"}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {format(new Date(p.created_at), "d MMM HH:mm", { locale: es })}
-                  </span>
+        {gallery.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-display font-bold mb-3">Galería</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {gallery.map((imageUrl, i) => (
+                <div key={`${imageUrl}-${i}`} className="overflow-hidden rounded-lg border border-border bg-card">
+                  <img
+                    src={imageUrl}
+                    alt={`${event.name} - imagen ${i + 1}`}
+                    className="w-full h-52 object-cover"
+                    loading="lazy"
+                  />
                 </div>
-                <p className="text-sm text-foreground/90">{p.content}</p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
+
+        {!event.description && !event.details && !event.hero_image_url && links.length === 0 && gallery.length === 0 && (
+          <p className="text-muted-foreground text-sm">Este evento todavía no tiene contenido adicional publicado.</p>
+        )}
+
       </div>
     </div>
   );

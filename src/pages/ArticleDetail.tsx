@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ArrowLeft, ExternalLink } from "lucide-react";
+import { parseDateValue } from "@/lib/date";
 
 interface Article {
   headline: string;
@@ -48,7 +49,7 @@ export default function ArticleDetailPage() {
 
         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-8">
           {article.published_at && (
-            <span>{format(new Date(article.published_at), "d MMMM yyyy", { locale: es })}</span>
+            <span>{format(parseDateValue(article.published_at), "d MMMM yyyy", { locale: es })}</span>
           )}
           {article.source_name && (
             <span className="flex items-center gap-1">
@@ -66,7 +67,18 @@ export default function ArticleDetailPage() {
         )}
 
         {article.body_markdown && (
-          <div className="prose prose-invert prose-sm max-w-none [&_h1]:font-display [&_h2]:font-display [&_h3]:font-display [&_a]:text-primary">
+          <div
+            className="
+              prose prose-invert prose-base max-w-none
+              prose-headings:font-display prose-headings:tracking-tight
+              prose-p:leading-7 prose-p:text-foreground/90
+              prose-li:leading-7
+              prose-a:text-primary hover:prose-a:text-accent
+              prose-strong:text-foreground
+              prose-blockquote:border-primary/40 prose-blockquote:text-foreground/80
+              prose-hr:border-border
+            "
+          >
             <ReactMarkdown>{article.body_markdown}</ReactMarkdown>
           </div>
         )}

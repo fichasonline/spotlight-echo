@@ -5,7 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AgeGate } from "@/components/AgeGate";
-import { ProtectedRoute, AdminRoute } from "@/components/ProtectedRoute";
+import { ProtectedRoute, AdminRoute, StaffRoute } from "@/components/ProtectedRoute";
+import { RouteSeo } from "@/components/RouteSeo";
+import { SupportChatWidget } from "@/components/SupportChatWidget";
 
 import Index from "./pages/Index";
 import AuthPage from "./pages/Auth";
@@ -30,6 +32,7 @@ const App = () => (
       <AgeGate>
         <BrowserRouter>
           <AuthProvider>
+            <RouteSeo />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<AuthPage />} />
@@ -41,9 +44,10 @@ const App = () => (
               <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
               <Route path="/admin/eventos" element={<AdminRoute><AdminEventos /></AdminRoute>} />
               <Route path="/admin/noticias" element={<AdminRoute><AdminNoticias /></AdminRoute>} />
-              <Route path="/admin/moderacion" element={<AdminRoute><AdminModeracion /></AdminRoute>} />
+              <Route path="/admin/moderacion" element={<StaffRoute><AdminModeracion /></StaffRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
+            <SupportChatWidget />
           </AuthProvider>
         </BrowserRouter>
       </AgeGate>

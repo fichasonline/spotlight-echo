@@ -10,19 +10,22 @@ import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Check, X } from "lucide-react";
+import { Plus, Check, X, Pencil } from "lucide-react";
 
 interface Article {
   id: string;
   slug: string;
   headline: string;
   summary: string | null;
+  body_markdown: string | null;
   status: string;
   created_at: string;
   source_name: string | null;
+  source_url: string | null;
 }
 
 const emptyForm = { slug: "", headline: "", summary: "", body_markdown: "", source_name: "", source_url: "" };
+const emptyDraftForm = { ...emptyForm, raw_content: "" };
 
 export default function AdminNoticias() {
   const { user } = useAuth();
@@ -30,48 +33,89 @@ export default function AdminNoticias() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [tab, setTab] = useState("needs_review");
   const [form, setForm] = useState(emptyForm);
+  const [editId, setEditId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [draftOpen, setDraftOpen] = useState(false);
-  const [draftForm, setDraftForm] = useState(emptyForm);
+  const [draftForm, setDraftForm] = useState(emptyDraftForm);
 
   const fetchArticles = async () => {
-    const { data } = await supabase.from("articles").select("id, slug, headline, summary, status, created_at, source_name").order("created_at", { ascending: false });
+    const { data } = await supabase
+      .from("articles")
+      .select("id, slug, headline, summary, body_markdown, status, created_at, source_name, source_url")
+      .order("created_at", { ascending: false });
     if (data) setArticles(data);
   };
 
   useEffect(() => { fetchArticles(); }, []);
 
   const filtered = articles.filter((a) => a.status === tab);
+  const buildSlug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
-  const handleCreate = async () => {
-    const slug = form.slug || form.headline.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    const { error } = await supabase.from("articles").insert({
-      ...form,
+  const handleSaveArticle = async () => {
+    if (!form.headline.trim()) {
+      toast({ title: "Falta el titular", description: "Debes completar el titular.", variant: "destructive" });
+      return;
+    }
+
+    const slug = form.slug || buildSlug(form.headline);
+    const payload = {
       slug,
       summary: form.summary || null,
       body_markdown: form.body_markdown || null,
       source_name: form.source_name || null,
       source_url: form.source_url || null,
-      created_by: user?.id,
-    });
+      headline: form.headline,
+    };
+
+    const { error } = editId
+      ? await supabase.from("articles").update(payload).eq("id", editId)
+      : await supabase.from("articles").insert({ ...payload, created_by: user?.id });
+
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else { setOpen(false); setForm(emptyForm); fetchArticles(); }
+    else {
+      setOpen(false);
+      setForm(emptyForm);
+      setEditId(null);
+      fetchArticles();
+    }
   };
 
   const handleDraftSave = async () => {
-    const slug = draftForm.slug || draftForm.headline.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    if (!draftForm.headline.trim()) {
+      toast({ title: "Falta el titular", description: "Debes completar el titular.", variant: "destructive" });
+      return;
+    }
+
+    const slug = draftForm.slug || buildSlug(draftForm.headline);
     const { error } = await supabase.from("articles").insert({
-      ...draftForm,
+      headline: draftForm.headline,
       slug,
       status: "needs_review",
       summary: draftForm.summary || null,
-      body_markdown: draftForm.body_markdown || null,
+      body_markdown: draftForm.body_markdown || draftForm.raw_content || null,
       source_name: draftForm.source_name || null,
       source_url: draftForm.source_url || null,
       created_by: user?.id,
     });
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else { setDraftOpen(false); setDraftForm(emptyForm); fetchArticles(); }
+    else {
+      setDraftOpen(false);
+      setDraftForm(emptyDraftForm);
+      fetchArticles();
+    }
+  };
+
+  const handleEdit = (article: Article) => {
+    setForm({
+      slug: article.slug,
+      headline: article.headline,
+      summary: article.summary ?? "",
+      body_markdown: article.body_markdown ?? "",
+      source_name: article.source_name ?? "",
+      source_url: article.source_url ?? "",
+    });
+    setEditId(article.id);
+    setOpen(true);
   };
 
   const handleApprove = async (id: string) => {
@@ -97,7 +141,10 @@ export default function AdminNoticias() {
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <h1 className="text-3xl font-display font-bold">Gestión de noticias</h1>
           <div className="flex gap-2">
-            <Dialog open={draftOpen} onOpenChange={setDraftOpen}>
+            <Dialog open={draftOpen} onOpenChange={(next) => {
+              setDraftOpen(next);
+              if (!next) setDraftForm(emptyDraftForm);
+            }}>
               <DialogTrigger asChild>
                 <Button variant="outline">Importar borrador IA</Button>
               </DialogTrigger>
@@ -105,24 +152,29 @@ export default function AdminNoticias() {
                 <DialogHeader><DialogTitle>Importar borrador IA</DialogTitle></DialogHeader>
                 <div className="space-y-3">
                   <div><Label>Titular</Label><Input value={draftForm.headline} onChange={(e) => setDraftForm({ ...draftForm, headline: e.target.value })} /></div>
+                  <div><Label>URL fuente original (opcional)</Label><Input value={draftForm.source_url} onChange={(e) => setDraftForm({ ...draftForm, source_url: e.target.value })} placeholder="https://..." /></div>
                   <div><Label>Slug (opcional)</Label><Input value={draftForm.slug} onChange={(e) => setDraftForm({ ...draftForm, slug: e.target.value })} placeholder="auto-generado" /></div>
+                  <div><Label>Contenido crudo (opcional)</Label><Textarea value={draftForm.raw_content} onChange={(e) => setDraftForm({ ...draftForm, raw_content: e.target.value })} rows={4} /></div>
                   <div><Label>Resumen</Label><Textarea value={draftForm.summary} onChange={(e) => setDraftForm({ ...draftForm, summary: e.target.value })} rows={2} /></div>
                   <div><Label>Cuerpo (Markdown)</Label><Textarea value={draftForm.body_markdown} onChange={(e) => setDraftForm({ ...draftForm, body_markdown: e.target.value })} rows={6} /></div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div><Label>Fuente</Label><Input value={draftForm.source_name} onChange={(e) => setDraftForm({ ...draftForm, source_name: e.target.value })} /></div>
-                    <div><Label>URL fuente</Label><Input value={draftForm.source_url} onChange={(e) => setDraftForm({ ...draftForm, source_url: e.target.value })} /></div>
-                  </div>
+                  <div><Label>Nombre de fuente</Label><Input value={draftForm.source_name} onChange={(e) => setDraftForm({ ...draftForm, source_name: e.target.value })} /></div>
                   <Button onClick={handleDraftSave} className="w-full">Guardar borrador</Button>
                 </div>
               </DialogContent>
             </Dialog>
 
-            <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(emptyForm); }}>
+            <Dialog open={open} onOpenChange={(o) => {
+              setOpen(o);
+              if (!o) {
+                setForm(emptyForm);
+                setEditId(null);
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button><Plus className="h-4 w-4 mr-1" /> Nuevo artículo</Button>
               </DialogTrigger>
               <DialogContent className="max-w-lg">
-                <DialogHeader><DialogTitle>Nuevo artículo</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>{editId ? "Editar artículo" : "Nuevo artículo"}</DialogTitle></DialogHeader>
                 <div className="space-y-3">
                   <div><Label>Titular</Label><Input value={form.headline} onChange={(e) => setForm({ ...form, headline: e.target.value })} /></div>
                   <div><Label>Slug (opcional)</Label><Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="auto-generado" /></div>
@@ -132,7 +184,7 @@ export default function AdminNoticias() {
                     <div><Label>Fuente</Label><Input value={form.source_name} onChange={(e) => setForm({ ...form, source_name: e.target.value })} /></div>
                     <div><Label>URL fuente</Label><Input value={form.source_url} onChange={(e) => setForm({ ...form, source_url: e.target.value })} /></div>
                   </div>
-                  <Button onClick={handleCreate} className="w-full">Crear artículo</Button>
+                  <Button onClick={handleSaveArticle} className="w-full">{editId ? "Guardar cambios" : "Crear artículo"}</Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -157,16 +209,21 @@ export default function AdminNoticias() {
                       {a.source_name && <span className="text-xs text-muted-foreground">{a.source_name}</span>}
                     </div>
                   </div>
-                  {a.status === "needs_review" && (
-                    <div className="flex gap-2 ml-3">
+                  <div className="flex gap-2 ml-3">
+                    <Button size="sm" variant="ghost" onClick={() => handleEdit(a)} title="Editar">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    {a.status === "needs_review" && (
                       <Button size="sm" variant="ghost" onClick={() => handleApprove(a.id)} title="Aprobar">
                         <Check className="h-4 w-4 text-primary" />
                       </Button>
+                    )}
+                    {a.status === "needs_review" && (
                       <Button size="sm" variant="ghost" onClick={() => handleReject(a.id)} title="Rechazar">
                         <X className="h-4 w-4 text-destructive" />
                       </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               ))}
               {filtered.length === 0 && <p className="text-muted-foreground text-center py-8">No hay artículos en esta categoría.</p>}

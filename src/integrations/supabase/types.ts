@@ -113,7 +113,10 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          details: string | null
           end_date: string | null
+          gallery: Json | null
+          hero_image_url: string | null
           id: string
           links: Json | null
           name: string
@@ -126,7 +129,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          details?: string | null
           end_date?: string | null
+          gallery?: Json | null
+          hero_image_url?: string | null
           id?: string
           links?: Json | null
           name: string
@@ -139,7 +145,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          details?: string | null
           end_date?: string | null
+          gallery?: Json | null
+          hero_image_url?: string | null
           id?: string
           links?: Json | null
           name?: string
