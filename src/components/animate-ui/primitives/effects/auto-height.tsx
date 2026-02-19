@@ -47,7 +47,14 @@ function AutoHeight({
       transition={transition}
       {...props}
     >
-      <div ref={ref}>{children}</div>
+      <div
+        ref={ref}
+        // Creates a new block formatting context so child margins don't collapse out
+        // of this box and get clipped by the animated overflow container.
+        style={{ display: 'flow-root' }}
+      >
+        {children}
+      </div>
     </Comp>
   );
 }

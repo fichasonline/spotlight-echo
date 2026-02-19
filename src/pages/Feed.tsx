@@ -1005,7 +1005,7 @@ export default function FeedPage() {
                                         }))
                                       }
                                       onKeyDown={(e) => e.key === "Enter" && void handleComment(post.id)}
-                                      className="h-9 rounded-full bg-muted/40"
+                                      className="h-9 rounded-full bg-muted/40 focus-visible:border-primary/70 focus-visible:ring-0 focus-visible:ring-offset-0"
                                     />
                                     <Button
                                       size="sm"
