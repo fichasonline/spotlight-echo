@@ -3,6 +3,11 @@ import { useLocation } from "react-router-dom";
 
 const SITE_NAME = "Fichas Online";
 const DEFAULT_DESCRIPTION = "Noticias, calendario y comunidad de Fichas Online.";
+const SHARE_IMAGE_PATH = "/social-share.png";
+const SHARE_IMAGE_ALT = "Fichas Online";
+const SHARE_IMAGE_TYPE = "image/png";
+const SHARE_IMAGE_WIDTH = "1200";
+const SHARE_IMAGE_HEIGHT = "630";
 const NOINDEX = "noindex, nofollow";
 const INDEX = "index, follow";
 
@@ -140,7 +145,7 @@ export function RouteSeo() {
   useEffect(() => {
     const siteUrl = window.location.origin;
     const canonicalUrl = new URL(pathname || "/", siteUrl).toString();
-    const imageUrl = `${siteUrl}/logo_fichas.png`;
+    const imageUrl = new URL(SHARE_IMAGE_PATH, siteUrl).toString();
     const seo = getSeoConfig(pathname);
 
     document.documentElement.setAttribute("lang", "es");
@@ -151,11 +156,16 @@ export function RouteSeo() {
     upsertMetaByName("twitter:title", seo.title);
     upsertMetaByName("twitter:description", seo.description);
     upsertMetaByName("twitter:image", imageUrl);
+    upsertMetaByName("twitter:image:alt", SHARE_IMAGE_ALT);
 
     upsertMetaByProperty("og:title", seo.title);
     upsertMetaByProperty("og:description", seo.description);
     upsertMetaByProperty("og:url", canonicalUrl);
     upsertMetaByProperty("og:image", imageUrl);
+    upsertMetaByProperty("og:image:alt", SHARE_IMAGE_ALT);
+    upsertMetaByProperty("og:image:type", SHARE_IMAGE_TYPE);
+    upsertMetaByProperty("og:image:width", SHARE_IMAGE_WIDTH);
+    upsertMetaByProperty("og:image:height", SHARE_IMAGE_HEIGHT);
 
     upsertCanonical(canonicalUrl);
     upsertWebSiteSchema(siteUrl);
