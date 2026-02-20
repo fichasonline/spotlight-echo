@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Suspense, lazy } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AgeGate } from "@/components/AgeGate";
 import { ProtectedRoute, AdminRoute, StaffRoute } from "@/components/ProtectedRoute";
@@ -10,18 +11,18 @@ import { RouteSeo } from "@/components/RouteSeo";
 import { SupportChatWidget } from "@/components/SupportChatWidget";
 import { BottomInstagramBanner } from "@/components/BottomInstagramBanner";
 
-import Index from "./pages/Index";
-import AuthPage from "./pages/Auth";
-import CalendarioPage from "./pages/Calendario";
-import EventoDetailPage from "./pages/EventoDetail";
-import NoticiasPage from "./pages/Noticias";
-import ArticleDetailPage from "./pages/ArticleDetail";
-import FeedPage from "./pages/Feed";
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import AdminEventos from "./pages/admin/AdminEventos";
-import AdminNoticias from "./pages/admin/AdminNoticias";
-import AdminModeracion from "./pages/admin/AdminModeracion";
-import NotFound from "./pages/NotFound";
+const Index = lazy(() => import("./pages/Index"));
+const AuthPage = lazy(() => import("./pages/Auth"));
+const CalendarioPage = lazy(() => import("./pages/Calendario"));
+const EventoDetailPage = lazy(() => import("./pages/EventoDetail"));
+const NoticiasPage = lazy(() => import("./pages/Noticias"));
+const ArticleDetailPage = lazy(() => import("./pages/ArticleDetail"));
+const FeedPage = lazy(() => import("./pages/Feed"));
+const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminEventos = lazy(() => import("./pages/admin/AdminEventos"));
+const AdminNoticias = lazy(() => import("./pages/admin/AdminNoticias"));
+const AdminModeracion = lazy(() => import("./pages/admin/AdminModeracion"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
 
@@ -35,20 +36,57 @@ const App = () => (
           <AuthProvider>
             <RouteSeo />
             <div className="pb-24 md:pb-20">
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<AuthPage />} />
-                <Route path="/calendario" element={<CalendarioPage />} />
-                <Route path="/eventos/:id" element={<EventoDetailPage />} />
-                <Route path="/noticias" element={<NoticiasPage />} />
-                <Route path="/noticias/:slug" element={<ArticleDetailPage />} />
-                <Route path="/feed" element={<ProtectedRoute><FeedPage /></ProtectedRoute>} />
-                <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-                <Route path="/admin/eventos" element={<AdminRoute><AdminEventos /></AdminRoute>} />
-                <Route path="/admin/noticias" element={<AdminRoute><AdminNoticias /></AdminRoute>} />
-                <Route path="/admin/moderacion" element={<StaffRoute><AdminModeracion /></StaffRoute>} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+              <Suspense fallback={<div className="min-h-[40vh]" aria-hidden />}>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<AuthPage />} />
+                  <Route path="/calendario" element={<CalendarioPage />} />
+                  <Route path="/eventos/:id" element={<EventoDetailPage />} />
+                  <Route path="/noticias" element={<NoticiasPage />} />
+                  <Route path="/noticias/:slug" element={<ArticleDetailPage />} />
+                  <Route
+                    path="/feed"
+                    element={
+                      <ProtectedRoute>
+                        <FeedPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin"
+                    element={
+                      <AdminRoute>
+                        <AdminDashboard />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/eventos"
+                    element={
+                      <AdminRoute>
+                        <AdminEventos />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/noticias"
+                    element={
+                      <AdminRoute>
+                        <AdminNoticias />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/moderacion"
+                    element={
+                      <StaffRoute>
+                        <AdminModeracion />
+                      </StaffRoute>
+                    }
+                  />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
             </div>
             <BottomInstagramBanner />
             <SupportChatWidget />
