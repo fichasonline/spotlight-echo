@@ -71,7 +71,7 @@ export default function HomePage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL?.trim() || "https://instagram.com/fichasonlineuy";
-  const telegramUrl = import.meta.env.VITE_TELEGRAM_URL?.trim() || "https://t.me";
+  const telegramUrl = import.meta.env.VITE_TELEGRAM_URL?.trim() || "https://t.me/+59891856965";
   const whatsappUrl = import.meta.env.VITE_WHATSAPP_URL?.trim() || "https://wa.me";
   const socialLinks = [
     {
@@ -89,8 +89,9 @@ export default function HomePage() {
     {
       label: "WhatsApp",
       href: whatsappUrl,
-      description: "Contacto directo",
+      description: "Contacto directo (proximamente)",
       icon: MessageSquare,
+      disabled: true,
     },
   ];
 
@@ -255,20 +256,30 @@ export default function HomePage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {socialLinks.map((social, i) => {
               const Icon = social.icon;
+              const isDisabled = Boolean(social.disabled);
               return (
                 <motion.a
                   key={social.label}
-                  href={social.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`Abrir ${social.label}`}
+                  href={isDisabled ? undefined : social.href}
+                  target={isDisabled ? undefined : "_blank"}
+                  rel={isDisabled ? undefined : "noreferrer"}
+                  aria-label={isDisabled ? `${social.label} deshabilitado` : `Abrir ${social.label}`}
+                  aria-disabled={isDisabled}
+                  tabIndex={isDisabled ? -1 : undefined}
+                  onClick={isDisabled ? (event) => event.preventDefault() : undefined}
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.06 }}
-                  className="group flex items-center justify-between bg-card px-4 py-4 transition-colors"
+                  className={`group flex items-center justify-between bg-card px-4 py-4 transition-colors ${
+                    isDisabled ? "cursor-not-allowed opacity-60" : ""
+                  }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary">
+                    <span
+                      className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                        isDisabled ? "bg-muted text-muted-foreground" : "bg-primary/15 text-primary"
+                      }`}
+                    >
                       <Icon className="h-5 w-5" />
                     </span>
                     <div>
@@ -276,7 +287,11 @@ export default function HomePage() {
                       <p className="text-xs text-muted-foreground">{social.description}</p>
                     </div>
                   </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+                  <ArrowRight
+                    className={`h-4 w-4 text-muted-foreground ${
+                      isDisabled ? "" : "transition-transform group-hover:translate-x-1 group-hover:text-primary"
+                    }`}
+                  />
                 </motion.a>
               );
             })}

@@ -375,9 +375,9 @@ export function SupportChatWidget() {
       <Button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-4 right-4 z-50 h-12 rounded-full px-4 shadow-[0_10px_35px_hsl(273_66%_56%_/_0.35)] md:bottom-6 md:right-6"
+        className="fixed bottom-24 right-4 z-50 h-14 rounded-full border border-accent/70 bg-gradient-to-r from-primary to-accent px-6 text-base font-semibold text-primary-foreground shadow-[0_14px_40px_hsl(273_66%_56%_/_0.55)] ring-2 ring-primary/35 transition-all hover:scale-[1.03] hover:shadow-[0_18px_48px_hsl(273_66%_56%_/_0.68)] focus-visible:ring-4 focus-visible:ring-accent/40 md:bottom-24 md:right-6"
       >
-        <MessageCircle className="mr-2 h-4 w-4" />
+        <MessageCircle className="mr-2 h-5 w-5" />
         Chat
       </Button>
 

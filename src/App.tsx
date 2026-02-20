@@ -8,6 +8,7 @@ import { AgeGate } from "@/components/AgeGate";
 import { ProtectedRoute, AdminRoute, StaffRoute } from "@/components/ProtectedRoute";
 import { RouteSeo } from "@/components/RouteSeo";
 import { SupportChatWidget } from "@/components/SupportChatWidget";
+import { BottomInstagramBanner } from "@/components/BottomInstagramBanner";
 
 import Index from "./pages/Index";
 import AuthPage from "./pages/Auth";
@@ -33,20 +34,23 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <RouteSeo />
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<AuthPage />} />
-              <Route path="/calendario" element={<CalendarioPage />} />
-              <Route path="/eventos/:id" element={<EventoDetailPage />} />
-              <Route path="/noticias" element={<NoticiasPage />} />
-              <Route path="/noticias/:slug" element={<ArticleDetailPage />} />
-              <Route path="/feed" element={<ProtectedRoute><FeedPage /></ProtectedRoute>} />
-              <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-              <Route path="/admin/eventos" element={<AdminRoute><AdminEventos /></AdminRoute>} />
-              <Route path="/admin/noticias" element={<AdminRoute><AdminNoticias /></AdminRoute>} />
-              <Route path="/admin/moderacion" element={<StaffRoute><AdminModeracion /></StaffRoute>} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <div className="pb-24 md:pb-20">
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<AuthPage />} />
+                <Route path="/calendario" element={<CalendarioPage />} />
+                <Route path="/eventos/:id" element={<EventoDetailPage />} />
+                <Route path="/noticias" element={<NoticiasPage />} />
+                <Route path="/noticias/:slug" element={<ArticleDetailPage />} />
+                <Route path="/feed" element={<ProtectedRoute><FeedPage /></ProtectedRoute>} />
+                <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                <Route path="/admin/eventos" element={<AdminRoute><AdminEventos /></AdminRoute>} />
+                <Route path="/admin/noticias" element={<AdminRoute><AdminNoticias /></AdminRoute>} />
+                <Route path="/admin/moderacion" element={<StaffRoute><AdminModeracion /></StaffRoute>} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </div>
+            <BottomInstagramBanner />
             <SupportChatWidget />
           </AuthProvider>
         </BrowserRouter>
