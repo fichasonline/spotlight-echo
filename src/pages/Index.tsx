@@ -20,6 +20,7 @@ interface Event {
   id: string;
   name: string;
   start_date: string;
+  end_date: string | null;
   city: string | null;
   country: string | null;
   venue: string | null;
@@ -70,6 +71,7 @@ export default function HomePage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
+  const today = getLocalDateISO();
   const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL?.trim() || "https://instagram.com/fichasonlineuy";
   const telegramUrl = import.meta.env.VITE_TELEGRAM_URL?.trim() || "https://t.me/+59891856965";
   const whatsappUrl = import.meta.env.VITE_WHATSAPP_URL?.trim() || "https://wa.me";
@@ -97,6 +99,7 @@ export default function HomePage() {
 
   useEffect(() => {
     const fetchData = async () => {
+      const today = getLocalDateISO();
       const [artRes, evtRes, postRes] = await Promise.all([
         supabase
           .from("articles")
@@ -106,8 +109,8 @@ export default function HomePage() {
           .limit(6),
         supabase
           .from("events")
-          .select("id, name, start_date, city, country, venue")
-          .gte("start_date", getLocalDateISO())
+          .select("id, name, start_date, end_date, city, country, venue")
+          .or(`start_date.gte.${today},end_date.gte.${today}`)
           .order("start_date")
           .limit(5),
         supabase
@@ -205,43 +208,59 @@ export default function HomePage() {
         <section>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-display font-bold flex items-center gap-2">
-              <Calendar className="h-6 w-6 text-accent" /> Próximos eventos
+              <Calendar className="h-6 w-6 text-accent" /> Eventos en curso y próximos
             </h2>
             <Link to="/calendario" className="text-sm text-accent hover:underline flex items-center gap-1">
               Ver calendario <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="space-y-3">
-            {events.map((e, i) => (
-              <motion.div
-                key={e.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05 }}
-              >
-                <Link
-                  to={`/eventos/${e.id}`}
-                  className="flex items-center gap-4 bg-card border border-border rounded-lg p-4 hover:border-accent/40 transition-colors"
+            {events.map((e, i) => {
+              const eventEndDate = e.end_date ?? e.start_date;
+              const isLive = e.start_date <= today && eventEndDate >= today;
+
+              return (
+                <motion.div
+                  key={e.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
                 >
-                  <div className="flex-shrink-0 w-14 h-14 bg-accent/10 rounded-lg flex flex-col items-center justify-center">
-                    <span className="text-xs text-accent font-semibold uppercase">
-                      {format(parseDateValue(e.start_date), "MMM", { locale: es })}
-                    </span>
-                    <span className="text-lg font-bold text-accent">
-                      {format(parseDateValue(e.start_date), "d")}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">{e.name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {[e.venue, e.city, e.country].filter(Boolean).join(" · ")}
-                    </p>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
+                  <Link
+                    to={`/eventos/${e.id}`}
+                    className="flex items-center gap-4 bg-card border border-border rounded-lg p-4 hover:border-accent/40 transition-colors"
+                  >
+                    <div className="flex-shrink-0 w-14 h-14 bg-accent/10 rounded-lg flex flex-col items-center justify-center">
+                      <span className="text-xs text-accent font-semibold uppercase">
+                        {format(parseDateValue(e.start_date), "MMM", { locale: es })}
+                      </span>
+                      <span className="text-lg font-bold text-accent">
+                        {format(parseDateValue(e.start_date), "d")}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-center gap-2">
+                        <h3 className="font-semibold text-foreground">{e.name}</h3>
+                        {isLive && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-300">
+                            <span className="relative flex h-2 w-2">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                              <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                            </span>
+                            En vivo
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {[e.venue, e.city, e.country].filter(Boolean).join(" · ")}
+                      </p>
+                    </div>
+                  </Link>
+                </motion.div>
+              );
+            })}
             {events.length === 0 && (
-              <p className="text-muted-foreground text-center py-8">No hay eventos próximos.</p>
+              <p className="text-muted-foreground text-center py-8">No hay eventos en curso ni próximos.</p>
             )}
           </div>
         </section>
