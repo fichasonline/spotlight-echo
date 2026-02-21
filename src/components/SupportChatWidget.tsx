@@ -11,6 +11,7 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } f
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 type ThreadStatus = "open" | "closed";
 
@@ -33,6 +34,10 @@ interface PersistedSupportSession {
 
 const SUPPORT_SESSION_KEY = "support_chat_session_v3";
 
+interface SupportChatWidgetProps {
+  triggerVariant?: "floating" | "header";
+}
+
 function parseSession(raw: string | null): PersistedSupportSession | null {
   if (!raw) return null;
   try {
@@ -53,7 +58,7 @@ function formatTime(value: string) {
   });
 }
 
-export function SupportChatWidget() {
+export function SupportChatWidget({ triggerVariant = "floating" }: SupportChatWidgetProps) {
   const isMobile = useIsMobile();
   const { isStaff } = useAuth();
   const { toast } = useToast();
@@ -370,15 +375,24 @@ export function SupportChatWidget() {
 
   if (isStaff) return null;
 
+  const isHeaderTrigger = triggerVariant === "header";
+
   return (
     <>
       <Button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-24 right-4 z-50 h-14 rounded-full border border-accent/70 bg-gradient-to-r from-primary to-accent px-6 text-base font-semibold text-primary-foreground shadow-[0_14px_40px_hsl(273_66%_56%_/_0.55)] ring-2 ring-primary/35 transition-all hover:scale-[1.03] hover:shadow-[0_18px_48px_hsl(273_66%_56%_/_0.68)] focus-visible:ring-4 focus-visible:ring-accent/40 md:bottom-24 md:right-6"
+        variant={isHeaderTrigger ? "ghost" : "default"}
+        size={isHeaderTrigger ? "icon" : "default"}
+        aria-label="Abrir chat"
+        className={cn(
+          isHeaderTrigger
+            ? "h-10 w-10 rounded-full text-foreground/90 transition-colors hover:bg-primary/10 hover:text-foreground"
+            : "fixed bottom-24 right-4 z-50 h-14 rounded-full border border-accent/70 bg-gradient-to-r from-primary to-accent px-6 text-base font-semibold text-primary-foreground shadow-[0_14px_40px_hsl(273_66%_56%_/_0.55)] ring-2 ring-primary/35 transition-all hover:scale-[1.03] hover:shadow-[0_18px_48px_hsl(273_66%_56%_/_0.68)] focus-visible:ring-4 focus-visible:ring-accent/40 md:bottom-24 md:right-6",
+        )}
       >
-        <MessageCircle className="mr-2 h-5 w-5" />
-        Chat
+        <MessageCircle className={cn("h-5 w-5", !isHeaderTrigger && "mr-2")} />
+        {!isHeaderTrigger && "Chat"}
       </Button>
 
       {isMobile ? (

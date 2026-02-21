@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X, LogOut, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
+import { SupportChatWidget } from "@/components/SupportChatWidget";
 
 function getInitial(name: string | null | undefined) {
   const cleanName = name?.trim();
@@ -76,59 +77,63 @@ export function Navbar() {
           ))}
         </div>
 
-        <div className="hidden md:flex items-center gap-3">
-          {user && !isAnonymous ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={profile?.avatar_url ?? undefined} />
-                    <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
-                      {getInitial(profile?.display_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-sm font-medium text-foreground">
-                    {profile?.display_name ?? "Usuario"}
-                  </span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {isAdmin && (
-                  <DropdownMenuItem onClick={() => navigate("/admin")}>
-                    <Shield className="mr-2 h-4 w-4" /> Admin
-                  </DropdownMenuItem>
-                )}
-                {isStaff && (
-                  <DropdownMenuItem onClick={() => navigate("/admin/moderacion")}>
-                    <Shield className="mr-2 h-4 w-4" /> Moderación
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={signOut}>
-                  <LogOut className="mr-2 h-4 w-4" /> Cerrar sesión
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Button
-              size="sm"
-              onClick={() => navigate("/auth")}
-              className="bg-primary text-primary-foreground font-semibold shadow-[0_0_16px_hsl(273_66%_56%_/_0.32)] hover:bg-primary/90"
-            >
-              Iniciar sesión
-            </Button>
-          )}
-        </div>
+        <div className="flex items-center gap-2">
+          <SupportChatWidget triggerVariant="header" />
 
-        {/* Mobile toggle */}
-        <button
-          className="md:hidden text-foreground"
-          onClick={() => setMobileOpen((prev) => !prev)}
-          aria-expanded={mobileOpen}
-          aria-controls="mobile-nav-menu"
-          aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
-        >
-          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+          <div className="hidden md:flex items-center gap-3">
+            {user && !isAnonymous ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={profile?.avatar_url ?? undefined} />
+                      <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
+                        {getInitial(profile?.display_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm font-medium text-foreground">
+                      {profile?.display_name ?? "Usuario"}
+                    </span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => navigate("/admin")}>
+                      <Shield className="mr-2 h-4 w-4" /> Admin
+                    </DropdownMenuItem>
+                  )}
+                  {isStaff && (
+                    <DropdownMenuItem onClick={() => navigate("/admin/moderacion")}>
+                      <Shield className="mr-2 h-4 w-4" /> Moderación
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={signOut}>
+                    <LogOut className="mr-2 h-4 w-4" /> Cerrar sesión
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button
+                size="sm"
+                onClick={() => navigate("/auth")}
+                className="bg-primary text-primary-foreground font-semibold shadow-[0_0_16px_hsl(273_66%_56%_/_0.32)] hover:bg-primary/90"
+              >
+                Iniciar sesión
+              </Button>
+            )}
+          </div>
+
+          {/* Mobile toggle */}
+          <button
+            className="md:hidden text-foreground"
+            onClick={() => setMobileOpen((prev) => !prev)}
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-nav-menu"
+            aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile menu */}
