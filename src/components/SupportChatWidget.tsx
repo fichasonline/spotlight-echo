@@ -50,6 +50,26 @@ function parseSession(raw: string | null): PersistedSupportSession | null {
   }
 }
 
+function playVisitorNotificationTone() {
+  if (typeof window === "undefined" || typeof window.AudioContext === "undefined") return;
+  try {
+    const context = new window.AudioContext();
+    const oscillator = context.createOscillator();
+    const gainNode = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(660, context.currentTime);
+    oscillator.frequency.setValueAtTime(880, context.currentTime + 0.1);
+    gainNode.gain.setValueAtTime(0.0001, context.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.07, context.currentTime + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.3);
+    oscillator.connect(gainNode);
+    gainNode.connect(context.destination);
+    oscillator.start(context.currentTime);
+    oscillator.stop(context.currentTime + 0.3);
+    oscillator.onended = () => { void context.close(); };
+  } catch { /* ignora bloqueos de autoplay */ }
+}
+
 function formatTime(value: string) {
   const date = new Date(value);
   return date.toLocaleTimeString("es-ES", {
@@ -83,6 +103,7 @@ export function SupportChatWidget({ triggerVariant = "floating" }: SupportChatWi
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const notifiedStaffMsgIdsRef = useRef<Set<string>>(new Set());
 
   const hasActiveThread = Boolean(threadId && visitorToken);
 
@@ -156,6 +177,15 @@ export function SupportChatWidget({ triggerVariant = "floating" }: SupportChatWi
     if (!open) return;
     const container = messagesContainerRef.current;
     if (container) container.scrollTop = container.scrollHeight;
+  }, [messages, open]);
+
+  useEffect(() => {
+    for (const msg of messages) {
+      if (msg.sender_type === "staff" && !notifiedStaffMsgIdsRef.current.has(msg.id)) {
+        notifiedStaffMsgIdsRef.current.add(msg.id);
+        if (!open) playVisitorNotificationTone();
+      }
+    }
   }, [messages, open]);
 
   const hasContactData = useMemo(

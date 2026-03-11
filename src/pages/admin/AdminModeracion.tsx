@@ -4,7 +4,6 @@ import { es } from "date-fns/locale";
 import {
   Bell,
   BellOff,
-  EyeOff,
   Lock,
   Mail,
   MessageSquare,
@@ -12,7 +11,6 @@ import {
   Send,
   Unlock,
   User,
-  XCircle,
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -21,16 +19,6 @@ import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-
-interface Report {
-  id: string;
-  target_type: string;
-  target_id: string;
-  reason: string;
-  status: string;
-  created_at: string;
-  profiles: { display_name: string | null } | null;
-}
 
 interface SupportThread {
   id: string;
@@ -103,9 +91,6 @@ export default function AdminModeracion() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const [reports, setReports] = useState<Report[]>([]);
-  const [reportsError, setReportsError] = useState<string | null>(null);
-
   const [threads, setThreads] = useState<SupportThread[]>([]);
   const [threadsError, setThreadsError] = useState<string | null>(null);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
@@ -115,6 +100,8 @@ export default function AdminModeracion() {
   const [sendingReply, setSendingReply] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [threadScope, setThreadScope] = useState<"open" | "all">("open");
+  const [mobileView, setMobileView] = useState<"list" | "thread">("list");
+  const [needsReplyIds, setNeedsReplyIds] = useState<Set<string>>(new Set());
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
@@ -165,23 +152,28 @@ export default function AdminModeracion() {
     [notifyIncomingVisitorMessage],
   );
 
-  const fetchReports = async () => {
-    setReportsError(null);
-
-    const { data, error } = await supabase
-      .from("reports")
-      .select("id, target_type, target_id, reason, status, created_at, profiles:reporter_id(display_name)")
-      .eq("status", "pending")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      setReports([]);
-      setReportsError(error.message);
+  const fetchLastSenders = useCallback(async (threadIds: string[]) => {
+    if (threadIds.length === 0) {
+      setNeedsReplyIds(new Set());
       return;
     }
+    const { data } = await (supabase as any)
+      .from("support_messages")
+      .select("thread_id, sender_type")
+      .in("thread_id", threadIds)
+      .order("created_at", { ascending: false })
+      .limit(Math.max(50, threadIds.length * 4));
 
-    setReports((data as Report[]) ?? []);
-  };
+    const seen = new Set<string>();
+    const needsReply = new Set<string>();
+    for (const msg of (data ?? []) as { thread_id: string; sender_type: string }[]) {
+      if (!seen.has(msg.thread_id)) {
+        seen.add(msg.thread_id);
+        if (msg.sender_type === "visitor") needsReply.add(msg.thread_id);
+      }
+    }
+    setNeedsReplyIds(needsReply);
+  }, []);
 
   const fetchThreads = useCallback(async () => {
     setThreadsError(null);
@@ -220,6 +212,7 @@ export default function AdminModeracion() {
       return;
     }
     setThreads(rows);
+    void fetchLastSenders(rows.map((t) => t.id));
 
     if (hasThreadsBaselineRef.current) {
       const changedThreadIds = rows
@@ -245,7 +238,7 @@ export default function AdminModeracion() {
     if (selectedThreadId && !rows.some((thread) => thread.id === selectedThreadId)) {
       setSelectedThreadId(rows[0]?.id ?? null);
     }
-  }, [checkLatestThreadMessageForNotification, selectedThreadId, threadScope]);
+  }, [checkLatestThreadMessageForNotification, fetchLastSenders, selectedThreadId, threadScope]);
 
   const fetchMessages = useCallback(async (threadId: string) => {
     setLoadingMessages(true);
@@ -282,7 +275,6 @@ export default function AdminModeracion() {
   }, [toast]);
 
   useEffect(() => {
-    void fetchReports();
     void fetchThreads();
   }, [fetchThreads]);
 
@@ -405,7 +397,13 @@ export default function AdminModeracion() {
     }
 
     setReplyText("");
+    setNeedsReplyIds((prev) => { const next = new Set(prev); next.delete(selectedThread.id); return next; });
     await Promise.all([fetchThreads(), fetchMessages(selectedThread.id)]);
+  };
+
+  const handleSelectThread = (threadId: string) => {
+    setSelectedThreadId(threadId);
+    setMobileView("thread");
   };
 
   const handleSetThreadStatus = async (threadId: string, nextStatus: "open" | "closed") => {
@@ -436,22 +434,6 @@ export default function AdminModeracion() {
     await Promise.all([fetchThreads(), fetchMessages(threadId)]);
   };
 
-  const handleHide = async (report: Report) => {
-    if (report.target_type === "post") {
-      await supabase.from("posts").update({ is_hidden: true }).eq("id", report.target_id);
-    } else if (report.target_type === "comment") {
-      await supabase.from("comments").update({ is_deleted: true }).eq("id", report.target_id);
-    }
-    await supabase.from("reports").update({ status: "resolved" }).eq("id", report.id);
-    toast({ title: "Contenido oculto" });
-    void fetchReports();
-  };
-
-  const handleDismiss = async (id: string) => {
-    await supabase.from("reports").update({ status: "dismissed" }).eq("id", id);
-    void fetchReports();
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -464,7 +446,7 @@ export default function AdminModeracion() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
-            <div className="rounded-lg border border-border bg-card">
+            <div className={`rounded-lg border border-border bg-card ${mobileView === "thread" ? "hidden lg:block" : "block"}`}>
               <div className="border-b border-border px-4 py-3">
                 <h2 className="font-display text-lg font-semibold">Chats</h2>
                 <p className="text-xs text-muted-foreground">Conversaciones con visitantes</p>
@@ -501,21 +483,32 @@ export default function AdminModeracion() {
               <div className="max-h-[620px] space-y-2 overflow-y-auto p-3">
                 {threads.map((thread) => {
                   const isActive = thread.id === selectedThreadId;
+                  const needsReply = needsReplyIds.has(thread.id);
                   return (
                     <button
                       key={thread.id}
                       type="button"
-                      onClick={() => setSelectedThreadId(thread.id)}
+                      onClick={() => handleSelectThread(thread.id)}
                       className={`w-full rounded-lg border px-3 py-3 text-left transition-colors ${
                         isActive
                           ? "border-primary/50 bg-primary/10"
+                          : needsReply
+                          ? "border-primary/30 bg-primary/5 hover:border-primary/50"
                           : "border-border hover:border-primary/30 hover:bg-muted/40"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-foreground">{thread.visitor_name || "Visitante"}</p>
-                          <p className="truncate text-xs text-muted-foreground">{thread.visitor_email || "Sin email"}</p>
+                        <div className="min-w-0 flex items-center gap-2">
+                          {needsReply && (
+                            <span className="relative flex h-2.5 w-2.5 shrink-0">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
+                              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+                            </span>
+                          )}
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-foreground">{thread.visitor_name || "Visitante"}</p>
+                            <p className="truncate text-xs text-muted-foreground">{thread.visitor_email || "Sin email"}</p>
+                          </div>
                         </div>
                         <span
                           className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
@@ -544,7 +537,7 @@ export default function AdminModeracion() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-border bg-card">
+            <div className={`rounded-lg border border-border bg-card ${mobileView === "list" ? "hidden lg:block" : "block"}`}>
               {!selectedThread ? (
                 <div className="p-8 text-center text-muted-foreground">
                   Selecciona una conversacion para ver los mensajes.
@@ -554,7 +547,16 @@ export default function AdminModeracion() {
                   <div className="border-b border-border px-4 py-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="space-y-1">
-                        <p className="font-display text-lg font-semibold text-foreground">{selectedThread.visitor_name || "Visitante"}</p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setMobileView("list")}
+                            className="lg:hidden text-sm text-primary hover:underline flex items-center gap-1"
+                          >
+                            ← Volver
+                          </button>
+                          <p className="font-display text-lg font-semibold text-foreground">{selectedThread.visitor_name || "Visitante"}</p>
+                        </div>
                         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                           <span className="inline-flex items-center gap-1">
                             <Mail className="h-3.5 w-3.5" /> {selectedThread.visitor_email || "Sin email"}
@@ -654,46 +656,6 @@ export default function AdminModeracion() {
               )}
             </div>
           </div>
-        </section>
-
-        <section>
-          <h2 className="mb-4 text-2xl font-display font-bold">Reportes pendientes</h2>
-
-          {reportsError ? (
-            <p className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-              No se pudieron cargar los reportes: {reportsError}
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {reports.map((report) => (
-                <div key={report.id} className="rounded-lg border border-border bg-card p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm text-foreground">
-                        <span className="font-medium">{report.profiles?.display_name ?? "Anonimo"}</span> reporto un{" "}
-                        <span className="font-semibold text-accent">{report.target_type}</span>
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">"{report.reason}"</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(report.created_at)}</p>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => void handleHide(report)} title="Ocultar contenido">
-                        <EyeOff className="mr-1 h-4 w-4" /> Ocultar
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => void handleDismiss(report.id)} title="Descartar">
-                        <XCircle className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {reports.length === 0 && (
-                <p className="py-10 text-center text-muted-foreground">No hay reportes pendientes.</p>
-              )}
-            </div>
-          )}
         </section>
       </div>
     </div>
