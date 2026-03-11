@@ -35,7 +35,7 @@ interface PersistedSupportSession {
 const SUPPORT_SESSION_KEY = "support_chat_session_v3";
 
 interface SupportChatWidgetProps {
-  triggerVariant?: "floating" | "header";
+  triggerVariant?: "floating" | "header" | "hero";
 }
 
 function parseSession(raw: string | null): PersistedSupportSession | null {
@@ -82,6 +82,7 @@ export function SupportChatWidget({ triggerVariant = "floating" }: SupportChatWi
   const [threadStatus, setThreadStatus] = useState<ThreadStatus>("open");
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   const hasActiveThread = Boolean(threadId && visitorToken);
 
@@ -153,7 +154,8 @@ export function SupportChatWidget({ triggerVariant = "floating" }: SupportChatWi
 
   useEffect(() => {
     if (!open) return;
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const container = messagesContainerRef.current;
+    if (container) container.scrollTop = container.scrollHeight;
   }, [messages, open]);
 
   const hasContactData = useMemo(
@@ -320,7 +322,7 @@ export function SupportChatWidget({ triggerVariant = "floating" }: SupportChatWi
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+        <div ref={messagesContainerRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
           {loadingMessages && messages.length === 0 && (
             <p className="text-sm text-muted-foreground">Cargando mensajes...</p>
           )}
@@ -376,24 +378,51 @@ export function SupportChatWidget({ triggerVariant = "floating" }: SupportChatWi
   if (isStaff) return null;
 
   const isHeaderTrigger = triggerVariant === "header";
+  const isHeroTrigger = triggerVariant === "hero";
 
   return (
     <>
-      <Button
-        type="button"
-        onClick={() => setOpen(true)}
-        variant={isHeaderTrigger ? "ghost" : "default"}
-        size={isHeaderTrigger ? "icon" : "default"}
-        aria-label="Abrir chat"
-        className={cn(
-          isHeaderTrigger
-            ? "h-10 w-10 rounded-full text-foreground/90 transition-colors hover:bg-primary/10 hover:text-foreground"
-            : "fixed bottom-24 right-4 z-50 h-14 rounded-full border border-accent/70 bg-gradient-to-r from-primary to-accent px-6 text-base font-semibold text-primary-foreground shadow-[0_14px_40px_hsl(273_66%_56%_/_0.55)] ring-2 ring-primary/35 transition-all hover:scale-[1.03] hover:shadow-[0_18px_48px_hsl(273_66%_56%_/_0.68)] focus-visible:ring-4 focus-visible:ring-accent/40 md:bottom-24 md:right-6",
-        )}
-      >
-        <MessageCircle className={cn("h-5 w-5", !isHeaderTrigger && "mr-2")} />
-        {!isHeaderTrigger && "Chat"}
-      </Button>
+      {isHeroTrigger ? (
+        <div className="mt-8 mx-auto max-w-lg">
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label="Abrir chat de soporte"
+            className="group w-full rounded-2xl border border-primary/30 bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 p-5 text-left transition-all hover:border-primary/60 hover:from-primary/15 hover:via-accent/15 hover:to-primary/15 hover:shadow-[0_8px_32px_hsl(273_66%_56%_/_0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent shadow-[0_4px_16px_hsl(273_66%_56%_/_0.45)]">
+                  <MessageCircle className="h-5 w-5 text-primary-foreground" />
+                </span>
+                <div>
+                  <p className="font-display font-semibold text-foreground">¿Tenés alguna consulta?</p>
+                  <p className="text-sm text-muted-foreground">Chateá en tiempo real con el equipo</p>
+                </div>
+              </div>
+              <span className="shrink-0 rounded-full border border-accent/60 bg-gradient-to-r from-primary to-accent px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[0_4px_16px_hsl(273_66%_56%_/_0.4)] transition-transform group-hover:scale-105">
+                Chatear
+              </span>
+            </div>
+          </button>
+        </div>
+      ) : (
+        <Button
+          type="button"
+          onClick={() => setOpen(true)}
+          variant={isHeaderTrigger ? "ghost" : "default"}
+          size={isHeaderTrigger ? "icon" : "default"}
+          aria-label="Abrir chat"
+          className={cn(
+            isHeaderTrigger
+              ? "h-10 w-10 rounded-full text-foreground/90 transition-colors hover:bg-primary/10 hover:text-foreground"
+              : "fixed bottom-24 right-4 z-50 h-14 rounded-full border border-accent/70 bg-gradient-to-r from-primary to-accent px-6 text-base font-semibold text-primary-foreground shadow-[0_14px_40px_hsl(273_66%_56%_/_0.55)] ring-2 ring-primary/35 transition-all hover:scale-[1.03] hover:shadow-[0_18px_48px_hsl(273_66%_56%_/_0.68)] focus-visible:ring-4 focus-visible:ring-accent/40 md:bottom-24 md:right-6",
+          )}
+        >
+          <MessageCircle className={cn("h-5 w-5", !isHeaderTrigger && "mr-2")} />
+          {!isHeaderTrigger && "Chat"}
+        </Button>
+      )}
 
       {isMobile ? (
         <Drawer open={open} onOpenChange={setOpen} fixed repositionInputs={false}>

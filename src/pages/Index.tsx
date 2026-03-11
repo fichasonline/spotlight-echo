@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
+import { SupportChatWidget } from "@/components/SupportChatWidget";
 import { motion } from "framer-motion";
 import { Calendar, Newspaper, MessageSquare, ArrowRight, Instagram, Send } from "lucide-react";
 import { format } from "date-fns";
@@ -157,6 +158,7 @@ export default function HomePage() {
             <p className="text-lg text-muted-foreground max-w-xl mx-auto">
               Todo el ecosistema de Fichas Online en un solo lugar
             </p>
+            <SupportChatWidget triggerVariant="hero" />
           </motion.div>
         </div>
       </section>

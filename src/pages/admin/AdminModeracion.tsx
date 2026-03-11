@@ -117,6 +117,7 @@ export default function AdminModeracion() {
   const [threadScope, setThreadScope] = useState<"open" | "all">("open");
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const notifiedMessageIdsRef = useRef<Set<string>>(new Set());
   const previousThreadMessageAtRef = useRef<Record<string, string>>({});
   const hasThreadsBaselineRef = useRef(false);
@@ -359,7 +360,8 @@ export default function AdminModeracion() {
   }, [fetchMessages, selectedThreadId]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const container = messagesContainerRef.current;
+    if (container) container.scrollTop = container.scrollHeight;
   }, [messages]);
 
   const handleSendReply = async (event: React.FormEvent) => {
@@ -587,7 +589,7 @@ export default function AdminModeracion() {
                     </div>
                   </div>
 
-                  <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+                  <div ref={messagesContainerRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
                     {loadingMessages && messages.length === 0 && (
                       <p className="text-sm text-muted-foreground">Cargando mensajes...</p>
                     )}

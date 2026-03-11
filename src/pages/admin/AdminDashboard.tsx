@@ -2,24 +2,26 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
-import { Newspaper, Calendar, Flag, Users } from "lucide-react";
+import { Newspaper, Calendar, Flag, Users, MessageCircle } from "lucide-react";
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({ articles: 0, events: 0, reports: 0, users: 0 });
+  const [stats, setStats] = useState({ articles: 0, events: 0, reports: 0, users: 0, chats: 0 });
 
   useEffect(() => {
     const fetch = async () => {
-      const [a, e, r, u] = await Promise.all([
+      const [a, e, r, u, c] = await Promise.all([
         supabase.from("articles").select("id", { count: "exact", head: true }),
         supabase.from("events").select("id", { count: "exact", head: true }),
         supabase.from("reports").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("profiles").select("id", { count: "exact", head: true }),
+        (supabase as any).from("support_threads").select("id", { count: "exact", head: true }).eq("status", "open"),
       ]);
       setStats({
         articles: a.count ?? 0,
         events: e.count ?? 0,
         reports: r.count ?? 0,
         users: u.count ?? 0,
+        chats: c.count ?? 0,
       });
     };
     fetch();
@@ -29,6 +31,7 @@ export default function AdminDashboard() {
     { label: "Artículos", value: stats.articles, icon: Newspaper, to: "/admin/noticias", color: "text-primary" },
     { label: "Eventos", value: stats.events, icon: Calendar, to: "/admin/eventos", color: "text-accent" },
     { label: "Reportes pendientes", value: stats.reports, icon: Flag, to: "/admin/moderacion", color: "text-destructive" },
+    { label: "Chats abiertos", value: stats.chats, icon: MessageCircle, to: "/admin/moderacion", color: "text-primary" },
     { label: "Usuarios", value: stats.users, icon: Users, to: "#", color: "text-muted-foreground" },
   ];
 
@@ -37,7 +40,7 @@ export default function AdminDashboard() {
       <Navbar />
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-display font-bold mb-8">Panel de administración</h1>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {cards.map((c) => (
             <Link
               key={c.label}

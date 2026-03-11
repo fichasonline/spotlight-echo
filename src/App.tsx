@@ -9,7 +9,6 @@ import { AgeGate } from "@/components/AgeGate";
 import { ProtectedRoute, AdminRoute, StaffRoute } from "@/components/ProtectedRoute";
 import { RouteSeo } from "@/components/RouteSeo";
 import { BottomInstagramBanner } from "@/components/BottomInstagramBanner";
-import { SupportChatWidget } from "@/components/SupportChatWidget";
 
 const Index = lazy(() => import("./pages/Index"));
 const AuthPage = lazy(() => import("./pages/Auth"));
@@ -89,7 +88,6 @@ const App = () => (
               </Suspense>
             </div>
             <BottomInstagramBanner />
-            <SupportChatWidget />
           </AuthProvider>
         </BrowserRouter>
       </AgeGate>
