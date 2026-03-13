@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AgeGate } from "@/components/AgeGate";
@@ -21,9 +21,16 @@ const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminEventos = lazy(() => import("./pages/admin/AdminEventos"));
 const AdminNoticias = lazy(() => import("./pages/admin/AdminNoticias"));
 const AdminModeracion = lazy(() => import("./pages/admin/AdminModeracion"));
+const AdminLeads = lazy(() => import("./pages/admin/AdminLeads"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
+
+function InstagramBannerConditional() {
+  const { pathname } = useLocation();
+  if (pathname.startsWith("/admin")) return null;
+  return <BottomInstagramBanner />;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -83,11 +90,19 @@ const App = () => (
                       </StaffRoute>
                     }
                   />
+                  <Route
+                    path="/admin/leads"
+                    element={
+                      <AdminRoute>
+                        <AdminLeads />
+                      </AdminRoute>
+                    }
+                  />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
             </div>
-            <BottomInstagramBanner />
+            <InstagramBannerConditional />
           </AuthProvider>
         </BrowserRouter>
       </AgeGate>
