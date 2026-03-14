@@ -9,21 +9,33 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const fetch = async () => {
-      const [a, e, r, u, c, l] = await Promise.all([
+      const [a, e, r, u, openThreads, allLeads] = await Promise.all([
         supabase.from("articles").select("id", { count: "exact", head: true }),
         supabase.from("events").select("id", { count: "exact", head: true }),
         supabase.from("reports").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("profiles").select("id", { count: "exact", head: true }),
-        (supabase as any).from("support_threads").select("id", { count: "exact", head: true }).eq("status", "open"),
-        (supabase as any).from("support_leads").select("id", { count: "exact", head: true }),
+        (supabase as any)
+          .from("support_threads")
+          .select("id, lead_id")
+          .eq("status", "open"),
+        (supabase as any)
+          .from("support_leads")
+          .select("id"),
       ]);
+
+      const openLeadIds = new Set(
+        ((openThreads.data ?? []) as { lead_id: string | null }[])
+          .map((thread) => thread.lead_id)
+          .filter((leadId): leadId is string => Boolean(leadId)),
+      );
+
       setStats({
         articles: a.count ?? 0,
         events: e.count ?? 0,
         reports: r.count ?? 0,
         users: u.count ?? 0,
-        chats: c.count ?? 0,
-        leads: l.count ?? 0,
+        chats: openThreads.count ?? openThreads.data?.length ?? 0,
+        leads: ((allLeads.data ?? []) as { id: string }[]).filter((lead) => !openLeadIds.has(lead.id)).length,
       });
     };
     fetch();

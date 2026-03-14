@@ -110,15 +110,35 @@ export default function AdminLeads() {
 
   async function loadLeads() {
     setLoading(true);
-    const { data, error } = await (supabase as any)
-      .from("support_leads")
-      .select("id, full_name, email, phone, source, status, created_at")
-      .order("created_at", { ascending: false });
-    if (error) {
-      toast({ title: "Error al cargar leads", description: error.message, variant: "destructive" });
+    const [leadsResult, openThreadsResult] = await Promise.all([
+      (supabase as any)
+        .from("support_leads")
+        .select("id, full_name, email, phone, source, status, created_at")
+        .order("created_at", { ascending: false }),
+      (supabase as any)
+        .from("support_threads")
+        .select("lead_id")
+        .eq("status", "open"),
+    ]);
+
+    if (leadsResult.error) {
+      toast({ title: "Error al cargar leads", description: leadsResult.error.message, variant: "destructive" });
+    } else if (openThreadsResult.error) {
+      toast({ title: "Error al cargar chats", description: openThreadsResult.error.message, variant: "destructive" });
     } else {
-      setLeads((data ?? []).map((l: any) => ({ ...l, status: l.status ?? "nuevo" })));
+      const openLeadIds = new Set(
+        ((openThreadsResult.data ?? []) as { lead_id: string | null }[])
+          .map((thread) => thread.lead_id)
+          .filter((leadId): leadId is string => Boolean(leadId)),
+      );
+
+      setLeads(
+        ((leadsResult.data ?? []) as any[])
+          .map((lead) => ({ ...lead, status: lead.status ?? "nuevo" }))
+          .filter((lead) => !openLeadIds.has(lead.id)),
+      );
     }
+
     setLoading(false);
   }
 
@@ -184,7 +204,7 @@ export default function AdminLeads() {
           </Link>
           <div>
             <h1 className="text-2xl font-display font-bold">Leads de soporte</h1>
-            <p className="text-sm text-muted-foreground">{leads.length} contactos registrados</p>
+            <p className="text-sm text-muted-foreground">{leads.length} contactos sin chat abierto</p>
           </div>
         </div>
 
