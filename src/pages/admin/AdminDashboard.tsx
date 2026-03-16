@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
+import { isLandingLead } from "@/lib/support-leads";
 import { Newspaper, Calendar, Flag, Users, MessageCircle, ContactRound } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -20,7 +21,7 @@ export default function AdminDashboard() {
           .eq("status", "open"),
         (supabase as any)
           .from("support_leads")
-          .select("id"),
+          .select("id, source"),
       ]);
 
       const openLeadIds = new Set(
@@ -35,7 +36,9 @@ export default function AdminDashboard() {
         reports: r.count ?? 0,
         users: u.count ?? 0,
         chats: openThreads.count ?? openThreads.data?.length ?? 0,
-        leads: ((allLeads.data ?? []) as { id: string }[]).filter((lead) => !openLeadIds.has(lead.id)).length,
+        leads: ((allLeads.data ?? []) as { id: string; source: string | null }[])
+          .filter((lead) => isLandingLead(lead) && !openLeadIds.has(lead.id))
+          .length,
       });
     };
     fetch();

@@ -27,6 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { isLandingLead } from "@/lib/support-leads";
 import { ArrowLeft, Eye, Pencil, MessageCircle, Check, X } from "lucide-react";
 
 type LeadStatus = "nuevo" | "contactado" | "en_seguimiento" | "cerrado";
@@ -135,7 +136,7 @@ export default function AdminLeads() {
       setLeads(
         ((leadsResult.data ?? []) as any[])
           .map((lead) => ({ ...lead, status: lead.status ?? "nuevo" }))
-          .filter((lead) => !openLeadIds.has(lead.id)),
+          .filter((lead) => isLandingLead(lead) && !openLeadIds.has(lead.id)),
       );
     }
 
@@ -203,8 +204,8 @@ export default function AdminLeads() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-display font-bold">Leads de soporte</h1>
-            <p className="text-sm text-muted-foreground">{leads.length} contactos sin chat abierto</p>
+            <h1 className="text-2xl font-display font-bold">Leads de landing</h1>
+            <p className="text-sm text-muted-foreground">{leads.length} contactos de landing</p>
           </div>
         </div>
 
