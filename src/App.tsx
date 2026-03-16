@@ -22,6 +22,7 @@ const AdminEventos = lazy(() => import("./pages/admin/AdminEventos"));
 const AdminNoticias = lazy(() => import("./pages/admin/AdminNoticias"));
 const AdminModeracion = lazy(() => import("./pages/admin/AdminModeracion"));
 const AdminLeads = lazy(() => import("./pages/admin/AdminLeads"));
+const AdminChatLeads = lazy(() => import("./pages/admin/AdminChatLeads"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -95,6 +96,14 @@ const App = () => (
                     element={
                       <AdminRoute>
                         <AdminLeads />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/chat-leads"
+                    element={
+                      <AdminRoute>
+                        <AdminChatLeads />
                       </AdminRoute>
                     }
                   />
