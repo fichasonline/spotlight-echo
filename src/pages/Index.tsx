@@ -111,6 +111,7 @@ export default function HomePage() {
         supabase
           .from("events")
           .select("id, name, start_date, end_date, city, country, venue")
+          .eq("status", "published")
           .or(`start_date.gte.${today},end_date.gte.${today}`)
           .order("start_date")
           .limit(5),

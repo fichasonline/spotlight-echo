@@ -25,7 +25,6 @@ interface Article {
 }
 
 const emptyForm = { slug: "", headline: "", summary: "", body_markdown: "", source_name: "", source_url: "" };
-const emptyDraftForm = { ...emptyForm, raw_content: "" };
 
 export default function AdminNoticias() {
   const { user } = useAuth();
@@ -35,8 +34,6 @@ export default function AdminNoticias() {
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [draftOpen, setDraftOpen] = useState(false);
-  const [draftForm, setDraftForm] = useState(emptyDraftForm);
 
   const fetchArticles = async () => {
     const { data } = await supabase
@@ -80,31 +77,6 @@ export default function AdminNoticias() {
     }
   };
 
-  const handleDraftSave = async () => {
-    if (!draftForm.headline.trim()) {
-      toast({ title: "Falta el titular", description: "Debes completar el titular.", variant: "destructive" });
-      return;
-    }
-
-    const slug = draftForm.slug || buildSlug(draftForm.headline);
-    const { error } = await supabase.from("articles").insert({
-      headline: draftForm.headline,
-      slug,
-      status: "needs_review",
-      summary: draftForm.summary || null,
-      body_markdown: draftForm.body_markdown || draftForm.raw_content || null,
-      source_name: draftForm.source_name || null,
-      source_url: draftForm.source_url || null,
-      created_by: user?.id,
-    });
-    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else {
-      setDraftOpen(false);
-      setDraftForm(emptyDraftForm);
-      fetchArticles();
-    }
-  };
-
   const handleEdit = (article: Article) => {
     setForm({
       slug: article.slug,
@@ -141,27 +113,6 @@ export default function AdminNoticias() {
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <h1 className="text-3xl font-display font-bold">Gestión de noticias</h1>
           <div className="flex gap-2">
-            <Dialog open={draftOpen} onOpenChange={(next) => {
-              setDraftOpen(next);
-              if (!next) setDraftForm(emptyDraftForm);
-            }}>
-              <DialogTrigger asChild>
-                <Button variant="outline">Importar borrador IA</Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader><DialogTitle>Importar borrador IA</DialogTitle></DialogHeader>
-                <div className="space-y-3">
-                  <div><Label>Titular</Label><Input value={draftForm.headline} onChange={(e) => setDraftForm({ ...draftForm, headline: e.target.value })} /></div>
-                  <div><Label>URL fuente original (opcional)</Label><Input value={draftForm.source_url} onChange={(e) => setDraftForm({ ...draftForm, source_url: e.target.value })} placeholder="https://..." /></div>
-                  <div><Label>Slug (opcional)</Label><Input value={draftForm.slug} onChange={(e) => setDraftForm({ ...draftForm, slug: e.target.value })} placeholder="auto-generado" /></div>
-                  <div><Label>Contenido crudo (opcional)</Label><Textarea value={draftForm.raw_content} onChange={(e) => setDraftForm({ ...draftForm, raw_content: e.target.value })} rows={4} /></div>
-                  <div><Label>Resumen</Label><Textarea value={draftForm.summary} onChange={(e) => setDraftForm({ ...draftForm, summary: e.target.value })} rows={2} /></div>
-                  <div><Label>Cuerpo (Markdown)</Label><Textarea value={draftForm.body_markdown} onChange={(e) => setDraftForm({ ...draftForm, body_markdown: e.target.value })} rows={6} /></div>
-                  <div><Label>Nombre de fuente</Label><Input value={draftForm.source_name} onChange={(e) => setDraftForm({ ...draftForm, source_name: e.target.value })} /></div>
-                  <Button onClick={handleDraftSave} className="w-full">Guardar borrador</Button>
-                </div>
-              </DialogContent>
-            </Dialog>
 
             <Dialog open={open} onOpenChange={(o) => {
               setOpen(o);

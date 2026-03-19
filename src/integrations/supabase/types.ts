@@ -108,6 +108,7 @@ export type Database = {
       }
       events: {
         Row: {
+          buy_in: string | null
           city: string | null
           country: string | null
           created_at: string
@@ -116,14 +117,18 @@ export type Database = {
           details: string | null
           end_date: string | null
           gallery: Json | null
+          guaranteed: string | null
           hero_image_url: string | null
           id: string
           links: Json | null
           name: string
+          source_url: string | null
           start_date: string
+          status: string | null
           venue: string | null
         }
         Insert: {
+          buy_in?: string | null
           city?: string | null
           country?: string | null
           created_at?: string
@@ -132,14 +137,18 @@ export type Database = {
           details?: string | null
           end_date?: string | null
           gallery?: Json | null
+          guaranteed?: string | null
           hero_image_url?: string | null
           id?: string
           links?: Json | null
           name: string
+          source_url?: string | null
           start_date: string
+          status?: string | null
           venue?: string | null
         }
         Update: {
+          buy_in?: string | null
           city?: string | null
           country?: string | null
           created_at?: string
@@ -148,11 +157,14 @@ export type Database = {
           details?: string | null
           end_date?: string | null
           gallery?: Json | null
+          guaranteed?: string | null
           hero_image_url?: string | null
           id?: string
           links?: Json | null
           name?: string
+          source_url?: string | null
           start_date?: string
+          status?: string | null
           venue?: string | null
         }
         Relationships: [

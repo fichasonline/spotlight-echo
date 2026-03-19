@@ -27,7 +27,7 @@ export default function CalendarioPage() {
 
   useEffect(() => {
     const fetch = async () => {
-      let query = supabase.from("events").select("*").order("start_date");
+      let query = supabase.from("events").select("*").eq("status", "published").order("start_date");
       if (monthFilter !== "all") {
         const year = new Date().getFullYear();
         const month = parseInt(monthFilter);
@@ -47,7 +47,7 @@ export default function CalendarioPage() {
   }, [monthFilter, countryFilter]);
 
   useEffect(() => {
-    supabase.from("events").select("country").then(({ data }) => {
+    supabase.from("events").select("country").eq("status", "published").then(({ data }) => {
       if (data) {
         const unique = [...new Set(data.map((e) => e.country).filter(Boolean))] as string[];
         setCountries(unique);

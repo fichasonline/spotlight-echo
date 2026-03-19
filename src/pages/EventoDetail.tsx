@@ -21,6 +21,10 @@ interface Event {
   hero_image_url: string | null;
   links: unknown;
   gallery: unknown;
+  status: string | null;
+  buy_in: string | null;
+  guaranteed: string | null;
+  source_url: string | null;
 }
 
 export default function EventoDetailPage() {
@@ -97,6 +101,16 @@ export default function EventoDetailPage() {
               {[event.venue, event.city, event.country].filter(Boolean).join(", ")}
             </span>
           )}
+          {event.buy_in && (
+            <span className="flex items-center gap-1 font-semibold text-foreground">
+              Buy-in: {event.buy_in}
+            </span>
+          )}
+          {event.guaranteed && (
+            <span className="flex items-center gap-1 font-semibold text-foreground">
+              GTD: {event.guaranteed}
+            </span>
+          )}
         </div>
 
         {event.hero_image_url && (
@@ -141,6 +155,17 @@ export default function EventoDetailPage() {
                   {link.label || link.url}
                 </a>
               ))}
+              {event.source_url && (
+                <a
+                  href={event.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline font-semibold"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Fuente Oficial
+                </a>
+              )}
             </div>
           </div>
         )}
@@ -163,7 +188,7 @@ export default function EventoDetailPage() {
           </div>
         )}
 
-        {!event.description && !event.details && !event.hero_image_url && links.length === 0 && gallery.length === 0 && (
+        {!event.description && !event.details && !event.hero_image_url && links.length === 0 && gallery.length === 0 && !event.source_url && (
           <p className="text-muted-foreground text-sm">Este evento todavía no tiene contenido adicional publicado.</p>
         )}
 

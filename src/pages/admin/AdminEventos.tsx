@@ -26,6 +26,10 @@ interface Event {
   hero_image_url: string | null;
   links: unknown;
   gallery: unknown;
+  status: string | null;
+  buy_in: string | null;
+  guaranteed: string | null;
+  source_url: string | null;
 }
 
 interface EventLink {
@@ -45,6 +49,10 @@ interface EventForm {
   hero_image_url: string;
   links_text: string;
   gallery_text: string;
+  status: string;
+  buy_in: string;
+  guaranteed: string;
+  source_url: string;
 }
 
 const EVENT_MEDIA_BUCKET = "event-media";
@@ -62,6 +70,10 @@ const emptyForm: EventForm = {
   hero_image_url: "",
   links_text: "",
   gallery_text: "",
+  status: "draft",
+  buy_in: "",
+  guaranteed: "",
+  source_url: "",
 };
 
 function sanitizeFileName(value: string): string {
@@ -322,8 +334,12 @@ export default function AdminEventos() {
       description: form.description.trim() || null,
       details: form.details.trim() || null,
       hero_image_url: heroImageValue || null,
-      links: parsedLinks.links,
-      gallery: parsedGallery.images,
+      links: parsedLinks.links as any,
+      gallery: parsedGallery.images as any,
+      status: form.status,
+      buy_in: form.buy_in.trim() || null,
+      guaranteed: form.guaranteed.trim() || null,
+      source_url: form.source_url.trim() || null,
     };
 
     let error;
@@ -361,6 +377,10 @@ export default function AdminEventos() {
       hero_image_url: e.hero_image_url ?? "",
       links_text: linksToText(e.links),
       gallery_text: galleryToText(e.gallery),
+      status: e.status ?? "draft",
+      buy_in: e.buy_in ?? "",
+      guaranteed: e.guaranteed ?? "",
+      source_url: e.source_url ?? "",
     });
     setEditId(e.id);
     setOpen(true);
@@ -433,6 +453,36 @@ export default function AdminEventos() {
                   <div>
                     <Label>Venue</Label>
                     <Input value={form.venue} onChange={(e) => setForm({ ...form, venue: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label>Estado</Label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      value={form.status}
+                      onChange={(e) => setForm({ ...form, status: e.target.value })}
+                    >
+                      <option value="draft">Borrador (Draft)</option>
+                      <option value="needs_review">Pendiente de Revisión</option>
+                      <option value="published">Publicado</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label>URL Fuente</Label>
+                    <Input value={form.source_url} onChange={(e) => setForm({ ...form, source_url: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label>Buy In</Label>
+                    <Input value={form.buy_in} onChange={(e) => setForm({ ...form, buy_in: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Garantizado (GTD)</Label>
+                    <Input value={form.guaranteed} onChange={(e) => setForm({ ...form, guaranteed: e.target.value })} />
                   </div>
                 </div>
 
@@ -537,6 +587,7 @@ export default function AdminEventos() {
                   {format(parseDateValue(e.start_date), "d MMM yyyy", { locale: es })}
                   {e.end_date && ` — ${format(parseDateValue(e.end_date), "d MMM yyyy", { locale: es })}`}
                   {e.city && ` · ${e.city}`}
+                  {e.status && ` · [${e.status}]`}
                 </p>
               </div>
               <div className="flex gap-2">
