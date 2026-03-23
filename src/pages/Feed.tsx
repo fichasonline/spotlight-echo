@@ -553,7 +553,7 @@ export default function FeedPage() {
 
   const renderContentWithHashtags = useCallback(
     (content: string) =>
-      content.split(HASHTAG_SPLIT_REGEX).map((chunk, index) => {
+      content.replace(/\\n/g, "\n").split(HASHTAG_SPLIT_REGEX).map((chunk, index) => {
         if (!HASHTAG_ONLY_REGEX.test(chunk)) {
           return <span key={`${chunk}-${index}`}>{chunk}</span>;
         }
