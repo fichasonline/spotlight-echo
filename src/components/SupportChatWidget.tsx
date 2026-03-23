@@ -78,6 +78,36 @@ function formatTime(value: string) {
   });
 }
 
+const URL_RE = /https?:\/\/[^\s<>)"]+/g;
+
+/** Normalise literal "\n" sequences into real newlines, then split on URLs so they render as <a> tags. */
+function renderMessageBody(raw: string) {
+  const text = raw.replace(/\\n/g, "\n");
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  URL_RE.lastIndex = 0;
+  while ((match = URL_RE.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const url = match[0];
+    parts.push(
+      <a key={match.index} href={url} target="_blank" rel="noopener noreferrer" className="underline break-all">
+        {url}
+      </a>,
+    );
+    lastIndex = URL_RE.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts;
+}
+
 export function SupportChatWidget({ triggerVariant = "floating" }: SupportChatWidgetProps) {
   const isMobile = useIsMobile();
   const { isStaff } = useAuth();
@@ -373,7 +403,7 @@ export function SupportChatWidget({ triggerVariant = "floating" }: SupportChatWi
                     {message.sender_name || "Soporte"}
                   </p>
                 )}
-                <p className="whitespace-pre-wrap">{message.body}</p>
+                <p className="whitespace-pre-wrap">{renderMessageBody(message.body)}</p>
                 <p className={`mt-1 text-[10px] ${isVisitor ? "text-primary-foreground/75" : "text-muted-foreground"}`}>
                   {formatTime(message.created_at)}
                 </p>
