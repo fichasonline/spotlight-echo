@@ -16,6 +16,7 @@ interface Article {
   published_at: string | null;
   source_name: string | null;
   source_url: string | null;
+  image_url: string | null;
 }
 
 export default function ArticleDetailPage() {
@@ -45,6 +46,16 @@ export default function ArticleDetailPage() {
         <Link to="/noticias" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
           <ArrowLeft className="h-4 w-4" /> Volver a noticias
         </Link>
+
+        {article.image_url && (
+          <div className="w-full aspect-[21/9] md:aspect-[21/8] overflow-hidden rounded-lg mb-6">
+            <img
+              src={article.image_url}
+              alt={article.headline}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
 
         <h1 className="text-3xl md:text-4xl font-display font-bold mb-4">{article.headline}</h1>
 

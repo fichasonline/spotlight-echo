@@ -14,6 +14,7 @@ interface Article {
   summary: string | null;
   published_at: string | null;
   source_name: string | null;
+  image_url: string | null;
 }
 
 const PAGE_SIZE = 12;
@@ -26,7 +27,7 @@ export default function NoticiasPage() {
   const fetchArticles = async (p: number) => {
     const { data } = await supabase
       .from("articles")
-      .select("id, slug, headline, summary, published_at, source_name")
+      .select("id, slug, headline, summary, published_at, source_name, image_url")
       .eq("status", "published")
       .order("published_at", { ascending: false })
       .range(p * PAGE_SIZE, (p + 1) * PAGE_SIZE - 1);
@@ -52,15 +53,26 @@ export default function NoticiasPage() {
             <Link
               key={a.id}
               to={`/noticias/${a.slug}`}
-              className="bg-card border border-border rounded-lg p-5 hover:border-primary/40 transition-colors group"
+              className="bg-card border border-border rounded-lg overflow-hidden hover:border-primary/40 transition-colors group flex flex-col"
             >
-              <h3 className="font-display font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2 mb-2">
-                {a.headline}
-              </h3>
-              {a.summary && <p className="text-sm text-muted-foreground line-clamp-3 mb-3">{a.summary}</p>}
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                {a.published_at && <span>{format(parseDateValue(a.published_at), "d MMM yyyy", { locale: es })}</span>}
-                {a.source_name && <span>· {a.source_name}</span>}
+              {a.image_url && (
+                <div className="aspect-video w-full overflow-hidden">
+                  <img
+                    src={a.image_url}
+                    alt={a.headline}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+              )}
+              <div className="p-5 flex-1 flex flex-col">
+                <h3 className="font-display font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2 mb-2">
+                  {a.headline}
+                </h3>
+                {a.summary && <p className="text-sm text-muted-foreground line-clamp-3 mb-3">{a.summary}</p>}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-auto">
+                  {a.published_at && <span>{format(parseDateValue(a.published_at), "d MMM yyyy", { locale: es })}</span>}
+                  {a.source_name && <span>· {a.source_name}</span>}
+                </div>
               </div>
             </Link>
           ))}
