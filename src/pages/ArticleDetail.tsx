@@ -8,8 +8,18 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { parseDateValue } from "@/lib/date";
+import {
+  SITE_NAME,
+  SITE_URL,
+  applySeo,
+  buildAbsoluteUrl,
+  getDefaultSeoConfig,
+  stripMarkdown,
+  truncateText,
+} from "@/lib/seo";
 
 interface Article {
+  created_at: string;
   headline: string;
   summary: string | null;
   body_markdown: string | null;
@@ -22,19 +32,131 @@ interface Article {
 export default function ArticleDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const [article, setArticle] = useState<Article | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
-    supabase.from("articles").select("*").eq("slug", slug).single().then(({ data }) => {
-      if (data) setArticle(data);
-    });
+    setIsLoaded(false);
+    supabase
+      .from("articles")
+      .select("*")
+      .eq("slug", slug)
+      .eq("status", "published")
+      .maybeSingle()
+      .then(({ data }) => {
+        setArticle(data);
+        setIsLoaded(true);
+      });
   }, [slug]);
+
+  useEffect(() => {
+    if (!slug) return;
+
+    if (!article && isLoaded) {
+      applySeo({
+        ...getDefaultSeoConfig(`/noticias/${slug}`),
+        title: `Artículo no encontrado | ${SITE_NAME}`,
+        description: "La noticia que buscas no está disponible o fue removida.",
+        path: `/noticias/${slug}`,
+        robots: "noindex, nofollow",
+      });
+      return;
+    }
+
+    if (!article) return;
+
+    const canonicalPath = `/noticias/${slug}`;
+    const canonicalUrl = buildAbsoluteUrl(canonicalPath, SITE_URL);
+    const description = truncateText(
+      article.summary || stripMarkdown(article.body_markdown) || `Lee esta noticia en ${SITE_NAME}.`,
+      160,
+    );
+    const publishedTime = article.published_at || article.created_at;
+
+    applySeo({
+      title: `${article.headline} | ${SITE_NAME}`,
+      description,
+      path: canonicalPath,
+      imagePath: article.image_url,
+      imageAlt: article.headline,
+      ogType: "article",
+      publishedTime,
+      modifiedTime: publishedTime,
+      structuredData: [
+        {
+          "@context": "https://schema.org",
+          "@type": "NewsArticle",
+          headline: article.headline,
+          description,
+          url: canonicalUrl,
+          mainEntityOfPage: canonicalUrl,
+          inLanguage: "es",
+          datePublished: publishedTime,
+          dateModified: publishedTime,
+          image: article.image_url ? [article.image_url] : undefined,
+          author: {
+            "@type": "Organization",
+            name: SITE_NAME,
+          },
+          publisher: {
+            "@type": "Organization",
+            name: SITE_NAME,
+            logo: {
+              "@type": "ImageObject",
+              url: buildAbsoluteUrl("/logo_fichas.png", SITE_URL),
+            },
+          },
+        },
+        {
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            {
+              "@type": "ListItem",
+              position: 1,
+              name: "Inicio",
+              item: buildAbsoluteUrl("/", SITE_URL),
+            },
+            {
+              "@type": "ListItem",
+              position: 2,
+              name: "Noticias",
+              item: buildAbsoluteUrl("/noticias", SITE_URL),
+            },
+            {
+              "@type": "ListItem",
+              position: 3,
+              name: article.headline,
+              item: canonicalUrl,
+            },
+          ],
+        },
+      ],
+    });
+  }, [article, isLoaded, slug]);
+
+  if (!article && !isLoaded) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="container mx-auto px-4 py-12 text-center text-muted-foreground">Cargando...</div>
+      </div>
+    );
+  }
 
   if (!article) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <div className="container mx-auto px-4 py-12 text-center text-muted-foreground">Cargando...</div>
+        <div className="container mx-auto max-w-3xl px-4 py-12 text-center">
+          <h1 className="mb-3 text-2xl font-display font-bold">Noticia no encontrada</h1>
+          <p className="mb-6 text-muted-foreground">
+            Este artículo no está disponible o todavía no fue publicado.
+          </p>
+          <Link to="/noticias" className="text-primary hover:underline">
+            Volver a noticias
+          </Link>
+        </div>
       </div>
     );
   }

@@ -11,6 +11,30 @@
       "destination": "/api/:path*"
     },
     {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    },
+    {
+      "source": "/sitemaps/pages.xml",
+      "destination": "/api/sitemap-pages"
+    },
+    {
+      "source": "/sitemaps/articles.xml",
+      "destination": "/api/sitemap-articles"
+    },
+    {
+      "source": "/sitemaps/events.xml",
+      "destination": "/api/sitemap-events"
+    },
+    {
+      "source": "/news-sitemap.xml",
+      "destination": "/api/news-sitemap"
+    },
+    {
+      "source": "/rss.xml",
+      "destination": "/api/rss"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
