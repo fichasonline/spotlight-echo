@@ -109,6 +109,39 @@ export type Database = {
           },
         ]
       }
+      home_banners: {
+        Row: {
+          id: string
+          position: "top_left" | "top_right" | "bottom_left" | "bottom_right"
+          image_url: string | null
+          link_url: string | null
+          alt_text: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          position: "top_left" | "top_right" | "bottom_left" | "bottom_right"
+          image_url?: string | null
+          link_url?: string | null
+          alt_text?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          position?: "top_left" | "top_right" | "bottom_left" | "bottom_right"
+          image_url?: string | null
+          link_url?: string | null
+          alt_text?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       events: {
         Row: {
           buy_in: string | null

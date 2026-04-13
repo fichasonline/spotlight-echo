@@ -2,13 +2,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AgeGate } from "@/components/AgeGate";
 import { ProtectedRoute, AdminRoute, StaffRoute } from "@/components/ProtectedRoute";
 import { RouteSeo } from "@/components/RouteSeo";
-import { BottomInstagramBanner } from "@/components/BottomInstagramBanner";
 
 const Index = lazy(() => import("./pages/Index"));
 const AuthPage = lazy(() => import("./pages/Auth"));
@@ -23,15 +22,10 @@ const AdminNoticias = lazy(() => import("./pages/admin/AdminNoticias"));
 const AdminModeracion = lazy(() => import("./pages/admin/AdminModeracion"));
 const AdminLeads = lazy(() => import("./pages/admin/AdminLeads"));
 const AdminChatLeads = lazy(() => import("./pages/admin/AdminChatLeads"));
+const AdminBanners = lazy(() => import("./pages/admin/AdminBanners"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
-
-function InstagramBannerConditional() {
-  const { pathname } = useLocation();
-  if (pathname.startsWith("/admin")) return null;
-  return <BottomInstagramBanner />;
-}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -42,7 +36,7 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <RouteSeo />
-            <div className="pb-24 md:pb-20">
+            <div>
               <Suspense fallback={<div className="min-h-[40vh]" aria-hidden />}>
                 <Routes>
                   <Route path="/" element={<Index />} />
@@ -107,11 +101,18 @@ const App = () => (
                       </AdminRoute>
                     }
                   />
+                  <Route
+                    path="/admin/banners"
+                    element={
+                      <AdminRoute>
+                        <AdminBanners />
+                      </AdminRoute>
+                    }
+                  />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
             </div>
-            <InstagramBannerConditional />
           </AuthProvider>
         </BrowserRouter>
       </AgeGate>

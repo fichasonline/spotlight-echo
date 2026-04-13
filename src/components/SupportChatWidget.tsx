@@ -443,24 +443,28 @@ export function SupportChatWidget({ triggerVariant = "floating" }: SupportChatWi
   return (
     <>
       {isHeroTrigger ? (
-        <div className="mt-8 mx-auto max-w-lg">
+        <div className="mx-auto mt-7 w-full max-w-[420px]">
           <button
             type="button"
             onClick={() => setOpen(true)}
             aria-label="Abrir chat de soporte"
-            className="group w-full rounded-2xl border border-primary/30 bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 p-5 text-left transition-all hover:border-primary/60 hover:from-primary/15 hover:via-accent/15 hover:to-primary/15 hover:shadow-[0_8px_32px_hsl(273_66%_56%_/_0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            className="group w-full rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(41,30,52,0.92),rgba(28,21,36,0.94))] p-[10px] text-left shadow-[0_14px_34px_rgba(0,0,0,0.34)] transition-all hover:border-primary/40 hover:shadow-[0_18px_40px_rgba(87,52,127,0.34)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           >
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent shadow-[0_4px_16px_hsl(273_66%_56%_/_0.45)]">
-                  <MessageCircle className="h-5 w-5 text-primary-foreground" />
+                  <MessageCircle className="h-4.5 w-4.5 text-primary-foreground" />
                 </span>
-                <div>
-                  <p className="font-display font-semibold text-foreground">¿Tenés alguna consulta?</p>
-                  <p className="text-sm text-muted-foreground">Chateá en tiempo real con el equipo</p>
+                <div className="min-w-0">
+                  <p className="font-display text-[1.02rem] font-semibold leading-none text-foreground">
+                    ¿Tenés alguna consulta?
+                  </p>
+                  <p className="mt-1 text-sm leading-none text-muted-foreground">
+                    Chateá en tiempo real con el equipo
+                  </p>
                 </div>
               </div>
-              <span className="shrink-0 rounded-full border border-accent/60 bg-gradient-to-r from-primary to-accent px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[0_4px_16px_hsl(273_66%_56%_/_0.4)] transition-transform group-hover:scale-105">
+              <span className="shrink-0 rounded-full border border-accent/60 bg-gradient-to-r from-primary to-accent px-5 py-2 text-sm font-semibold text-primary-foreground shadow-[0_4px_16px_hsl(273_66%_56%_/_0.4)] transition-transform group-hover:scale-105">
                 Chatear
               </span>
             </div>

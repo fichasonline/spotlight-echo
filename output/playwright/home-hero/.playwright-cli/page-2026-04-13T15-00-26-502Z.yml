@@ -1,0 +1,12 @@
+- generic [active]:
+  - generic:
+    - region "Notifications (F8)":
+      - list
+    - region "Notifications alt+T"
+    - generic [ref=e2]:
+      - img [ref=e3]
+      - heading "Verificación de edad" [level=2] [ref=e6]
+      - paragraph [ref=e7]: ¿Sos mayor de 18 años?
+      - generic [ref=e8]:
+        - button "Sí, soy mayor" [ref=e9] [cursor=pointer]
+        - button "No" [ref=e10] [cursor=pointer]

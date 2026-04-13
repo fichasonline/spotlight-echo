@@ -213,7 +213,14 @@ export default function ArticleDetailPage() {
               prose-hr:border-border
             "
           >
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{article.body_markdown}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {article.image_url
+                ? article.body_markdown.replace(
+                    new RegExp(`!\\[[^\\]]*\\]\\(${article.image_url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\)`, "g"),
+                    "",
+                  )
+                : article.body_markdown}
+            </ReactMarkdown>
           </div>
         )}
       </article>

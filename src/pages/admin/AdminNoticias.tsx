@@ -8,9 +8,19 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Check, X, Pencil } from "lucide-react";
+import { Plus, Check, X, Pencil, Trash2 } from "lucide-react";
 
 interface Article {
   id: string;
@@ -22,9 +32,10 @@ interface Article {
   created_at: string;
   source_name: string | null;
   source_url: string | null;
+  image_url: string | null;
 }
 
-const emptyForm = { slug: "", headline: "", summary: "", body_markdown: "", source_name: "", source_url: "" };
+const emptyForm = { slug: "", headline: "", summary: "", body_markdown: "", source_name: "", source_url: "", image_url: "" };
 
 export default function AdminNoticias() {
   const { user } = useAuth();
@@ -34,11 +45,13 @@ export default function AdminNoticias() {
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Article | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchArticles = async () => {
     const { data } = await supabase
       .from("articles")
-      .select("id, slug, headline, summary, body_markdown, status, created_at, source_name, source_url")
+      .select("id, slug, headline, summary, body_markdown, status, created_at, source_name, source_url, image_url")
       .order("created_at", { ascending: false });
     if (data) setArticles(data);
   };
@@ -61,6 +74,7 @@ export default function AdminNoticias() {
       body_markdown: form.body_markdown || null,
       source_name: form.source_name || null,
       source_url: form.source_url || null,
+      image_url: form.image_url || null,
       headline: form.headline,
     };
 
@@ -85,6 +99,7 @@ export default function AdminNoticias() {
       body_markdown: article.body_markdown ?? "",
       source_name: article.source_name ?? "",
       source_url: article.source_url ?? "",
+      image_url: article.image_url ?? "",
     });
     setEditId(article.id);
     setOpen(true);
@@ -97,6 +112,30 @@ export default function AdminNoticias() {
 
   const handleReject = async (id: string) => {
     await supabase.from("articles").update({ status: "rejected" }).eq("id", id);
+    fetchArticles();
+  };
+
+  const handleDelete = async (article: Article) => {
+    setDeletingId(article.id);
+
+    const { error } = await supabase.from("articles").delete().eq("id", article.id);
+
+    if (error) {
+      toast({
+        title: "No se pudo eliminar el artículo",
+        description: error.message,
+        variant: "destructive",
+      });
+      setDeletingId(null);
+      return;
+    }
+
+    setDeleteTarget(null);
+    setDeletingId(null);
+    toast({
+      title: "Artículo eliminado",
+      description: "El artículo publicado fue eliminado correctamente.",
+    });
     fetchArticles();
   };
 
@@ -131,6 +170,7 @@ export default function AdminNoticias() {
                   <div><Label>Slug (opcional)</Label><Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="auto-generado" /></div>
                   <div><Label>Resumen</Label><Textarea value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} rows={2} /></div>
                   <div><Label>Cuerpo (Markdown)</Label><Textarea value={form.body_markdown} onChange={(e) => setForm({ ...form, body_markdown: e.target.value })} rows={6} /></div>
+                  <div><Label>URL imagen (portada)</Label><Input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="https://..." /></div>
                   <div className="grid grid-cols-2 gap-3">
                     <div><Label>Fuente</Label><Input value={form.source_name} onChange={(e) => setForm({ ...form, source_name: e.target.value })} /></div>
                     <div><Label>URL fuente</Label><Input value={form.source_url} onChange={(e) => setForm({ ...form, source_url: e.target.value })} /></div>
@@ -174,6 +214,17 @@ export default function AdminNoticias() {
                         <X className="h-4 w-4 text-destructive" />
                       </Button>
                     )}
+                    {a.status === "published" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleteTarget(a)}
+                        title="Eliminar"
+                        disabled={deletingId === a.id}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -181,6 +232,36 @@ export default function AdminNoticias() {
             </div>
           </TabsContent>
         </Tabs>
+
+        <AlertDialog
+          open={deleteTarget !== null}
+          onOpenChange={(isOpen) => {
+            if (!isOpen && !deletingId) setDeleteTarget(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Eliminar artículo publicado</AlertDialogTitle>
+              <AlertDialogDescription>
+                {deleteTarget
+                  ? `Vas a eliminar "${deleteTarget.headline}" de Fichas Online. Esta acción no se puede deshacer.`
+                  : "Esta acción no se puede deshacer."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={Boolean(deletingId)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (deleteTarget) void handleDelete(deleteTarget);
+                }}
+                disabled={Boolean(deletingId)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deletingId ? "Eliminando..." : "Eliminar artículo"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

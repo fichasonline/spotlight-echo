@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { isChatLead, isLandingLead } from "@/lib/support-leads";
-import { Newspaper, Calendar, Flag, Users, MessageCircle, ContactRound } from "lucide-react";
+import { Newspaper, Calendar, Flag, Users, MessageCircle, ContactRound, Image } from "lucide-react";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ articles: 0, events: 0, reports: 0, users: 0, chats: 0, leads: 0, chatLeads: 0 });
@@ -55,6 +55,7 @@ export default function AdminDashboard() {
     { label: "Usuarios", value: stats.users, icon: Users, to: "#", color: "text-muted-foreground" },
     { label: "Leads landing", value: stats.leads, icon: ContactRound, to: "/admin/leads", color: "text-primary" },
     { label: "Leads chat", value: stats.chatLeads, icon: ContactRound, to: "/admin/chat-leads", color: "text-accent" },
+    { label: "Banners home", value: 4, icon: Image, to: "/admin/banners", color: "text-primary" },
   ];
 
   return (
@@ -62,7 +63,7 @@ export default function AdminDashboard() {
       <Navbar />
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-display font-bold mb-8">Panel de administración</h1>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {cards.map((c) => (
             <Link
               key={c.label}
