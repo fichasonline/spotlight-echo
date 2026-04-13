@@ -264,7 +264,7 @@ export default function HomePage() {
                 initial={{ opacity: 0, y: 22 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.55 }}
-                className="flex w-full max-w-[720px] flex-1 flex-col items-center justify-center px-2 py-8 text-center lg:min-h-[443px] lg:px-4 lg:py-4"
+                className="flex w-full max-w-[720px] flex-1 flex-col items-center justify-center px-2 py-5 text-center sm:py-8 lg:min-h-[443px] lg:px-4 lg:py-4"
               >
                 <h1
                   className="font-display font-black uppercase leading-[0.9] tracking-[-0.05em] text-balance select-none"
@@ -288,7 +288,7 @@ export default function HomePage() {
               <PortraitBannerSlot banner={banners["top_right"]} className="hidden lg:flex" />
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3 lg:hidden">
+            <div className="mt-3 hidden grid-cols-2 gap-3 sm:grid lg:hidden">
               <BannerSlot
                 banner={banners["top_left"]}
                 className="aspect-[231/411] rounded-[24px]"
@@ -311,7 +311,7 @@ export default function HomePage() {
             />
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:hidden">
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 lg:hidden">
             <BannerSlot
               banner={banners["bottom_left"]}
               className="aspect-[572/182] rounded-[24px]"
@@ -330,7 +330,7 @@ export default function HomePage() {
       {/* ══════════════════════════════════════════════════════════════
           CONTENT — only visible after scrolling past the hero
       ══════════════════════════════════════════════════════════════ */}
-      <div className="container mx-auto px-4 pb-16 space-y-16 mt-14">
+      <div className="container mx-auto px-4 pb-10 space-y-10 mt-8 lg:mt-14 lg:space-y-16 lg:pb-16">
 
         {/* Latest articles */}
         <section>
@@ -577,10 +577,9 @@ export default function HomePage() {
 
         {/* Social links */}
         <section>
-          <div className="mb-6">
-            <h2 className="text-2xl font-display font-bold">Seguinos en redes</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Enterate de novedades y eventos en Instagram, Telegram y WhatsApp.
+          <div className="mb-5 flex items-center justify-between gap-4">
+            <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-white">
+              Seguinos en redes
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -600,7 +599,7 @@ export default function HomePage() {
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.06 }}
-                  className={`group flex items-center justify-between bg-card px-4 py-4 rounded-lg border border-border transition-colors ${
+                  className={`group flex items-center justify-between bg-card px-4 py-3 rounded-lg border border-border transition-colors sm:py-4 ${
                     isDisabled ? "cursor-not-allowed opacity-60" : "hover:border-primary/40"
                   }`}
                 >
