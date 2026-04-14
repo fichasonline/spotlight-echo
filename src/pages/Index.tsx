@@ -5,8 +5,11 @@ import { Navbar } from "@/components/Navbar";
 import { SupportChatWidget } from "@/components/SupportChatWidget";
 import { CryptoTicker } from "@/components/CryptoTicker";
 import { BannerMedia } from "@/components/BannerMedia";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
-import { Calendar, Newspaper, MessageSquare, ArrowRight, Send, Instagram } from "lucide-react";
+import { Calendar, Newspaper, MessageSquare, ArrowRight, Send, Instagram, Copy, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getLocalDateISO, parseDateValue } from "@/lib/date";
@@ -35,8 +38,30 @@ interface HomeBanner {
   position: "top_left" | "top_right" | "bottom_left" | "bottom_right";
   image_url: string | null;
   link_url: string | null;
+  affiliate_code: string | null;
   alt_text: string | null;
   is_active: boolean;
+}
+
+async function copyToClipboard(text: string) {
+  if (!text) return;
+
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  if (typeof document === "undefined") return;
+
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.setAttribute("readonly", "");
+  textArea.style.position = "absolute";
+  textArea.style.left = "-9999px";
+  document.body.appendChild(textArea);
+  textArea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textArea);
 }
 
 /* ─── Banner slot ─────────────────────────────────────────────── */
@@ -44,12 +69,16 @@ function BannerSlot({
   banner,
   className = "",
   imageClassName = "h-full w-full object-cover",
+  onAction,
 }: {
   banner: HomeBanner | undefined;
   className?: string;
   imageClassName?: string;
+  onAction?: (banner: HomeBanner) => void;
 }) {
   const hasImage = !!(banner?.image_url && banner.is_active);
+  const hasAction = hasImage && Boolean(banner?.link_url || banner?.affiliate_code);
+  const shouldOpenModal = hasAction && Boolean(banner?.affiliate_code) && Boolean(onAction);
 
   const content = hasImage ? (
     <BannerMedia
@@ -81,6 +110,18 @@ function BannerSlot({
 
   const base = `overflow-hidden rounded-[26px] border border-white/10 bg-black/40 ${className}`;
 
+  if (hasAction && shouldOpenModal && banner) {
+    return (
+      <button
+        type="button"
+        onClick={() => onAction?.(banner)}
+        className={`block w-full appearance-none border-0 bg-transparent p-0 text-left transition-opacity hover:opacity-90 ${base}`}
+      >
+        {content}
+      </button>
+    );
+  }
+
   if (hasImage && banner?.link_url) {
     return (
       <a
@@ -99,11 +140,15 @@ function BannerSlot({
 function PortraitBannerSlot({
   banner,
   className = "",
+  onAction,
 }: {
   banner: HomeBanner | undefined;
   className?: string;
+  onAction?: (banner: HomeBanner) => void;
 }) {
   const hasImage = !!(banner?.image_url && banner.is_active);
+  const hasAction = hasImage && Boolean(banner?.link_url || banner?.affiliate_code);
+  const shouldOpenModal = hasAction && Boolean(banner?.affiliate_code) && Boolean(onAction);
 
   const content = hasImage ? (
     <div className="h-[411px] w-[231px] overflow-hidden rounded-[24px] bg-[#100b15]">
@@ -131,6 +176,18 @@ function PortraitBannerSlot({
 
   const base = `flex h-[443px] w-[263px] shrink-0 items-center justify-center rounded-[38px] bg-black/95 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.48)] ${className}`;
 
+  if (hasAction && shouldOpenModal && banner) {
+    return (
+      <button
+        type="button"
+        onClick={() => onAction?.(banner)}
+        className={`${base} appearance-none border-0 bg-transparent text-left transition-transform duration-300 hover:-translate-y-1`}
+      >
+        {content}
+      </button>
+    );
+  }
+
   if (hasImage && banner?.link_url) {
     return (
       <a
@@ -152,9 +209,11 @@ export default function HomePage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [events, setEvents]     = useState<Event[]>([]);
   const [banners, setBanners]   = useState<Record<string, HomeBanner>>({});
+  const [activeBanner, setActiveBanner] = useState<HomeBanner | null>(null);
   const today                   = getLocalDateISO();
   const articlesScrollerRef     = useRef<HTMLDivElement | null>(null);
   const newsAutoScrollPausedRef = useRef(false);
+  const { toast } = useToast();
 
   const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL?.trim() || "https://instagram.com/fichasonlineuy";
   const telegramUrl  = import.meta.env.VITE_TELEGRAM_URL?.trim()  || "https://t.me/+59891856965";
@@ -165,6 +224,31 @@ export default function HomePage() {
     { label: "Telegram",  href: telegramUrl,  description: "Canal de novedades",              icon: Send },
     { label: "WhatsApp",  href: whatsappUrl,  description: "Contacto directo (proximamente)", icon: MessageSquare, disabled: true },
   ];
+
+  const buildAffiliateMessage = (banner: HomeBanner) => {
+    const parts = ["Mirá esta oferta que vi en Fichas.uy"];
+
+    if (banner.link_url) parts.push(banner.link_url);
+    if (banner.affiliate_code) parts.push(`Codigo de afiliado: ${banner.affiliate_code}`);
+
+    return parts.join("\n");
+  };
+
+  const handleCopyValue = async (value: string, label: string) => {
+    try {
+      await copyToClipboard(value);
+      toast({
+        title: `${label} copiado`,
+        description: "Lo dejamos pronto para que lo pegues donde quieras.",
+      });
+    } catch {
+      toast({
+        title: "No se pudo copiar",
+        description: "Probá copiar manualmente.",
+        variant: "destructive",
+      });
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -185,7 +269,7 @@ export default function HomePage() {
           .limit(5),
         supabase
           .from("home_banners")
-          .select("position, image_url, link_url, alt_text, is_active"),
+          .select("position, image_url, link_url, affiliate_code, alt_text, is_active"),
       ]);
 
       if (artRes.data) setArticles(artRes.data);
@@ -258,7 +342,11 @@ export default function HomePage() {
         <div className="relative z-10 mx-auto flex w-full max-w-[1360px] flex-1 flex-col px-4 pb-3 pt-5 lg:px-6">
           <div className="flex flex-1 flex-col justify-center">
             <div className="flex flex-col items-center gap-4 lg:flex-row lg:items-center lg:justify-center lg:gap-4 xl:gap-7">
-              <PortraitBannerSlot banner={banners["top_left"]} className="hidden lg:flex" />
+              <PortraitBannerSlot
+                banner={banners["top_left"]}
+                className="hidden lg:flex"
+                onAction={setActiveBanner}
+              />
 
               <motion.div
                 initial={{ opacity: 0, y: 22 }}
@@ -285,17 +373,23 @@ export default function HomePage() {
                 <SupportChatWidget triggerVariant="hero" />
               </motion.div>
 
-              <PortraitBannerSlot banner={banners["top_right"]} className="hidden lg:flex" />
+              <PortraitBannerSlot
+                banner={banners["top_right"]}
+                className="hidden lg:flex"
+                onAction={setActiveBanner}
+              />
             </div>
 
             <div className="mt-3 hidden grid-cols-2 gap-3 sm:grid lg:hidden">
               <BannerSlot
                 banner={banners["top_left"]}
                 className="aspect-[231/411] rounded-[24px]"
+                onAction={setActiveBanner}
               />
               <BannerSlot
                 banner={banners["top_right"]}
                 className="aspect-[231/411] rounded-[24px]"
+                onAction={setActiveBanner}
               />
             </div>
           </div>
@@ -304,10 +398,12 @@ export default function HomePage() {
             <BannerSlot
               banner={banners["bottom_left"]}
               className="h-[182px] w-[572px] shrink-0 rounded-[24px] shadow-[0_18px_40px_rgba(0,0,0,0.28)]"
+              onAction={setActiveBanner}
             />
             <BannerSlot
               banner={banners["bottom_right"]}
               className="h-[182px] w-[572px] shrink-0 rounded-[24px] shadow-[0_18px_40px_rgba(0,0,0,0.28)]"
+              onAction={setActiveBanner}
             />
           </div>
 
@@ -315,10 +411,12 @@ export default function HomePage() {
             <BannerSlot
               banner={banners["bottom_left"]}
               className="aspect-[572/182] rounded-[24px]"
+              onAction={setActiveBanner}
             />
             <BannerSlot
               banner={banners["bottom_right"]}
               className="aspect-[572/182] rounded-[24px]"
+              onAction={setActiveBanner}
             />
           </div>
         </div>
@@ -629,6 +727,76 @@ export default function HomePage() {
           </div>
         </section>
       </div>
+
+      <Dialog open={!!activeBanner} onOpenChange={(open) => !open && setActiveBanner(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              {activeBanner?.alt_text || "Acceso al anuncio"}
+            </DialogTitle>
+            <DialogDescription>
+              {activeBanner?.link_url
+                ? "Copiá el código y abrí el enlace cuando quieras."
+                : "Copiá el código para compartir este anuncio."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {activeBanner?.affiliate_code && (
+            <div className="rounded-lg border border-border bg-muted/40 p-3">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Código de afiliado
+              </p>
+              <p className="font-mono text-lg font-bold text-foreground">{activeBanner.affiliate_code}</p>
+            </div>
+          )}
+
+          <div className="grid gap-2">
+            {activeBanner?.affiliate_code && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => handleCopyValue(activeBanner.affiliate_code ?? "", "Código")}
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Copiar código
+              </Button>
+            )}
+
+            {activeBanner && (activeBanner.link_url || activeBanner.affiliate_code) && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleCopyValue(buildAffiliateMessage(activeBanner), "Mensaje")}
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Copiar mensaje completo
+              </Button>
+            )}
+
+            {activeBanner?.link_url && (
+              <Button asChild>
+                <a href={activeBanner.link_url} target="_blank" rel="noreferrer noopener">
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Abrir anuncio
+                </a>
+              </Button>
+            )}
+
+            {activeBanner?.link_url && (
+              <Button asChild variant="outline">
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(buildAffiliateMessage(activeBanner))}`}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Compartir por WhatsApp
+                </a>
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

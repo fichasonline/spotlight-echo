@@ -15,6 +15,7 @@ interface Banner {
   position: Position;
   image_url: string | null;
   link_url: string | null;
+  affiliate_code: string | null;
   alt_text: string | null;
   is_active: boolean;
 }
@@ -99,6 +100,7 @@ function BannerCard({ banner, onSave }: { banner: Banner; onSave: (updated: Bann
       .update({
         image_url: form.image_url || null,
         link_url:  form.link_url  || null,
+        affiliate_code: form.affiliate_code || null,
         alt_text:  form.alt_text  || null,
         is_active: form.is_active,
         updated_at: new Date().toISOString(),
@@ -225,6 +227,19 @@ function BannerCard({ banner, onSave }: { banner: Banner; onSave: (updated: Bann
         />
       </div>
 
+      {/* Affiliate code */}
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">Código de afiliado (opcional)</Label>
+        <Input
+          placeholder="FICHAS123"
+          value={form.affiliate_code ?? ""}
+          onChange={(e) => setForm((f) => ({ ...f, affiliate_code: e.target.value || null }))}
+        />
+        <p className="text-[11px] text-muted-foreground">
+          Si hay código, al hacer clic se abre un modal con opciones para copiar y compartir.
+        </p>
+      </div>
+
       {/* Alt text */}
       <div className="space-y-1">
         <Label className="text-xs text-muted-foreground">Texto alternativo</Label>
@@ -251,7 +266,7 @@ export default function AdminBanners() {
   const fetchBanners = async () => {
     const { data, error } = await supabase
       .from("home_banners")
-      .select("position, image_url, link_url, alt_text, is_active");
+      .select("position, image_url, link_url, affiliate_code, alt_text, is_active");
 
     if (error) {
       toast({ title: "Error al cargar banners", description: error.message, variant: "destructive" });
@@ -265,7 +280,7 @@ export default function AdminBanners() {
     // Ensure all 4 positions exist in the map
     for (const pos of POSITIONS) {
       if (!map[pos]) {
-        map[pos] = { position: pos, image_url: null, link_url: null, alt_text: null, is_active: true };
+        map[pos] = { position: pos, image_url: null, link_url: null, affiliate_code: null, alt_text: null, is_active: true };
       }
     }
 

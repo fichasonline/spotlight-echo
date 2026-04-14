@@ -115,6 +115,7 @@ export type Database = {
           position: "top_left" | "top_right" | "bottom_left" | "bottom_right"
           image_url: string | null
           link_url: string | null
+          affiliate_code: string | null
           alt_text: string | null
           is_active: boolean
           created_at: string
@@ -125,6 +126,7 @@ export type Database = {
           position: "top_left" | "top_right" | "bottom_left" | "bottom_right"
           image_url?: string | null
           link_url?: string | null
+          affiliate_code?: string | null
           alt_text?: string | null
           is_active?: boolean
           created_at?: string
@@ -135,6 +137,7 @@ export type Database = {
           position?: "top_left" | "top_right" | "bottom_left" | "bottom_right"
           image_url?: string | null
           link_url?: string | null
+          affiliate_code?: string | null
           alt_text?: string | null
           is_active?: boolean
           created_at?: string
