@@ -64,6 +64,28 @@ async function copyToClipboard(text: string) {
   document.body.removeChild(textArea);
 }
 
+function buildCleanAdUrl(linkUrl: string | null, affiliateCode: string | null) {
+  const rawLink = linkUrl?.trim();
+  if (!rawLink) return null;
+
+  try {
+    const url = new URL(rawLink);
+    const normalizedCode = affiliateCode?.trim().toLowerCase();
+
+    if (normalizedCode) {
+      for (const [key, value] of Array.from(url.searchParams.entries())) {
+        if (value.trim().toLowerCase() === normalizedCode) {
+          url.searchParams.delete(key);
+        }
+      }
+    }
+
+    return url.toString();
+  } catch {
+    return rawLink;
+  }
+}
+
 /* ─── Banner slot ─────────────────────────────────────────────── */
 function BannerSlot({
   banner,
@@ -227,8 +249,9 @@ export default function HomePage() {
 
   const buildAffiliateMessage = (banner: HomeBanner) => {
     const parts = ["Mirá esta oferta que vi en Fichas.uy"];
+    const cleanUrl = buildCleanAdUrl(banner.link_url, banner.affiliate_code);
 
-    if (banner.link_url) parts.push(banner.link_url);
+    if (cleanUrl) parts.push(`Link: ${cleanUrl}`);
     if (banner.affiliate_code) parts.push(`Codigo de afiliado: ${banner.affiliate_code}`);
 
     return parts.join("\n");
@@ -249,6 +272,10 @@ export default function HomePage() {
       });
     }
   };
+
+  const activeBannerOpenUrl = activeBanner
+    ? buildCleanAdUrl(activeBanner.link_url, activeBanner.affiliate_code)
+    : null;
 
   useEffect(() => {
     (async () => {
@@ -773,16 +800,16 @@ export default function HomePage() {
               </Button>
             )}
 
-            {activeBanner?.link_url && (
+            {activeBannerOpenUrl && (
               <Button asChild>
-                <a href={activeBanner.link_url} target="_blank" rel="noreferrer noopener">
+                <a href={activeBannerOpenUrl} target="_blank" rel="noreferrer noopener">
                   <ExternalLink className="mr-2 h-4 w-4" />
                   Abrir anuncio
                 </a>
               </Button>
             )}
 
-            {activeBanner?.link_url && (
+            {activeBanner && activeBannerOpenUrl && (
               <Button asChild variant="outline">
                 <a
                   href={`https://wa.me/?text=${encodeURIComponent(buildAffiliateMessage(activeBanner))}`}
