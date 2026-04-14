@@ -43,6 +43,12 @@ interface HomeBanner {
   is_active: boolean;
 }
 
+interface PartnerRoom {
+  name: string;
+  logo: string;
+  logoClassName?: string;
+}
+
 async function copyToClipboard(text: string) {
   if (!text) return;
 
@@ -245,6 +251,14 @@ export default function HomePage() {
     { label: "Instagram", href: instagramUrl, description: "Fotos, clips y anuncios",        icon: Instagram },
     { label: "Telegram",  href: telegramUrl,  description: "Canal de novedades",              icon: Send },
     { label: "WhatsApp",  href: whatsappUrl,  description: "Contacto directo (proximamente)", icon: MessageSquare, disabled: true },
+  ];
+
+  const partnerRooms: PartnerRoom[] = [
+    { name: "ACR Poker", logo: "/logos/ACR_Poker_idk6uEtleG_0.png", logoClassName: "scale-[1.05]" },
+    { name: "GGPoker", logo: "/logos/gg.png", logoClassName: "scale-[1.12]" },
+    { name: "PokerStars", logo: "/logos/PokerStars-Logo.png", logoClassName: "scale-[2.2]" },
+    { name: "KK Poker", logo: "/logos/kk.svg", logoClassName: "scale-[1.28]" },
+    { name: "BlackChip Poker", logo: "/logos/blackchup.png", logoClassName: "scale-[1.1]" },
   ];
 
   const buildAffiliateMessage = (banner: HomeBanner) => {
@@ -697,6 +711,37 @@ export default function HomePage() {
               </div>
             )}
             </div>
+          </div>
+        </section>
+
+        {/* Partner rooms */}
+        <section>
+          <div className="mb-5 flex items-center justify-between gap-4">
+            <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-white">
+              Salas con las que trabajamos
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {partnerRooms.map((room, i) => (
+              <motion.div
+                key={room.name}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="group relative overflow-hidden rounded-2xl border border-white/12 bg-[#140f1b] p-3 shadow-[0_14px_32px_rgba(0,0,0,0.2)]"
+              >
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(172,102,255,0.20),transparent_70%)] opacity-60" />
+                <div className="relative flex h-[64px] items-center justify-center overflow-hidden">
+                  <img
+                    src={room.logo}
+                    alt={room.name}
+                    loading="lazy"
+                    className={`h-8 w-auto max-w-[78%] object-contain brightness-95 transition-opacity duration-300 group-hover:opacity-100 ${room.logoClassName ?? ""}`}
+                  />
+                </div>
+              </motion.div>
+            ))}
           </div>
         </section>
 
