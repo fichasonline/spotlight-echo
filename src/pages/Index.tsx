@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MutableRefObject, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type RefObject } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
@@ -9,6 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
+import { PartnerMarquee } from "@/components/PartnerMarquee";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
+gsap.registerPlugin(useGSAP);
 import { Calendar, Newspaper, MessageSquare, ArrowRight, Send, Instagram, Copy, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -101,6 +105,37 @@ function useAutoHorizontalScroll({
       window.clearInterval(intervalId);
     };
   }, [containerRef, pauseRef, enabled, intervalMs, minViewportWidth]);
+}
+
+function useVerticalScrollPassthrough(scrollerRef: RefObject<HTMLDivElement>) {
+  useEffect(() => {
+    const container = scrollerRef.current;
+    if (!container) return;
+    const handleWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault();
+        window.scrollBy({ top: e.deltaY, behavior: "auto" });
+      }
+    };
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
+  }, [scrollerRef]);
+}
+
+function useScrollDots(scrollerRef: RefObject<HTMLDivElement>, count: number) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  useEffect(() => {
+    const container = scrollerRef.current;
+    if (!container || count === 0) return;
+    const handleScroll = () => {
+      const itemWidth = container.scrollWidth / count;
+      const index = Math.round(container.scrollLeft / itemWidth);
+      setActiveIndex(Math.max(0, Math.min(index, count - 1)));
+    };
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, [scrollerRef, count]);
+  return activeIndex;
 }
 
 async function copyToClipboard(text: string) {
@@ -288,15 +323,28 @@ function PortraitBannerSlot({
 
 /* ─── Page ────────────────────────────────────────────────────── */
 export default function HomePage() {
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [events, setEvents]     = useState<Event[]>([]);
-  const [banners, setBanners]   = useState<Record<string, HomeBanner>>({});
-  const [activeBanner, setActiveBanner] = useState<HomeBanner | null>(null);
+  const [articles, setArticles]           = useState<Article[]>([]);
+  const [events, setEvents]               = useState<Event[]>([]);
+  const [banners, setBanners]             = useState<Record<string, HomeBanner>>({});
+  const [activeBanner, setActiveBanner]   = useState<HomeBanner | null>(null);
+  const [hasFetchedBanners, setHasFetchedBanners] = useState(false);
   const today                   = getLocalDateISO();
   const articlesScrollerRef     = useRef<HTMLDivElement | null>(null);
   const eventsScrollerRef       = useRef<HTMLDivElement | null>(null);
   const newsAutoScrollPausedRef = useRef(false);
   const eventsAutoScrollPausedRef = useRef(false);
+  const activeArticleIndex = useScrollDots(articlesScrollerRef, articles.length);
+  const activeEventIndex = useScrollDots(eventsScrollerRef, events.length);
+  useVerticalScrollPassthrough(articlesScrollerRef);
+  useVerticalScrollPassthrough(eventsScrollerRef);
+
+  // Hero & banner animation refs
+  const heroRef           = useRef<HTMLElement>(null);
+  const leftBannerRef     = useRef<HTMLDivElement>(null);
+  const rightBannerRef    = useRef<HTMLDivElement>(null);
+  const topMobileRef      = useRef<HTMLDivElement>(null);
+  const bottomDesktopRef  = useRef<HTMLDivElement>(null);
+  const bottomMobileRef   = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL?.trim() || "https://instagram.com/fichasonlineuy";
@@ -394,6 +442,13 @@ export default function HomePage() {
   };
 
   useEffect(() => {
+    let cancelled = false;
+    // Safety valve: if fetch takes > 1200ms, reveal banner slots anyway
+    // so the layout doesn't sit invisible forever.
+    const timeout = setTimeout(() => {
+      if (!cancelled) setHasFetchedBanners(true);
+    }, 1200);
+
     (async () => {
       const today = getLocalDateISO();
       const [artRes, evtRes, bannerRes] = await Promise.all([
@@ -401,8 +456,7 @@ export default function HomePage() {
           .from("articles")
           .select("id, slug, headline, summary, image_url, published_at")
           .eq("status", "published")
-          .order("published_at", { ascending: false })
-          .limit(6),
+          .order("published_at", { ascending: false }),
         supabase
           .from("events")
           .select("id, name, start_date, end_date, city, country, venue")
@@ -415,6 +469,9 @@ export default function HomePage() {
           .select("position, image_url, link_url, affiliate_code, alt_text, is_active"),
       ]);
 
+      if (cancelled) return;
+      clearTimeout(timeout);
+
       if (artRes.data) setArticles(artRes.data);
       if (evtRes.data) setEvents(evtRes.data);
       if (bannerRes.data) {
@@ -422,8 +479,61 @@ export default function HomePage() {
         for (const b of bannerRes.data as HomeBanner[]) map[b.position] = b;
         setBanners(map);
       }
+      setHasFetchedBanners(true);
     })();
+
+    return () => { cancelled = true; clearTimeout(timeout); };
   }, []);
+
+  /* ── Hero title entrance (GSAP) ───────────────────────────────── */
+  useGSAP(() => {
+    const mm = gsap.matchMedia();
+    mm.add(
+      { reduceMotion: "(prefers-reduced-motion: reduce)", motion: "(prefers-reduced-motion: no-preference)" },
+      (ctx) => {
+        const { reduceMotion } = ctx.conditions as { reduceMotion: boolean; motion: boolean };
+        if (reduceMotion) {
+          gsap.set(".hero-line, .hero-sub, .hero-cta", { autoAlpha: 1 });
+          return;
+        }
+        gsap.timeline({ defaults: { ease: "power3.out" } })
+          .from(".hero-line", { autoAlpha: 0, y: 32, scale: 0.985, duration: 0.65, stagger: 0.1 })
+          .from(".hero-sub",  { autoAlpha: 0, y: 16, duration: 0.5 }, "-=0.38")
+          .from(".hero-cta",  { autoAlpha: 0, y: 12, duration: 0.45 }, "-=0.3");
+      }
+    );
+    return () => mm.revert();
+  }, { scope: heroRef });
+
+  /* ── Banner slots: hide before data, reveal after ─────────────── */
+  useLayoutEffect(() => {
+    const targets = [leftBannerRef, rightBannerRef, topMobileRef, bottomDesktopRef, bottomMobileRef]
+      .map((r) => r.current)
+      .filter(Boolean);
+    gsap.set(targets, { autoAlpha: 0, y: 8 });
+  }, []);
+
+  useEffect(() => {
+    if (!hasFetchedBanners) return;
+    const targets = [leftBannerRef, rightBannerRef, topMobileRef, bottomDesktopRef, bottomMobileRef]
+      .map((r) => r.current)
+      .filter(Boolean);
+    const mm = gsap.matchMedia();
+    mm.add(
+      { motion: "(prefers-reduced-motion: no-preference)", reduceMotion: "(prefers-reduced-motion: reduce)" },
+      (ctx) => {
+        const { reduceMotion } = ctx.conditions as { motion: boolean; reduceMotion: boolean };
+        gsap.to(targets, {
+          autoAlpha: 1,
+          y: 0,
+          duration: reduceMotion ? 0 : 0.55,
+          stagger:  reduceMotion ? 0 : 0.08,
+          ease: "power2.out",
+        });
+      }
+    );
+    return () => mm.revert();
+  }, [hasFetchedBanners]);
 
   useAutoHorizontalScroll({
     containerRef: articlesScrollerRef,
@@ -447,13 +557,24 @@ export default function HomePage() {
           HERO — fills the full remaining viewport height
       ══════════════════════════════════════════════════════════════ */}
       <section
+        ref={heroRef}
         className="relative overflow-hidden flex flex-col"
         style={{
           minHeight: "calc(100vh - 64px)",
-          background:
-            "radial-gradient(circle at 50% 38%, rgba(86,49,116,0.34), rgba(14,9,19,0.96) 54%, #09060f 100%)",
+          backgroundImage: "url('/fondo.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center top",
+          backgroundRepeat: "no-repeat",
         }}
       >
+        {/* Gradient overlay encima del fondo */}
+        <div
+          className="pointer-events-none absolute inset-0 z-0"
+          style={{
+            background:
+              "radial-gradient(circle at 50% 38%, rgba(86,49,116,0.45), rgba(14,9,19,0.82) 54%, #09060f 100%)",
+          }}
+        />
         {/* Ambient glow blobs */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute left-1/2 top-20 h-[420px] w-[760px] -translate-x-1/2 rounded-full bg-purple-900/25 blur-[130px]" />
@@ -465,45 +586,50 @@ export default function HomePage() {
         <div className="relative z-10 mx-auto flex w-full max-w-[1360px] flex-1 flex-col px-4 pb-3 pt-5 lg:px-6">
           <div className="flex flex-1 flex-col justify-center">
             <div className="flex flex-col items-center gap-4 lg:flex-row lg:items-center lg:justify-center lg:gap-4 xl:gap-7">
-              <PortraitBannerSlot
-                banner={banners["top_left"]}
-                className="hidden lg:flex"
-                onAction={setActiveBanner}
-              />
+              <div ref={leftBannerRef}>
+                <PortraitBannerSlot
+                  banner={banners["top_left"]}
+                  className="hidden lg:flex"
+                  onAction={setActiveBanner}
+                />
+              </div>
 
-              <motion.div
-                initial={{ opacity: 0, y: 22 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.55 }}
-                className="flex w-full max-w-[720px] flex-1 flex-col items-center justify-center px-2 py-5 text-center sm:py-8 lg:min-h-[443px] lg:px-4 lg:py-4"
-              >
+              <div className="flex w-full max-w-[720px] flex-1 flex-col items-center justify-center px-2 py-5 text-center sm:py-8 lg:min-h-[443px] lg:px-4 lg:py-4">
                 <h1
                   className="font-display font-black uppercase leading-[0.9] tracking-[-0.05em] text-balance select-none"
                   style={{ fontSize: "clamp(2.65rem, 5.2vw, 4.0625rem)" }}
                 >
-                  <span className="block text-[#8f3cf9] lg:whitespace-nowrap">NOTICIAS, EVENTOS</span>
-                  <span className="block lg:whitespace-nowrap">
+                  <span className="hero-line block text-[#8f3cf9] lg:whitespace-nowrap">
+                    NOTICIAS, EVENTOS
+                  </span>
+                  <span className="hero-line block lg:whitespace-nowrap">
                     <span className="text-[#8f3cf9]">Y COMUNIDAD</span>{" "}
                     <span className="text-white">EN UN</span>
                   </span>
-                  <span className="block text-white lg:whitespace-nowrap">SOLO LUGAR</span>
+                  <span className="hero-line block text-white lg:whitespace-nowrap">
+                    SOLO LUGAR
+                  </span>
                 </h1>
 
-                <p className="mt-6 max-w-[560px] text-sm font-semibold uppercase tracking-[0.03em] text-white/42 md:text-[15px]">
+                <p className="hero-sub mt-6 max-w-[560px] text-sm font-semibold uppercase tracking-[0.03em] text-white/42 md:text-[15px]">
                   Todo el ecosistema de Fichas Online en un solo lugar
                 </p>
 
-                <SupportChatWidget triggerVariant="hero" />
-              </motion.div>
+                <div className="hero-cta">
+                  <SupportChatWidget triggerVariant="hero" />
+                </div>
+              </div>
 
-              <PortraitBannerSlot
-                banner={banners["top_right"]}
-                className="hidden lg:flex"
-                onAction={setActiveBanner}
-              />
+              <div ref={rightBannerRef}>
+                <PortraitBannerSlot
+                  banner={banners["top_right"]}
+                  className="hidden lg:flex"
+                  onAction={setActiveBanner}
+                />
+              </div>
             </div>
 
-            <div className="mt-3 hidden grid-cols-2 gap-3 sm:grid lg:hidden">
+            <div ref={topMobileRef} className="mt-3 hidden grid-cols-2 gap-3 sm:grid lg:hidden">
               <BannerSlot
                 banner={banners["top_left"]}
                 className="aspect-[231/411] rounded-[24px]"
@@ -517,7 +643,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="mt-5 hidden items-center justify-center gap-6 lg:flex">
+          <div ref={bottomDesktopRef} className="mt-5 hidden items-center justify-center gap-6 lg:flex">
             <BannerSlot
               banner={banners["bottom_left"]}
               className="h-[182px] w-[572px] shrink-0 rounded-[24px] shadow-[0_18px_40px_rgba(0,0,0,0.28)]"
@@ -530,7 +656,7 @@ export default function HomePage() {
             />
           </div>
 
-          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 lg:hidden">
+          <div ref={bottomMobileRef} className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 lg:hidden">
             <BannerSlot
               banner={banners["bottom_left"]}
               className="aspect-[572/182] rounded-[24px]"
@@ -569,7 +695,13 @@ export default function HomePage() {
               <span>También podés arrastrar</span>
             </div>
           )}
-          <div className="mb-5 flex items-center justify-between gap-4">
+          <motion.div
+            initial={{ opacity: 0, x: -16 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="mb-5 flex items-center justify-between gap-4"
+          >
             <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-white">
               Ultimas noticias
             </p>
@@ -580,7 +712,7 @@ export default function HomePage() {
               <Newspaper className="h-4 w-4" />
               Fichas News
             </Link>
-          </div>
+          </motion.div>
 
           <div className="relative">
             {articles.length > 3 && (
@@ -598,15 +730,16 @@ export default function HomePage() {
             {articles.map((a, i) => (
               <motion.div
                 key={a.id}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ delay: i * 0.07, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
                 data-carousel-card="true"
                 className="min-w-0 shrink-0 snap-start basis-[84%] sm:basis-[68%] lg:basis-[371px]"
               >
                 <Link
                   to={`/noticias/${a.slug}`}
-                  className="group flex h-full overflow-hidden rounded-[30px] border border-white/20 bg-[#E7E7E7] p-[14px] shadow-[0_22px_45px_rgba(0,0,0,0.22)] transition-transform duration-300 hover:-translate-y-1 lg:h-[490px]"
+                  className="group flex h-full overflow-hidden rounded-[30px] border border-white/20 bg-[#E7E7E7] p-[14px] shadow-[0_22px_45px_rgba(0,0,0,0.22)] lg:h-[490px]"
                 >
                   <div className="flex h-full w-full flex-col">
                   <div className="shrink-0 overflow-hidden rounded-[24px] bg-[#d8d8de] lg:h-[308px]">
@@ -658,6 +791,23 @@ export default function HomePage() {
             </div>
           </div>
 
+          {articles.length > 1 && (
+            <div className="mt-3 flex justify-center gap-1.5 lg:hidden">
+              {articles.map((_, i) => (
+                <motion.div
+                  key={i}
+                  animate={{
+                    width: i === activeArticleIndex ? 20 : 6,
+                    opacity: i === activeArticleIndex ? 1 : 0.3,
+                    backgroundColor: i === activeArticleIndex ? "rgb(143,60,249)" : "rgb(255,255,255)",
+                  }}
+                  transition={{ duration: 0.3 }}
+                  className="h-1.5 rounded-full"
+                />
+              ))}
+            </div>
+          )}
+
           {articles.length > 0 && (
             <div className="mt-6 flex justify-center xl:hidden">
               <Link
@@ -682,7 +832,13 @@ export default function HomePage() {
 
         {/* Upcoming events */}
         <section>
-          <div className="mb-3 flex items-center justify-between gap-4">
+          <motion.div
+            initial={{ opacity: 0, x: -16 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="mb-3 flex items-center justify-between gap-4"
+          >
             <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-white">
               Calendario
             </p>
@@ -693,7 +849,7 @@ export default function HomePage() {
               <Calendar className="h-4 w-4" />
               Ver calendario
             </Link>
-          </div>
+          </motion.div>
 
           {events.length > 1 && (
             <div className="mb-4 flex items-center justify-center gap-2 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white/40 lg:justify-end">
@@ -732,9 +888,10 @@ export default function HomePage() {
               return (
                 <motion.div
                   key={e.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ delay: i * 0.07, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
                   data-carousel-card="true"
                   className="min-w-0 shrink-0 snap-start basis-[88%] sm:basis-[72%] lg:basis-[500px]"
                 >
@@ -784,48 +941,55 @@ export default function HomePage() {
             )}
             </div>
           </div>
+
+          {events.length > 1 && (
+            <div className="mt-3 flex justify-center gap-1.5 lg:hidden">
+              {events.map((_, i) => (
+                <motion.div
+                  key={i}
+                  animate={{
+                    width: i === activeEventIndex ? 20 : 6,
+                    opacity: i === activeEventIndex ? 1 : 0.3,
+                    backgroundColor: i === activeEventIndex ? "rgb(143,60,249)" : "rgb(255,255,255)",
+                  }}
+                  transition={{ duration: 0.3 }}
+                  className="h-1.5 rounded-full"
+                />
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Partner rooms */}
         <section>
-          <div className="mb-5 flex items-center justify-between gap-4">
+          <motion.div
+            initial={{ opacity: 0, x: -16 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="mb-5 flex items-center justify-between gap-4"
+          >
             <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-white">
               Consegui el mejor deal para tu sala
             </p>
-          </div>
+          </motion.div>
 
-          <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain touch-pan-x pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {uniquePartnerRooms.map((room, i) => (
-              <motion.div
-                key={room.logo}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="group relative h-[86px] w-[210px] shrink-0 snap-start overflow-hidden rounded-2xl border border-white/12 bg-[#140f1b] p-3 shadow-[0_14px_32px_rgba(0,0,0,0.2)]"
-              >
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(172,102,255,0.20),transparent_70%)] opacity-60" />
-                <div className="relative flex h-full items-center justify-center overflow-hidden">
-                  <img
-                    src={room.logo}
-                    alt={room.alt || "Logo de sala"}
-                    loading="lazy"
-                    decoding="async"
-                    className={`h-[34px] w-[140px] transform-gpu object-contain brightness-95 transition-opacity duration-300 group-hover:opacity-100 ${room.logoClassName ?? ""}`}
-                    style={{ transform: `scale(${room.scale ?? 1.95})` }}
-                  />
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <PartnerMarquee rooms={uniquePartnerRooms} />
         </section>
 
         {/* Social links */}
         <section>
-          <div className="mb-5 flex items-center justify-between gap-4">
+          <motion.div
+            initial={{ opacity: 0, x: -16 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="mb-5 flex items-center justify-between gap-4"
+          >
             <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-white">
               Seguinos en redes
             </p>
-          </div>
+          </motion.div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {socialLinks.map((social, i) => {
               const Icon = social.icon;
@@ -840,9 +1004,11 @@ export default function HomePage() {
                   aria-disabled={isDisabled}
                   tabIndex={isDisabled ? -1 : undefined}
                   onClick={isDisabled ? (e) => e.preventDefault() : undefined}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.06 }}
+                  initial={{ opacity: 0, y: 14 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.08, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  whileHover={isDisabled ? {} : { y: -2 }}
                   className={`group flex items-center justify-between bg-card px-4 py-3 rounded-lg border border-border transition-colors sm:py-4 ${
                     isDisabled ? "cursor-not-allowed opacity-60" : "hover:border-primary/40"
                   }`}

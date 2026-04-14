@@ -2,11 +2,11 @@
 
 *Learn about the person you're helping. Update this as you go.*
 
-- **Name:** 
-- **What to call them:** 
+- **Name:** Francisco Salvatierra *(inferred from local username/path)*
+- **What to call them:** Francisco
 - **Pronouns:** *(optional)*
-- **Timezone:** 
-- **Notes:** 
+- **Timezone:** America/Montevideo
+- **Notes:** Building and growing Fichas.uy; currently focused on SEO for online poker keywords in Uruguay.
 
 ## Context
 
