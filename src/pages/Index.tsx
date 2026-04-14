@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MutableRefObject, type RefObject } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
@@ -44,9 +44,63 @@ interface HomeBanner {
 }
 
 interface PartnerRoom {
-  name: string;
   logo: string;
+  alt?: string;
+  scale?: number;
   logoClassName?: string;
+}
+
+function useAutoHorizontalScroll({
+  containerRef,
+  pauseRef,
+  enabled,
+  intervalMs = 4200,
+  minViewportWidth = 1024,
+}: {
+  containerRef: RefObject<HTMLDivElement>;
+  pauseRef: MutableRefObject<boolean>;
+  enabled: boolean;
+  intervalMs?: number;
+  minViewportWidth?: number;
+}) {
+  useEffect(() => {
+    if (typeof window === "undefined" || !enabled) return;
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const desktopMq = window.matchMedia(`(min-width: ${minViewportWidth}px)`);
+    const reducedMotionMq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const coarsePointerMq = window.matchMedia("(pointer: coarse)");
+
+    // Mobile optimization: avoid interval-based scroll on touch devices.
+    if (!desktopMq.matches || reducedMotionMq.matches || coarsePointerMq.matches) return;
+
+    const intervalId = window.setInterval(() => {
+      if (pauseRef.current || document.hidden) return;
+
+      const firstCard = container.querySelector<HTMLElement>("[data-carousel-card='true']");
+      const computedStyle = window.getComputedStyle(container);
+      const gapValue = computedStyle.columnGap !== "normal" ? computedStyle.columnGap : computedStyle.gap;
+      const gap = Number.parseFloat(gapValue || "0") || 0;
+      const step = firstCard ? firstCard.getBoundingClientRect().width + gap : container.clientWidth;
+      const maxScrollLeft = Math.max(container.scrollWidth - container.clientWidth, 0);
+
+      if (maxScrollLeft <= 0) return;
+
+      const nextLeft = container.scrollLeft + step;
+      if (nextLeft >= maxScrollLeft - 2) {
+        container.scrollTo({ left: 0, behavior: "smooth" });
+        return;
+      }
+
+      container.scrollTo({ left: nextLeft, behavior: "smooth" });
+    }, intervalMs);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [containerRef, pauseRef, enabled, intervalMs, minViewportWidth]);
 }
 
 async function copyToClipboard(text: string) {
@@ -240,7 +294,9 @@ export default function HomePage() {
   const [activeBanner, setActiveBanner] = useState<HomeBanner | null>(null);
   const today                   = getLocalDateISO();
   const articlesScrollerRef     = useRef<HTMLDivElement | null>(null);
+  const eventsScrollerRef       = useRef<HTMLDivElement | null>(null);
   const newsAutoScrollPausedRef = useRef(false);
+  const eventsAutoScrollPausedRef = useRef(false);
   const { toast } = useToast();
 
   const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL?.trim() || "https://instagram.com/fichasonlineuy";
@@ -253,13 +309,43 @@ export default function HomePage() {
     { label: "WhatsApp",  href: whatsappUrl,  description: "Contacto directo (proximamente)", icon: MessageSquare, disabled: true },
   ];
 
-  const partnerRooms: PartnerRoom[] = [
-    { name: "ACR Poker", logo: "/logos/ACR_Poker_idk6uEtleG_0.png", logoClassName: "scale-[1.05]" },
-    { name: "GGPoker", logo: "/logos/gg.png", logoClassName: "scale-[1.12]" },
-    { name: "PokerStars", logo: "/logos/PokerStars-Logo.png", logoClassName: "scale-[2.2]" },
-    { name: "KK Poker", logo: "/logos/kk.svg", logoClassName: "scale-[1.28]" },
-    { name: "BlackChip Poker", logo: "/logos/blackchup.png", logoClassName: "scale-[1.1]" },
-  ];
+  const partnerRooms = useMemo<PartnerRoom[]>(
+    () => [
+      { logo: "/logos/1xKgstyNJea5U1XlrZfvuJf6mA.avif", scale: 2.2 },
+      { logo: "/logos/2mhHbxpxNIGM4XPkRRS7XAjugzo.avif", scale: 2.2 },
+      { logo: "/logos/4QgmNilvdkzkVZ3TGcGFaTLfO4-1.avif", scale: 2.2 },
+      { logo: "/logos/B8bBSvDxcwJT02USIWiz5kIIm58.avif", scale: 2.2 },
+      { logo: "/logos/Eu0u1iQMQ68wnKhgukzIPAvlUSs.avif", scale: 2.2 },
+      { logo: "/logos/X0o6ZZXCjE1hwD5B7eHtEVFWYk.avif", scale: 2.15 },
+      { logo: "/logos/czfafuk61agm2d0m8cyZ7GGuwA.avif", scale: 2.2 },
+      { logo: "/logos/fKFuVulfMN8Qx5dzzNbwjTg8eQ.avif", scale: 2.25 },
+      { logo: "/logos/j4MVzhkvqVebGmoMjRA8T2EpBA.avif", scale: 2.25 },
+      { logo: "/logos/t9tFBv9mtBHDSHwp0lEwvouyk4.avif", scale: 1.38 },
+      {
+        logo: "/logos/kk.svg",
+        alt: "KK Poker",
+        scale: 1.08,
+        logoClassName: "saturate-0 brightness-[2.55] contrast-[1.1]",
+      },
+      {
+        logo: "/logos/blackchup.png",
+        alt: "BlackChip Poker",
+        scale: 1.12,
+        logoClassName: "saturate-0 brightness-[2.2] contrast-[1.08]",
+      },
+    ],
+    []
+  );
+
+  const uniquePartnerRooms = useMemo(() => {
+    const seen = new Set<string>();
+    return partnerRooms.filter((room) => {
+      const key = room.logo.trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [partnerRooms]);
 
   const buildAffiliateMessage = (banner: HomeBanner) => {
     const parts = ["Mirá esta oferta que vi en Fichas.uy"];
@@ -290,6 +376,22 @@ export default function HomePage() {
   const activeBannerOpenUrl = activeBanner
     ? buildCleanAdUrl(activeBanner.link_url, activeBanner.affiliate_code)
     : null;
+
+  const newsScrollerInteractionProps = {
+    onMouseEnter: () => { newsAutoScrollPausedRef.current = true; },
+    onMouseLeave: () => { newsAutoScrollPausedRef.current = false; },
+    onPointerDown: () => { newsAutoScrollPausedRef.current = true; },
+    onPointerUp: () => { newsAutoScrollPausedRef.current = false; },
+    onPointerCancel: () => { newsAutoScrollPausedRef.current = false; },
+  };
+
+  const eventsScrollerInteractionProps = {
+    onMouseEnter: () => { eventsAutoScrollPausedRef.current = true; },
+    onMouseLeave: () => { eventsAutoScrollPausedRef.current = false; },
+    onPointerDown: () => { eventsAutoScrollPausedRef.current = true; },
+    onPointerUp: () => { eventsAutoScrollPausedRef.current = false; },
+    onPointerCancel: () => { eventsAutoScrollPausedRef.current = false; },
+  };
 
   useEffect(() => {
     (async () => {
@@ -323,39 +425,19 @@ export default function HomePage() {
     })();
   }, []);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  useAutoHorizontalScroll({
+    containerRef: articlesScrollerRef,
+    pauseRef: newsAutoScrollPausedRef,
+    enabled: articles.length > 3,
+    intervalMs: 4200,
+  });
 
-    const container = articlesScrollerRef.current;
-    if (!container || articles.length <= 3) return;
-
-    const desktopMq = window.matchMedia("(min-width: 1024px)");
-    if (!desktopMq.matches) return;
-
-    const intervalId = window.setInterval(() => {
-      if (newsAutoScrollPausedRef.current || document.hidden) return;
-
-      const firstCard = container.querySelector<HTMLElement>("[data-news-card='true']");
-      const computedStyle = window.getComputedStyle(container);
-      const gapValue = computedStyle.columnGap !== "normal" ? computedStyle.columnGap : computedStyle.gap;
-      const gap = Number.parseFloat(gapValue || "0") || 0;
-      const step = firstCard ? firstCard.getBoundingClientRect().width + gap : container.clientWidth;
-      const maxScrollLeft = container.scrollWidth - container.clientWidth;
-
-      if (maxScrollLeft <= 0) return;
-
-      if (container.scrollLeft >= maxScrollLeft - step * 0.45) {
-        container.scrollTo({ left: 0, behavior: "smooth" });
-        return;
-      }
-
-      container.scrollBy({ left: step, behavior: "smooth" });
-    }, 4200);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [articles.length]);
+  useAutoHorizontalScroll({
+    containerRef: eventsScrollerRef,
+    pauseRef: eventsAutoScrollPausedRef,
+    enabled: events.length > 1,
+    intervalMs: 4600,
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -510,25 +592,8 @@ export default function HomePage() {
 
             <div
               ref={articlesScrollerRef}
-              className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              onMouseEnter={() => {
-                newsAutoScrollPausedRef.current = true;
-              }}
-              onMouseLeave={() => {
-                newsAutoScrollPausedRef.current = false;
-              }}
-              onTouchStart={() => {
-                newsAutoScrollPausedRef.current = true;
-              }}
-              onTouchEnd={() => {
-                newsAutoScrollPausedRef.current = false;
-              }}
-              onFocus={() => {
-                newsAutoScrollPausedRef.current = true;
-              }}
-              onBlur={() => {
-                newsAutoScrollPausedRef.current = false;
-              }}
+              className="flex snap-x snap-mandatory gap-5 overflow-x-auto overscroll-x-contain touch-pan-x pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              {...newsScrollerInteractionProps}
             >
             {articles.map((a, i) => (
               <motion.div
@@ -536,7 +601,7 @@ export default function HomePage() {
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
-                data-news-card="true"
+                data-carousel-card="true"
                 className="min-w-0 shrink-0 snap-start basis-[84%] sm:basis-[68%] lg:basis-[371px]"
               >
                 <Link
@@ -632,6 +697,8 @@ export default function HomePage() {
 
           {events.length > 1 && (
             <div className="mb-4 flex items-center justify-center gap-2 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white/40 lg:justify-end">
+              <span className="hidden lg:inline">Se mueve solo</span>
+              <span className="hidden lg:inline">•</span>
               <span>Deslizá para ver más eventos</span>
               <motion.span
                 aria-hidden="true"
@@ -652,7 +719,11 @@ export default function HomePage() {
               </>
             )}
 
-            <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div
+              ref={eventsScrollerRef}
+              className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain touch-pan-x pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              {...eventsScrollerInteractionProps}
+            >
             {events.map((e, i) => {
               const eventEndDate = e.end_date ?? e.start_date;
               const isLive = e.start_date <= today && eventEndDate >= today;
@@ -664,6 +735,7 @@ export default function HomePage() {
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.05 }}
+                  data-carousel-card="true"
                   className="min-w-0 shrink-0 snap-start basis-[88%] sm:basis-[72%] lg:basis-[500px]"
                 >
                   <Link
@@ -718,26 +790,28 @@ export default function HomePage() {
         <section>
           <div className="mb-5 flex items-center justify-between gap-4">
             <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-white">
-              Salas con las que trabajamos
+              Consegui el mejor deal para tu sala
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {partnerRooms.map((room, i) => (
+          <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain touch-pan-x pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {uniquePartnerRooms.map((room, i) => (
               <motion.div
-                key={room.name}
+                key={room.logo}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
-                className="group relative overflow-hidden rounded-2xl border border-white/12 bg-[#140f1b] p-3 shadow-[0_14px_32px_rgba(0,0,0,0.2)]"
+                className="group relative h-[86px] w-[210px] shrink-0 snap-start overflow-hidden rounded-2xl border border-white/12 bg-[#140f1b] p-3 shadow-[0_14px_32px_rgba(0,0,0,0.2)]"
               >
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(172,102,255,0.20),transparent_70%)] opacity-60" />
-                <div className="relative flex h-[64px] items-center justify-center overflow-hidden">
+                <div className="relative flex h-full items-center justify-center overflow-hidden">
                   <img
                     src={room.logo}
-                    alt={room.name}
+                    alt={room.alt || "Logo de sala"}
                     loading="lazy"
-                    className={`h-8 w-auto max-w-[78%] object-contain brightness-95 transition-opacity duration-300 group-hover:opacity-100 ${room.logoClassName ?? ""}`}
+                    decoding="async"
+                    className={`h-[34px] w-[140px] transform-gpu object-contain brightness-95 transition-opacity duration-300 group-hover:opacity-100 ${room.logoClassName ?? ""}`}
+                    style={{ transform: `scale(${room.scale ?? 1.95})` }}
                   />
                 </div>
               </motion.div>

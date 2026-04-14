@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, Send, XCircle } from "lucide-react";
 
-import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -110,7 +109,6 @@ function renderMessageBody(raw: string) {
 
 export function SupportChatWidget({ triggerVariant = "floating" }: SupportChatWidgetProps) {
   const isMobile = useIsMobile();
-  const { isStaff } = useAuth();
   const { toast } = useToast();
 
   const [open, setOpen] = useState(false);
@@ -434,8 +432,6 @@ export function SupportChatWidget({ triggerVariant = "floating" }: SupportChatWi
       </div>
     );
   };
-
-  if (isStaff) return null;
 
   const isHeaderTrigger = triggerVariant === "header";
   const isHeroTrigger = triggerVariant === "hero";
