@@ -133,7 +133,7 @@ export function PartnerMarquee({ rooms }: PartnerMarqueeProps) {
   return (
     <div
       ref={containerRef}
-      className="relative overflow-hidden"
+      className="relative"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onPointerDown={handlePointerDown}

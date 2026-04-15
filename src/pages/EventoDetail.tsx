@@ -58,6 +58,11 @@ function buildPdfPreviewUrl(url: string) {
   return `/api/pdf-proxy?url=${encodeURIComponent(normalized)}`;
 }
 
+function buildMobilePdfPreviewUrl(url: string) {
+  const normalized = normalizeUrl(url);
+  return `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(normalized)}`;
+}
+
 export default function EventoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const isMobile = useIsMobile();
@@ -236,13 +241,14 @@ export default function EventoDetailPage() {
       );
 
       if (!pdfUrl) return linkNode;
+      const previewUrl = isMobile ? buildMobilePdfPreviewUrl(pdfUrl) : buildPdfPreviewUrl(pdfUrl);
 
       return (
         <span className="my-2 inline-flex w-full flex-col gap-2">
           {linkNode}
           <span className="block overflow-hidden rounded-lg border border-border bg-white">
             <iframe
-              src={buildPdfPreviewUrl(pdfUrl)}
+              src={previewUrl}
               title={isMobile ? "Previsualización de PDF en móvil" : "Previsualización de PDF"}
               className={isMobile ? "h-[420px] w-full" : "h-[560px] w-full"}
               loading="lazy"
