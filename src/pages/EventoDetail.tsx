@@ -301,47 +301,6 @@ export default function EventoDetailPage() {
     prose-blockquote:border-primary/40 prose-blockquote:text-foreground/80
     prose-hr:border-border
   `;
-*** End Patch
-#+#+#+#+assistant to=functions.apply_patch code వ్యాఖ్య
-            </span>
-          </span>
-        );
-      }
-
-      return (
-        <span className="my-2 inline-flex w-full flex-col gap-2">
-          {linkNode}
-          <span className="block overflow-hidden rounded-lg border border-border bg-white">
-            <iframe
-              src={buildPdfPreviewUrl(pdfUrl)}
-              title="Previsualización de PDF"
-              className="h-[560px] w-full"
-              loading="lazy"
-              referrerPolicy="no-referrer"
-            />
-          </span>
-        </span>
-      );
-    },
-  };
-
-  const gallery = Array.isArray(event.gallery)
-    ? event.gallery
-        .filter((item): item is string => typeof item === "string")
-        .map((item) => item.trim())
-        .filter(Boolean)
-    : [];
-
-  const markdownClassName = `
-    prose prose-invert prose-base max-w-none
-    prose-headings:font-display prose-headings:tracking-tight
-    prose-p:leading-7 prose-p:text-foreground/90
-    prose-li:leading-7
-    prose-a:text-primary hover:prose-a:text-accent
-    prose-strong:text-foreground
-    prose-blockquote:border-primary/40 prose-blockquote:text-foreground/80
-    prose-hr:border-border
-  `;
 
   return (
     <div className="min-h-screen bg-background">
