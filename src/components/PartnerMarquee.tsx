@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
+import { openSupportChat } from "@/lib/supportChat";
 
 interface PartnerRoom {
   logo: string;
@@ -195,8 +196,13 @@ function LogoCard({ room }: { room: PartnerRoom }) {
   }
 
   return (
-    <div className={`${cardClassName} cursor-default`}>
+    <button
+      type="button"
+      onClick={openSupportChat}
+      aria-label={room.alt ? `Abrir chat para ${room.alt}` : "Abrir chat para conseguir un deal"}
+      className={`${cardClassName} cursor-pointer text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
+    >
       {content}
-    </div>
+    </button>
   );
 }

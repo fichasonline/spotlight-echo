@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { SUPPORT_CHAT_OPEN_EVENT } from "@/lib/supportChat";
 
 type ThreadStatus = "open" | "closed";
 
@@ -186,6 +187,19 @@ export function SupportChatWidget({ triggerVariant = "floating" }: SupportChatWi
     }
     setInitializing(false);
   }, []);
+
+  useEffect(() => {
+    if (triggerVariant !== "header") return;
+
+    const handleOpenChatEvent = () => {
+      setOpen(true);
+    };
+
+    window.addEventListener(SUPPORT_CHAT_OPEN_EVENT, handleOpenChatEvent);
+    return () => {
+      window.removeEventListener(SUPPORT_CHAT_OPEN_EVENT, handleOpenChatEvent);
+    };
+  }, [triggerVariant]);
 
   useEffect(() => {
     if (!open || !threadId || !visitorToken) return;
