@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
@@ -49,23 +49,24 @@ export default function NoticiasPage() {
         <h1 className="text-3xl font-display font-bold mb-6">Noticias</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {articles.map((a) => (
+          {articles.map((a, index) => (
             <Link
               key={a.id}
               to={`/noticias/${a.slug}`}
-              className="bg-card border border-border rounded-lg overflow-hidden hover:border-primary/40 transition-colors group flex flex-col"
+              style={{ "--card-reveal-delay": `${Math.min(index, 9) * 45}ms` } as CSSProperties}
+              className="card-reveal touch-manipulation bg-card border border-border rounded-lg overflow-hidden transition-colors group flex flex-col hover:border-primary/40 active:border-primary/45"
             >
               {a.image_url && (
                 <div className="aspect-video w-full overflow-hidden">
                   <img
                     src={a.image_url}
                     alt={a.headline}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 group-active:scale-105"
                   />
                 </div>
               )}
               <div className="p-5 flex-1 flex flex-col">
-                <h3 className="font-display font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2 mb-2">
+                <h3 className="font-display font-semibold text-foreground transition-colors line-clamp-2 mb-2 group-hover:text-primary group-active:text-primary">
                   {a.headline}
                 </h3>
                 {a.summary && <p className="text-sm text-muted-foreground line-clamp-3 mb-3">{a.summary}</p>}

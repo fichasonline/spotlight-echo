@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
@@ -93,11 +93,12 @@ export default function CalendarioPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {events.map((e) => (
+          {events.map((e, index) => (
             <Link
               key={e.id}
               to={`/eventos/${e.id}`}
-              className="bg-card border border-border rounded-lg p-5 hover:border-accent/40 transition-colors group"
+              style={{ "--card-reveal-delay": `${Math.min(index, 9) * 45}ms` } as CSSProperties}
+              className="card-reveal touch-manipulation bg-card border border-border rounded-lg p-5 transition-colors group hover:border-accent/40 active:border-accent/45"
             >
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-12 h-12 bg-accent/10 rounded-lg flex flex-col items-center justify-center">
@@ -109,7 +110,7 @@ export default function CalendarioPage() {
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-display font-semibold text-foreground group-hover:text-accent transition-colors truncate">
+                  <h3 className="font-display font-semibold text-foreground transition-colors truncate group-hover:text-accent group-active:text-accent">
                     {e.name}
                   </h3>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
