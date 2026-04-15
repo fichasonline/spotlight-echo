@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { MapPin, Calendar, ExternalLink, ArrowLeft } from "lucide-react";
 import { parseDateValue } from "@/lib/date";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   SITE_NAME,
   SITE_URL,
@@ -54,14 +55,12 @@ function isPdfUrl(url: string) {
 
 function buildPdfPreviewUrl(url: string) {
   const normalized = normalizeUrl(url);
-  if (import.meta.env.DEV) {
-    return `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(normalized)}`;
-  }
   return `/api/pdf-proxy?url=${encodeURIComponent(normalized)}`;
 }
 
 export default function EventoDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const isMobile = useIsMobile();
   const [event, setEvent] = useState<Event | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -222,11 +221,12 @@ export default function EventoDetailPage() {
     a: ({ href, children, ...props }) => {
       const normalizedHref = href ? normalizeUrl(href) : "";
       const pdfUrl = normalizedHref && isPdfUrl(normalizedHref) ? normalizedHref : null;
+      const resolvedHref = normalizedHref || href;
 
       const linkNode = (
         <a
           {...props}
-          href={normalizedHref || href}
+          href={resolvedHref}
           target="_blank"
           rel="noopener noreferrer"
           className="text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:text-accent break-all"
@@ -236,6 +236,7 @@ export default function EventoDetailPage() {
       );
 
       if (!pdfUrl) return linkNode;
+      if (isMobile) return linkNode;
 
       return (
         <span className="my-2 inline-flex w-full flex-col gap-2">

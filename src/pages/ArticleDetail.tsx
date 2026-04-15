@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { parseDateValue } from "@/lib/date";
+import { ArticleComments } from "@/components/ArticleComments";
 import {
   SITE_NAME,
   SITE_URL,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/seo";
 
 interface Article {
+  id: string;
   created_at: string;
   headline: string;
   summary: string | null;
@@ -223,6 +225,8 @@ export default function ArticleDetailPage() {
             </ReactMarkdown>
           </div>
         )}
+
+        <ArticleComments articleId={article.id} />
       </article>
     </div>
   );
