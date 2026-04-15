@@ -7,7 +7,7 @@ import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { MapPin, Calendar, ExternalLink, ArrowLeft, FileText, Eye, Download } from "lucide-react";
+import { MapPin, Calendar, ExternalLink, ArrowLeft } from "lucide-react";
 import { parseDateValue } from "@/lib/date";
 import {
   SITE_NAME,
@@ -53,7 +53,11 @@ function isPdfUrl(url: string) {
 }
 
 function buildPdfPreviewUrl(url: string) {
-  return `${url}${url.includes("#") ? "&" : "#"}view=FitH`;
+  const normalized = normalizeUrl(url);
+  if (import.meta.env.DEV) {
+    return `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(normalized)}`;
+  }
+  return `/api/pdf-proxy?url=${encodeURIComponent(normalized)}`;
 }
 
 export default function EventoDetailPage() {
@@ -215,14 +219,39 @@ export default function EventoDetailPage() {
 
   const usefulLinks = sourceLink ? [...links, sourceLink] : links;
   const markdownComponents: Components = {
-    a: ({ ...props }) => (
-      <a
-        {...props}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:text-accent break-all"
-      />
-    ),
+    a: ({ href, children, ...props }) => {
+      const normalizedHref = href ? normalizeUrl(href) : "";
+      const pdfUrl = normalizedHref && isPdfUrl(normalizedHref) ? normalizedHref : null;
+
+      const linkNode = (
+        <a
+          {...props}
+          href={normalizedHref || href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:text-accent break-all"
+        >
+          {children}
+        </a>
+      );
+
+      if (!pdfUrl) return linkNode;
+
+      return (
+        <span className="my-2 inline-flex w-full flex-col gap-2">
+          {linkNode}
+          <span className="block overflow-hidden rounded-lg border border-border bg-white">
+            <iframe
+              src={buildPdfPreviewUrl(pdfUrl)}
+              title="Previsualización de PDF"
+              className="h-[560px] w-full"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+          </span>
+        </span>
+      );
+    },
   };
 
   const gallery = Array.isArray(event.gallery)
@@ -310,65 +339,21 @@ export default function EventoDetailPage() {
         {usefulLinks.length > 0 && (
           <div className="mb-6">
             <h2 className="text-xl font-display font-bold mb-3">Links útiles</h2>
-            <div className="space-y-3">
-              {usefulLinks.map((link, i) => {
-                const pdf = isPdfUrl(link.url);
-                return (
-                  <div
-                    key={`${link.url}-${i}`}
-                    className="rounded-lg border border-border bg-card/60 p-3"
+            <ul className="space-y-2">
+              {usefulLinks.map((link, i) => (
+                <li key={`${link.url}-${i}`}>
+                  <a
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:text-accent break-all"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground inline-flex items-center gap-1.5">
-                          {pdf ? <FileText className="h-4 w-4 text-accent" /> : <ExternalLink className="h-4 w-4 text-accent" />}
-                          {link.label || (pdf ? "Documento PDF" : "Enlace externo")}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground break-all">{link.url}</p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <a
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 rounded-md border border-primary/35 bg-primary/10 px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          Abrir
-                        </a>
-                        {pdf && (
-                          <a
-                            href={link.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download
-                            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground/80 transition-colors hover:bg-muted"
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                            Descargar
-                          </a>
-                        )}
-                      </div>
-                    </div>
-
-                    {pdf && (
-                      <details className="mt-3">
-                        <summary className="cursor-pointer text-xs font-semibold text-primary/90 hover:text-primary">
-                          Previsualizar PDF
-                        </summary>
-                        <div className="mt-2 overflow-hidden rounded-md border border-border bg-background">
-                          <iframe
-                            src={buildPdfPreviewUrl(link.url)}
-                            title={link.label || "Previsualización de PDF"}
-                            className="h-[420px] w-full"
-                          />
-                        </div>
-                      </details>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                    {link.label || link.url}
+                  </a>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
