@@ -52,6 +52,7 @@ interface PartnerRoom {
   alt?: string;
   scale?: number;
   logoClassName?: string;
+  href?: string;
 }
 
 function useAutoHorizontalScroll({
@@ -348,6 +349,7 @@ export default function HomePage() {
   const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL?.trim() || "https://instagram.com/fichasonlineuy";
   const telegramUrl  = import.meta.env.VITE_TELEGRAM_URL?.trim()  || "https://t.me/+59891856965";
   const whatsappUrl  = import.meta.env.VITE_WHATSAPP_URL?.trim()  || "https://wa.me";
+  const partnerDealUrl = import.meta.env.VITE_PARTNER_DEAL_URL?.trim() || telegramUrl;
 
   const socialLinks = [
     { label: "Instagram", href: instagramUrl, description: "Fotos, clips y anuncios",        icon: Instagram },
@@ -356,7 +358,8 @@ export default function HomePage() {
   ];
 
   const partnerRooms = useMemo<PartnerRoom[]>(
-    () => [
+    () =>
+      [
       { logo: "/logos/1xKgstyNJea5U1XlrZfvuJf6mA.avif", scale: 2.2 },
       { logo: "/logos/2mhHbxpxNIGM4XPkRRS7XAjugzo.avif", scale: 2.2 },
       { logo: "/logos/4QgmNilvdkzkVZ3TGcGFaTLfO4-1.avif", scale: 2.2 },
@@ -379,8 +382,8 @@ export default function HomePage() {
         scale: 1.12,
         logoClassName: "saturate-0 brightness-[2.2] contrast-[1.08]",
       },
-    ],
-    []
+    ].map((room) => ({ ...room, href: room.href ?? partnerDealUrl })),
+    [partnerDealUrl]
   );
 
   const uniquePartnerRooms = useMemo(() => {

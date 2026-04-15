@@ -1,58 +1,133 @@
-import { useRef } from "react";
-import gsap from "gsap";
-import { useGSAP } from "@gsap/react";
-
-gsap.registerPlugin(useGSAP);
+import { useEffect, useMemo, useRef } from "react";
 
 interface PartnerRoom {
   logo: string;
   alt?: string;
   scale?: number;
   logoClassName?: string;
+  href?: string;
 }
 
 interface PartnerMarqueeProps {
   rooms: PartnerRoom[];
 }
 
+const MARQUEE_SPEED_PX_PER_SECOND = 72;
+
 export function PartnerMarquee({ rooms }: PartnerMarqueeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const trackRef     = useRef<HTMLDivElement>(null);
-  const tweenRef     = useRef<gsap.core.Tween | null>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const sequenceRef = useRef<HTMLDivElement>(null);
 
-  // Duplicate for seamless loop
-  const doubled = [...rooms, ...rooms];
+  const rafRef = useRef<number | null>(null);
+  const lastTsRef = useRef<number | null>(null);
+  const offsetRef = useRef(0);
+  const sequenceWidthRef = useRef(0);
+  const pauseRef = useRef(false);
 
-  useGSAP(
-    () => {
-      const mm = gsap.matchMedia();
+  const prefersReducedMotion = useMemo(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }, []);
 
-      mm.add(
-        {
-          reduceMotion: "(prefers-reduced-motion: reduce)",
-          motion:       "(prefers-reduced-motion: no-preference)",
-        },
-        (ctx) => {
-          const { reduceMotion } = ctx.conditions!;
+  const canHover = useMemo(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+    return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  }, []);
 
-          if (reduceMotion) return;
+  useEffect(() => {
+    if (prefersReducedMotion) return;
 
-          tweenRef.current = gsap.to(trackRef.current, {
-            xPercent: -50,
-            duration: 28,
-            ease: "none",
-            repeat: -1,
-          });
-        }
-      );
+    const updateMetrics = () => {
+      const sequenceWidth = sequenceRef.current?.getBoundingClientRect().width ?? 0;
+      sequenceWidthRef.current = sequenceWidth;
 
-      return () => mm.revert();
-    },
-    { scope: containerRef }
-  );
+      if (sequenceWidth > 0) {
+        offsetRef.current = ((offsetRef.current % sequenceWidth) + sequenceWidth) % sequenceWidth;
+      } else {
+        offsetRef.current = 0;
+      }
+    };
 
-  const handleMouseEnter = () => tweenRef.current?.pause();
-  const handleMouseLeave = () => tweenRef.current?.resume();
+    const animate = (ts: number) => {
+      if (lastTsRef.current === null) {
+        lastTsRef.current = ts;
+      }
+
+      const delta = Math.max(0, ts - lastTsRef.current) / 1000;
+      lastTsRef.current = ts;
+
+      const sequenceWidth = sequenceWidthRef.current;
+      const track = trackRef.current;
+
+      if (track && sequenceWidth > 0 && !pauseRef.current) {
+        let nextOffset = offsetRef.current + MARQUEE_SPEED_PX_PER_SECOND * delta;
+        nextOffset = ((nextOffset % sequenceWidth) + sequenceWidth) % sequenceWidth;
+        offsetRef.current = nextOffset;
+        track.style.transform = `translate3d(${-nextOffset}px, 0, 0)`;
+      }
+
+      rafRef.current = window.requestAnimationFrame(animate);
+    };
+
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateMetrics) : null;
+    if (observer) {
+      if (containerRef.current) observer.observe(containerRef.current);
+      if (sequenceRef.current) observer.observe(sequenceRef.current);
+    } else {
+      window.addEventListener("resize", updateMetrics);
+    }
+
+    const images = sequenceRef.current?.querySelectorAll("img") ?? [];
+    const imageListeners: Array<{ img: HTMLImageElement; handler: () => void }> = [];
+    images.forEach((img) => {
+      const htmlImg = img as HTMLImageElement;
+      if (!htmlImg.complete) {
+        const handler = () => updateMetrics();
+        htmlImg.addEventListener("load", handler, { once: true });
+        htmlImg.addEventListener("error", handler, { once: true });
+        imageListeners.push({ img: htmlImg, handler });
+      }
+    });
+
+    updateMetrics();
+    rafRef.current = window.requestAnimationFrame(animate);
+
+    return () => {
+      if (rafRef.current !== null) {
+        window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      lastTsRef.current = null;
+
+      if (observer) {
+        observer.disconnect();
+      } else {
+        window.removeEventListener("resize", updateMetrics);
+      }
+
+      imageListeners.forEach(({ img, handler }) => {
+        img.removeEventListener("load", handler);
+        img.removeEventListener("error", handler);
+      });
+    };
+  }, [prefersReducedMotion]);
+
+  const handleMouseEnter = () => {
+    if (canHover) pauseRef.current = true;
+  };
+
+  const handleMouseLeave = () => {
+    if (canHover) pauseRef.current = false;
+  };
+
+  const handlePointerDown = () => {
+    pauseRef.current = true;
+  };
+
+  const handlePointerUp = () => {
+    pauseRef.current = false;
+  };
 
   return (
     <div
@@ -60,16 +135,25 @@ export function PartnerMarquee({ rooms }: PartnerMarqueeProps) {
       className="relative overflow-hidden"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
     >
-      {/* Edge fade masks */}
-      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-background to-transparent" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-background to-transparent" />
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-background via-background/88 to-transparent sm:w-16" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background via-background/88 to-transparent sm:w-16" />
 
       <div className="py-2">
-        <div ref={trackRef} className="flex w-max gap-3 pr-3">
-          {doubled.map((room, i) => (
-            <LogoCard key={`${room.logo}-${i}`} room={room} />
-          ))}
+        <div ref={trackRef} className="flex w-max gap-3 pr-3 will-change-transform">
+          <div ref={sequenceRef} className="flex w-max gap-3 pr-3">
+            {rooms.map((room, i) => (
+              <LogoCard key={`${room.logo}-a-${i}`} room={room} />
+            ))}
+          </div>
+          <div className="flex w-max gap-3 pr-3" aria-hidden="true">
+            {rooms.map((room, i) => (
+              <LogoCard key={`${room.logo}-b-${i}`} room={room} />
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -77,38 +161,11 @@ export function PartnerMarquee({ rooms }: PartnerMarqueeProps) {
 }
 
 function LogoCard({ room }: { room: PartnerRoom }) {
-  const cardRef = useRef<HTMLDivElement>(null);
+  const cardClassName =
+    "group relative flex h-[86px] w-[210px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/12 bg-[#140f1b] p-3 shadow-[0_14px_32px_rgba(0,0,0,0.2)] transition-transform duration-300 ease-out hover:-translate-y-1 hover:scale-[1.03] hover:border-accent/45 hover:shadow-[0_18px_40px_rgba(143,60,249,0.25)]";
 
-  const handleEnter = () => {
-    gsap.to(cardRef.current, {
-      scale: 1.06,
-      y: -4,
-      borderColor: "rgba(143,60,249,0.45)",
-      boxShadow: "0 18px 40px rgba(143,60,249,0.25)",
-      duration: 0.3,
-      ease: "power2.out",
-    });
-  };
-
-  const handleLeave = () => {
-    gsap.to(cardRef.current, {
-      scale: 1,
-      y: 0,
-      borderColor: "rgba(255,255,255,0.12)",
-      boxShadow: "0 14px 32px rgba(0,0,0,0.2)",
-      duration: 0.4,
-      ease: "power2.inOut",
-    });
-  };
-
-  return (
-    <div
-      ref={cardRef}
-      onMouseEnter={handleEnter}
-      onMouseLeave={handleLeave}
-      className="group relative h-[86px] w-[210px] shrink-0 overflow-hidden rounded-2xl border border-white/12 bg-[#140f1b] p-3 shadow-[0_14px_32px_rgba(0,0,0,0.2)] cursor-default"
-      style={{ willChange: "transform" }}
-    >
+  const content = (
+    <>
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(172,102,255,0.20),transparent_70%)] opacity-60" />
       <div className="relative flex h-full items-center justify-center overflow-hidden">
         <img
@@ -120,6 +177,27 @@ function LogoCard({ room }: { room: PartnerRoom }) {
           style={{ transform: `scale(${room.scale ?? 1.95})` }}
         />
       </div>
+    </>
+  );
+
+  if (room.href) {
+    return (
+      <a
+        href={room.href}
+        target="_blank"
+        rel="noreferrer noopener"
+        aria-label={room.alt ? `Abrir oferta de ${room.alt}` : "Abrir oferta de sala"}
+        className={`${cardClassName} cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
+        style={{ willChange: "transform" }}
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <div className={`${cardClassName} cursor-default`} style={{ willChange: "transform" }}>
+      {content}
     </div>
   );
 }
