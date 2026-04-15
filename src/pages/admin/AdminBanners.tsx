@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { BannerMedia } from "@/components/BannerMedia";
 import { Loader2, Upload, X, ExternalLink } from "lucide-react";
 
-type Position = "top_left" | "top_right" | "bottom_left" | "bottom_right";
+type Position = "top_left" | "top_right" | "bottom_left" | "bottom_right" | "content_vertical";
 
 interface Banner {
   position: Position;
@@ -25,9 +25,10 @@ const POSITION_LABELS: Record<Position, string> = {
   top_right:    "Superior derecho",
   bottom_left:  "Inferior izquierdo",
   bottom_right: "Inferior derecho",
+  content_vertical: "Contenido vertical (anuncio 5)",
 };
 
-const POSITIONS: Position[] = ["top_left", "top_right", "bottom_left", "bottom_right"];
+const POSITIONS: Position[] = ["top_left", "top_right", "bottom_left", "bottom_right", "content_vertical"];
 
 function getBannerUploadContentType(file: File) {
   if (file.type) return file.type;
@@ -277,7 +278,7 @@ export default function AdminBanners() {
     const map: Record<string, Banner> = {};
     for (const b of (data ?? []) as Banner[]) map[b.position] = b;
 
-    // Ensure all 4 positions exist in the map
+    // Ensure all positions exist in the map
     for (const pos of POSITIONS) {
       if (!map[pos]) {
         map[pos] = { position: pos, image_url: null, link_url: null, affiliate_code: null, alt_text: null, is_active: true };
@@ -301,7 +302,7 @@ export default function AdminBanners() {
         <div className="mb-8">
           <h1 className="text-3xl font-display font-bold mb-1">Banners de la home</h1>
           <p className="text-sm text-muted-foreground">
-            Gestioná los 4 anuncios del hero. Cada slot acepta imágenes, GIFs y videos cortos.
+            Gestioná los 5 anuncios (hero + contenido vertical). Cada slot acepta imágenes, GIFs y videos cortos.
           </p>
         </div>
 
@@ -312,7 +313,7 @@ export default function AdminBanners() {
         ) : banners ? (
           <>
             {/* Visual layout hint */}
-            <div className="hidden md:grid grid-cols-[1fr_2fr_1fr] gap-2 mb-6 p-3 rounded-lg border border-dashed border-primary/20 bg-primary/5 text-xs text-muted-foreground text-center">
+            <div className="hidden md:grid grid-cols-[1fr_2fr_1fr] gap-2 mb-3 p-3 rounded-lg border border-dashed border-primary/20 bg-primary/5 text-xs text-muted-foreground text-center">
               <div className="space-y-2">
                 <div className="bg-primary/10 rounded py-2">Superior izq.</div>
                 <div className="bg-primary/10 rounded py-2">Inferior izq.</div>
@@ -325,8 +326,11 @@ export default function AdminBanners() {
                 <div className="bg-primary/10 rounded py-2">Inferior der.</div>
               </div>
             </div>
+            <div className="mb-6 hidden rounded-lg border border-dashed border-primary/20 bg-primary/5 px-3 py-2 text-center text-xs text-muted-foreground md:block">
+              Anuncio 5: bloque vertical en contenido (entre noticias y calendario).
+            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-5">
               {POSITIONS.map((pos) => (
                 <BannerCard key={pos} banner={banners[pos]} onSave={handleSave} />
               ))}

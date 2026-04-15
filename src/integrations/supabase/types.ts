@@ -112,7 +112,7 @@ export type Database = {
       home_banners: {
         Row: {
           id: string
-          position: "top_left" | "top_right" | "bottom_left" | "bottom_right"
+          position: "top_left" | "top_right" | "bottom_left" | "bottom_right" | "content_vertical"
           image_url: string | null
           link_url: string | null
           affiliate_code: string | null
@@ -123,7 +123,7 @@ export type Database = {
         }
         Insert: {
           id?: string
-          position: "top_left" | "top_right" | "bottom_left" | "bottom_right"
+          position: "top_left" | "top_right" | "bottom_left" | "bottom_right" | "content_vertical"
           image_url?: string | null
           link_url?: string | null
           affiliate_code?: string | null
@@ -134,7 +134,7 @@ export type Database = {
         }
         Update: {
           id?: string
-          position?: "top_left" | "top_right" | "bottom_left" | "bottom_right"
+          position?: "top_left" | "top_right" | "bottom_left" | "bottom_right" | "content_vertical"
           image_url?: string | null
           link_url?: string | null
           affiliate_code?: string | null

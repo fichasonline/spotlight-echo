@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type RefObject } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type RefObject } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
@@ -39,7 +39,7 @@ interface Event {
 }
 
 interface HomeBanner {
-  position: "top_left" | "top_right" | "bottom_left" | "bottom_right";
+  position: "top_left" | "top_right" | "bottom_left" | "bottom_right" | "content_vertical";
   image_url: string | null;
   link_url: string | null;
   affiliate_code: string | null;
@@ -830,7 +830,8 @@ export default function HomePage() {
         </section>
 
         {/* Upcoming events */}
-        <section>
+        <section className="relative">
+      
           <motion.div
             initial={{ opacity: 0, x: -16 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -876,7 +877,7 @@ export default function HomePage() {
 
             <div
               ref={eventsScrollerRef}
-              className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain [touch-action:pan-x_pan-y] pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="flex items-start snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain [touch-action:pan-x_pan-y] pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               {...eventsScrollerInteractionProps}
             >
             {events.map((e, i) => {
@@ -885,49 +886,68 @@ export default function HomePage() {
               const location = [e.venue, e.city, e.country].filter(Boolean).join(" · ");
               const monthLabel = format(parseDateValue(e.start_date), "MMM", { locale: es }).toUpperCase();
               return (
-                <motion.div
-                  key={e.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.07, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-                  data-carousel-card="true"
-                  className="min-w-0 shrink-0 snap-start basis-[88%] sm:basis-[72%] lg:basis-[500px]"
-                >
-                  <Link
-                    to={`/eventos/${e.id}`}
-                    className="group flex min-h-[136px] items-center gap-4 rounded-[18px] border border-white/12 bg-[#130e18] p-3 shadow-[0_18px_36px_rgba(0,0,0,0.22)] transition-colors hover:border-accent/35"
+                <Fragment key={e.id}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.07, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                    data-carousel-card="true"
+                    className="min-w-0 shrink-0 snap-start basis-[88%] sm:basis-[72%] lg:basis-[500px]"
                   >
-                    <div className="flex h-[98px] w-[114px] shrink-0 flex-col items-center justify-center rounded-[18px] bg-[linear-gradient(180deg,#b956ff_0%,#8f3cf9_100%)] text-white shadow-[0_12px_30px_rgba(143,60,249,0.35)]">
-                      <span className="text-[3.15rem] font-black leading-none tracking-[-0.08em]">
-                        {format(parseDateValue(e.start_date), "dd")}
-                      </span>
-                      <span className="mt-1 text-[1rem] font-black uppercase leading-none tracking-[-0.04em]">
-                        {monthLabel}
-                      </span>
-                    </div>
-
-                    <div className="min-w-0 flex-1 pr-2">
-                      <div className="mb-2 flex items-start justify-between gap-3">
-                        <h3 className="font-display line-clamp-2 text-[1.05rem] font-black uppercase leading-[0.9] tracking-[-0.04em] text-white lg:text-[1.15rem]">
-                          {e.name}
-                        </h3>
-                        {isLive && (
-                          <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full border border-red-500/35 bg-red-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-red-300">
-                            <span className="relative flex h-2 w-2">
-                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                              <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-                            </span>
-                            En vivo
-                          </span>
-                        )}
+                    <Link
+                      to={`/eventos/${e.id}`}
+                      className="group flex min-h-[136px] items-center gap-4 rounded-[18px] border border-white/12 bg-[#130e18] p-3 shadow-[0_18px_36px_rgba(0,0,0,0.22)] transition-colors hover:border-accent/35"
+                    >
+                      <div className="flex h-[98px] w-[114px] shrink-0 flex-col items-center justify-center rounded-[18px] bg-[linear-gradient(180deg,#b956ff_0%,#8f3cf9_100%)] text-white shadow-[0_12px_30px_rgba(143,60,249,0.35)]">
+                        <span className="text-[3.15rem] font-black leading-none tracking-[-0.08em]">
+                          {format(parseDateValue(e.start_date), "dd")}
+                        </span>
+                        <span className="mt-1 text-[1rem] font-black uppercase leading-none tracking-[-0.04em]">
+                          {monthLabel}
+                        </span>
                       </div>
 
-                      <p className="line-clamp-2 text-[0.9rem] font-medium uppercase leading-[1.02] tracking-[0.01em] text-white/32 lg:text-[1rem]">
-                        {location || "Evento destacado en fichas online"}
-                      </p>
-                    </div>
-                  </Link>
-                </motion.div>
+                      <div className="min-w-0 flex-1 pr-2">
+                        <div className="mb-2 flex items-start justify-between gap-3">
+                          <h3 className="font-display line-clamp-2 text-[1.05rem] font-black uppercase leading-[0.9] tracking-[-0.04em] text-white lg:text-[1.15rem]">
+                            {e.name}
+                          </h3>
+                          {isLive && (
+                            <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full border border-red-500/35 bg-red-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-red-300">
+                              <span className="relative flex h-2 w-2">
+                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                                <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                              </span>
+                              En vivo
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="line-clamp-2 text-[0.9rem] font-medium uppercase leading-[1.02] tracking-[0.01em] text-white/32 lg:text-[1rem]">
+                          {location || "Evento destacado en fichas online"}
+                        </p>
+                      </div>
+                    </Link>
+                  </motion.div>
+
+                  {i === 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.07 + 0.04, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                      data-carousel-card="true"
+                      className="hidden min-w-0 shrink-0 snap-start lg:block lg:basis-[500px]"
+                    >
+                      <div className="flex justify-center">
+                        <BannerSlot
+                          banner={banners["content_vertical"]}
+                          className="h-[443px] w-[263px] rounded-[32px] shadow-[0_24px_52px_rgba(0,0,0,0.38)]"
+                          onAction={setActiveBanner}
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </Fragment>
               );
             })}
             {events.length === 0 && (
