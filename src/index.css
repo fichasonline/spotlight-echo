@@ -123,7 +123,20 @@
   }
 }
 
+@keyframes partner-marquee-scroll {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
 @layer utilities {
+  .partner-marquee-track {
+    animation: partner-marquee-scroll var(--partner-marquee-duration, 28s) linear infinite;
+  }
+
   .text-gradient-primary {
     background: linear-gradient(135deg, hsl(273 66% 66%), hsl(0 0% 95%));
     -webkit-background-clip: text;

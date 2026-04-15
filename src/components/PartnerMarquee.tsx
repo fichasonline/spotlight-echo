@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { openSupportChat } from "@/lib/supportChat";
 
 interface PartnerRoom {
@@ -14,17 +14,14 @@ interface PartnerMarqueeProps {
 }
 
 const MARQUEE_SPEED_PX_PER_SECOND = 72;
+const REDUCED_MOTION_SPEED_FACTOR = 0.45;
+const MIN_MARQUEE_DURATION_SECONDS = 16;
 
 export function PartnerMarquee({ rooms }: PartnerMarqueeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
   const sequenceRef = useRef<HTMLDivElement>(null);
-
-  const rafRef = useRef<number | null>(null);
-  const lastTsRef = useRef<number | null>(null);
-  const offsetRef = useRef(0);
-  const sequenceWidthRef = useRef(0);
-  const pauseRef = useRef(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [durationSeconds, setDurationSeconds] = useState(28);
 
   const prefersReducedMotion = useMemo(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
@@ -37,38 +34,16 @@ export function PartnerMarquee({ rooms }: PartnerMarqueeProps) {
   }, []);
 
   useEffect(() => {
-    if (prefersReducedMotion) return;
-
     const updateMetrics = () => {
       const sequenceWidth = sequenceRef.current?.getBoundingClientRect().width ?? 0;
-      sequenceWidthRef.current = sequenceWidth;
+      if (sequenceWidth <= 0) return;
 
-      if (sequenceWidth > 0) {
-        offsetRef.current = ((offsetRef.current % sequenceWidth) + sequenceWidth) % sequenceWidth;
-      } else {
-        offsetRef.current = 0;
-      }
-    };
+      const speed = prefersReducedMotion
+        ? MARQUEE_SPEED_PX_PER_SECOND * REDUCED_MOTION_SPEED_FACTOR
+        : MARQUEE_SPEED_PX_PER_SECOND;
+      const nextDuration = Math.max(MIN_MARQUEE_DURATION_SECONDS, sequenceWidth / speed);
 
-    const animate = (ts: number) => {
-      if (lastTsRef.current === null) {
-        lastTsRef.current = ts;
-      }
-
-      const delta = Math.max(0, ts - lastTsRef.current) / 1000;
-      lastTsRef.current = ts;
-
-      const sequenceWidth = sequenceWidthRef.current;
-      const track = trackRef.current;
-
-      if (track && sequenceWidth > 0 && !pauseRef.current) {
-        let nextOffset = offsetRef.current + MARQUEE_SPEED_PX_PER_SECOND * delta;
-        nextOffset = ((nextOffset % sequenceWidth) + sequenceWidth) % sequenceWidth;
-        offsetRef.current = nextOffset;
-        track.style.transform = `translate3d(${-nextOffset}px, 0, 0)`;
-      }
-
-      rafRef.current = window.requestAnimationFrame(animate);
+      setDurationSeconds((current) => (Math.abs(current - nextDuration) > 0.05 ? nextDuration : current));
     };
 
     const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateMetrics) : null;
@@ -92,15 +67,8 @@ export function PartnerMarquee({ rooms }: PartnerMarqueeProps) {
     });
 
     updateMetrics();
-    rafRef.current = window.requestAnimationFrame(animate);
 
     return () => {
-      if (rafRef.current !== null) {
-        window.cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      lastTsRef.current = null;
-
       if (observer) {
         observer.disconnect();
       } else {
@@ -114,12 +82,21 @@ export function PartnerMarquee({ rooms }: PartnerMarqueeProps) {
     };
   }, [prefersReducedMotion]);
 
+  const trackStyle = useMemo(
+    () =>
+      ({
+        animationPlayState: isPaused ? "paused" : "running",
+        "--partner-marquee-duration": `${durationSeconds}s`,
+      }) as CSSProperties,
+    [durationSeconds, isPaused]
+  );
+
   const handleMouseEnter = () => {
-    if (canHover) pauseRef.current = true;
+    if (canHover) setIsPaused(true);
   };
 
   const handleMouseLeave = () => {
-    if (canHover) pauseRef.current = false;
+    if (canHover) setIsPaused(false);
   };
 
   return (
@@ -133,7 +110,7 @@ export function PartnerMarquee({ rooms }: PartnerMarqueeProps) {
       <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background via-background/88 to-transparent sm:w-16" />
 
       <div className="overflow-hidden py-2">
-        <div ref={trackRef} className="flex w-max gap-3 pr-3 will-change-transform">
+        <div style={trackStyle} className="partner-marquee-track flex w-max gap-3 pr-3 will-change-transform">
           <div ref={sequenceRef} className="flex w-max gap-3 pr-3">
             {rooms.map((room, i) => (
               <LogoCard key={`${room.logo}-a-${i}`} room={room} />
