@@ -240,23 +240,69 @@ export default function EventoDetailPage() {
       );
 
       if (!pdfUrl) return linkNode;
+      const openPdfButton = (
+        <a
+          href={resolvedHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex shrink-0 items-center gap-1 rounded-md border border-primary/35 px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:border-primary/60 hover:bg-primary/10"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Abrir PDF
+        </a>
+      );
+
       if (useMobilePdfPreview) {
         return (
           <span className="my-2 inline-flex w-full flex-col gap-2">
-            {linkNode}
             <span className="inline-flex w-full items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-3 py-2">
               <span className="text-xs text-muted-foreground">
                 En móvil abrimos el PDF en el visor nativo para evitar errores de iframe.
               </span>
-              <a
-                href={resolvedHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-primary/35 px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:border-primary/60 hover:bg-primary/10"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                Abrir PDF
-              </a>
+              {openPdfButton}
+            </span>
+          </span>
+        );
+      }
+
+      return (
+        <span className="my-2 inline-flex w-full flex-col gap-2">
+          <span className="inline-flex justify-end">
+            {openPdfButton}
+          </span>
+          <span className="block overflow-hidden rounded-lg border border-border bg-white">
+            <iframe
+              src={buildPdfPreviewUrl(pdfUrl)}
+              title="Previsualización de PDF"
+              className="h-[560px] w-full"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+          </span>
+        </span>
+      );
+    },
+  };
+  
+  const gallery = Array.isArray(event.gallery)
+    ? event.gallery
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
+
+  const markdownClassName = `
+    prose prose-invert prose-base max-w-none
+    prose-headings:font-display prose-headings:tracking-tight
+    prose-p:leading-7 prose-p:text-foreground/90
+    prose-li:leading-7
+    prose-a:text-primary hover:prose-a:text-accent
+    prose-strong:text-foreground
+    prose-blockquote:border-primary/40 prose-blockquote:text-foreground/80
+    prose-hr:border-border
+  `;
+*** End Patch
+#+#+#+#+assistant to=functions.apply_patch code వ్యాఖ్య
             </span>
           </span>
         );
