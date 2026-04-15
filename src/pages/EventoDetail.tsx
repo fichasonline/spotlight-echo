@@ -3,9 +3,11 @@ import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import ReactMarkdown from "react-markdown";
+import type { Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { MapPin, Calendar, ExternalLink, ArrowLeft } from "lucide-react";
+import { MapPin, Calendar, ExternalLink, ArrowLeft, FileText, Eye, Download } from "lucide-react";
 import { parseDateValue } from "@/lib/date";
 import {
   SITE_NAME,
@@ -35,6 +37,23 @@ interface Event {
   buy_in: string | null;
   guaranteed: string | null;
   source_url: string | null;
+}
+
+function normalizeUrl(rawUrl: string) {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return "";
+
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  return `https://${trimmed}`;
+}
+
+function isPdfUrl(url: string) {
+  return /\.pdf(?:$|[?#])/i.test(url);
+}
+
+function buildPdfPreviewUrl(url: string) {
+  return `${url}${url.includes("#") ? "&" : "#"}view=FitH`;
 }
 
 export default function EventoDetailPage() {
@@ -181,13 +200,30 @@ export default function EventoDetailPage() {
         .map((item) => {
           if (!item || typeof item !== "object") return null;
           const maybeLink = item as { label?: unknown; url?: unknown };
-          const url = typeof maybeLink.url === "string" ? maybeLink.url.trim() : "";
+          const rawUrl = typeof maybeLink.url === "string" ? maybeLink.url.trim() : "";
+          const url = rawUrl ? normalizeUrl(rawUrl) : "";
           if (!url) return null;
           const label = typeof maybeLink.label === "string" ? maybeLink.label.trim() : "";
           return { label, url };
         })
         .filter((item): item is { label: string; url: string } => item !== null)
     : [];
+
+  const sourceLink = event.source_url?.trim()
+    ? { label: "Fuente Oficial", url: normalizeUrl(event.source_url) }
+    : null;
+
+  const usefulLinks = sourceLink ? [...links, sourceLink] : links;
+  const markdownComponents: Components = {
+    a: ({ ...props }) => (
+      <a
+        {...props}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:text-accent break-all"
+      />
+    ),
+  };
 
   const gallery = Array.isArray(event.gallery)
     ? event.gallery
@@ -254,7 +290,9 @@ export default function EventoDetailPage() {
 
         {event.description && (
           <div className={`mb-4 ${markdownClassName}`}>
-            <ReactMarkdown>{event.description}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {event.description}
+            </ReactMarkdown>
           </div>
         )}
 
@@ -262,38 +300,74 @@ export default function EventoDetailPage() {
           <div className="mb-6">
             <h2 className="text-xl font-display font-bold mb-2">Información del evento</h2>
             <div className={markdownClassName}>
-              <ReactMarkdown>{event.details}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                {event.details}
+              </ReactMarkdown>
             </div>
           </div>
         )}
 
-        {links.length > 0 && (
+        {usefulLinks.length > 0 && (
           <div className="mb-6">
             <h2 className="text-xl font-display font-bold mb-3">Links útiles</h2>
-            <div className="flex flex-wrap gap-2">
-              {links.map((link, i) => (
-                <a
-                  key={`${link.url}-${i}`}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  {link.label || link.url}
-                </a>
-              ))}
-              {event.source_url && (
-                <a
-                  href={event.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline font-semibold"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  Fuente Oficial
-                </a>
-              )}
+            <div className="space-y-3">
+              {usefulLinks.map((link, i) => {
+                const pdf = isPdfUrl(link.url);
+                return (
+                  <div
+                    key={`${link.url}-${i}`}
+                    className="rounded-lg border border-border bg-card/60 p-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground inline-flex items-center gap-1.5">
+                          {pdf ? <FileText className="h-4 w-4 text-accent" /> : <ExternalLink className="h-4 w-4 text-accent" />}
+                          {link.label || (pdf ? "Documento PDF" : "Enlace externo")}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground break-all">{link.url}</p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-md border border-primary/35 bg-primary/10 px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          Abrir
+                        </a>
+                        {pdf && (
+                          <a
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground/80 transition-colors hover:bg-muted"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            Descargar
+                          </a>
+                        )}
+                      </div>
+                    </div>
+
+                    {pdf && (
+                      <details className="mt-3">
+                        <summary className="cursor-pointer text-xs font-semibold text-primary/90 hover:text-primary">
+                          Previsualizar PDF
+                        </summary>
+                        <div className="mt-2 overflow-hidden rounded-md border border-border bg-background">
+                          <iframe
+                            src={buildPdfPreviewUrl(link.url)}
+                            title={link.label || "Previsualización de PDF"}
+                            className="h-[420px] w-full"
+                          />
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
