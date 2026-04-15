@@ -87,6 +87,9 @@
   html,
   body,
   #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
     /* Keep touch scrolling, but block pinch-zoom gestures on mobile. */
     touch-action: pan-x pan-y;
     -ms-touch-action: pan-x pan-y;

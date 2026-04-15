@@ -133,7 +133,7 @@ export function PartnerMarquee({ rooms }: PartnerMarqueeProps) {
   return (
     <div
       ref={containerRef}
-      className="relative"
+      className="relative overflow-x-clip"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onPointerDown={handlePointerDown}
@@ -143,7 +143,7 @@ export function PartnerMarquee({ rooms }: PartnerMarqueeProps) {
       <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-background via-background/88 to-transparent sm:w-16" />
       <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background via-background/88 to-transparent sm:w-16" />
 
-      <div className="py-2">
+      <div className="overflow-hidden py-2">
         <div ref={trackRef} className="flex w-max gap-3 pr-3 will-change-transform">
           <div ref={sequenceRef} className="flex w-max gap-3 pr-3">
             {rooms.map((room, i) => (

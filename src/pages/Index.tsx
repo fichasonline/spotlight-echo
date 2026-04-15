@@ -18,6 +18,8 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getLocalDateISO, parseDateValue } from "@/lib/date";
 
+const NEWS_CAROUSEL_LIMIT = 10;
+
 /* ─── Types ────────────────────────────────────────────────────── */
 interface Article {
   id: string;
@@ -450,12 +452,20 @@ export default function HomePage() {
 
     (async () => {
       const today = getLocalDateISO();
-      const [artRes, evtRes, bannerRes] = await Promise.all([
-        supabase
-          .from("articles")
-          .select("id, slug, headline, summary, image_url, published_at")
-          .eq("status", "published")
-          .order("published_at", { ascending: false }),
+      const artResPromise = supabase
+        .from("articles")
+        .select("id, slug, headline, summary, image_url, published_at")
+        .eq("status", "published")
+        .order("published_at", { ascending: false })
+        .limit(NEWS_CAROUSEL_LIMIT);
+
+      // News carousel should render as soon as this single query resolves.
+      void artResPromise.then((artRes) => {
+        if (cancelled) return;
+        if (artRes.data) setArticles(artRes.data);
+      });
+
+      const [evtRes, bannerRes] = await Promise.all([
         supabase
           .from("events")
           .select("id, name, start_date, end_date, city, country, venue")
@@ -471,7 +481,6 @@ export default function HomePage() {
       if (cancelled) return;
       clearTimeout(timeout);
 
-      if (artRes.data) setArticles(artRes.data);
       if (evtRes.data) setEvents(evtRes.data);
       if (bannerRes.data) {
         const map: Record<string, HomeBanner> = {};
@@ -549,7 +558,7 @@ export default function HomePage() {
   });
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen overflow-x-clip bg-background">
       <Navbar />
 
       {/* ══════════════════════════════════════════════════════════════
