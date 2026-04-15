@@ -59,13 +59,11 @@ function useAutoHorizontalScroll({
   pauseRef,
   enabled,
   intervalMs = 4200,
-  minViewportWidth = 1024,
 }: {
   containerRef: RefObject<HTMLDivElement>;
   pauseRef: MutableRefObject<boolean>;
   enabled: boolean;
   intervalMs?: number;
-  minViewportWidth?: number;
 }) {
   useEffect(() => {
     if (typeof window === "undefined" || !enabled) return;
@@ -73,12 +71,9 @@ function useAutoHorizontalScroll({
     const container = containerRef.current;
     if (!container) return;
 
-    const desktopMq = window.matchMedia(`(min-width: ${minViewportWidth}px)`);
     const reducedMotionMq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const coarsePointerMq = window.matchMedia("(pointer: coarse)");
 
-    // Mobile optimization: avoid interval-based scroll on touch devices.
-    if (!desktopMq.matches || reducedMotionMq.matches || coarsePointerMq.matches) return;
+    if (reducedMotionMq.matches) return;
 
     const intervalId = window.setInterval(() => {
       if (pauseRef.current || document.hidden) return;
@@ -104,7 +99,7 @@ function useAutoHorizontalScroll({
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [containerRef, pauseRef, enabled, intervalMs, minViewportWidth]);
+  }, [containerRef, pauseRef, enabled, intervalMs]);
 }
 
 function useVerticalScrollPassthrough(scrollerRef: RefObject<HTMLDivElement>) {
@@ -333,8 +328,11 @@ export default function HomePage() {
   const eventsScrollerRef       = useRef<HTMLDivElement | null>(null);
   const newsAutoScrollPausedRef = useRef(false);
   const eventsAutoScrollPausedRef = useRef(false);
+  const eventBannerInsertAfterIndex = 2;
+  const hasEventsBannerCard = events.length > eventBannerInsertAfterIndex;
+  const eventsCarouselCount = events.length + (hasEventsBannerCard ? 1 : 0);
   const activeArticleIndex = useScrollDots(articlesScrollerRef, articles.length);
-  const activeEventIndex = useScrollDots(eventsScrollerRef, events.length);
+  const activeEventIndex = useScrollDots(eventsScrollerRef, eventsCarouselCount);
   useVerticalScrollPassthrough(articlesScrollerRef);
   useVerticalScrollPassthrough(eventsScrollerRef);
 
@@ -545,7 +543,7 @@ export default function HomePage() {
   useAutoHorizontalScroll({
     containerRef: eventsScrollerRef,
     pauseRef: eventsAutoScrollPausedRef,
-    enabled: events.length > 1,
+    enabled: eventsCarouselCount > 1,
     intervalMs: 4600,
   });
 
@@ -730,9 +728,9 @@ export default function HomePage() {
             {articles.map((a, i) => (
               <motion.div
                 key={a.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.07, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ delay: Math.min(i, 3) * 0.06, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                 data-carousel-card="true"
                 className="min-w-0 shrink-0 snap-start basis-[84%] sm:basis-[68%] lg:basis-[371px]"
               >
@@ -851,7 +849,7 @@ export default function HomePage() {
             </Link>
           </motion.div>
 
-          {events.length > 1 && (
+          {eventsCarouselCount > 1 && (
             <div className="mb-4 flex items-center justify-center gap-2 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white/40 lg:justify-end">
               <span className="hidden lg:inline">Se mueve solo</span>
               <span className="hidden lg:inline">•</span>
@@ -868,7 +866,7 @@ export default function HomePage() {
           )}
 
           <div className="relative">
-            {events.length > 1 && (
+            {eventsCarouselCount > 1 && (
               <>
                 <div className="pointer-events-none absolute inset-y-0 left-0 z-10 hidden w-12 bg-gradient-to-r from-background via-background/80 to-transparent lg:block" />
                 <div className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-16 bg-gradient-to-l from-background via-background/84 to-transparent lg:block" />
@@ -888,9 +886,9 @@ export default function HomePage() {
               return (
                 <Fragment key={e.id}>
                   <motion.div
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 14 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.07, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                    transition={{ delay: Math.min(i, 3) * 0.06, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                     data-carousel-card="true"
                     className="min-w-0 shrink-0 snap-start basis-[88%] sm:basis-[72%] lg:basis-[500px]"
                   >
@@ -930,18 +928,18 @@ export default function HomePage() {
                     </Link>
                   </motion.div>
 
-                  {i === 0 && (
+                  {i === eventBannerInsertAfterIndex && (
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.07 + 0.04, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
                       data-carousel-card="true"
-                      className="hidden min-w-0 shrink-0 snap-start lg:block lg:basis-[500px]"
+                      className="min-w-0 shrink-0 snap-start basis-[88%] sm:basis-[72%] lg:basis-[500px]"
                     >
-                      <div className="flex justify-center">
+                      <div className="h-[136px]">
                         <BannerSlot
                           banner={banners["content_vertical"]}
-                          className="h-[443px] w-[263px] rounded-[32px] shadow-[0_24px_52px_rgba(0,0,0,0.38)]"
+                          className="h-full w-full rounded-[18px] border border-white/12 bg-[#130e18] shadow-[0_18px_36px_rgba(0,0,0,0.22)]"
                           onAction={setActiveBanner}
                         />
                       </div>
@@ -960,9 +958,9 @@ export default function HomePage() {
             </div>
           </div>
 
-          {events.length > 1 && (
+          {eventsCarouselCount > 1 && (
             <div className="mt-3 flex justify-center gap-1.5 lg:hidden">
-              {events.map((_, i) => (
+              {Array.from({ length: eventsCarouselCount }).map((_, i) => (
                 <motion.div
                   key={i}
                   animate={{
