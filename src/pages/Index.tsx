@@ -724,15 +724,14 @@ export default function HomePage() {
 
             <div
               ref={articlesScrollerRef}
-              className="flex snap-x snap-mandatory gap-5 overflow-x-auto overscroll-x-contain touch-pan-x pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="flex snap-x snap-mandatory gap-5 overflow-x-auto overscroll-x-contain [touch-action:pan-x_pan-y] pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               {...newsScrollerInteractionProps}
             >
             {articles.map((a, i) => (
               <motion.div
                 key={a.id}
                 initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.07, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
                 data-carousel-card="true"
                 className="min-w-0 shrink-0 snap-start basis-[84%] sm:basis-[68%] lg:basis-[371px]"
@@ -877,7 +876,7 @@ export default function HomePage() {
 
             <div
               ref={eventsScrollerRef}
-              className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain touch-pan-x pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain [touch-action:pan-x_pan-y] pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               {...eventsScrollerInteractionProps}
             >
             {events.map((e, i) => {
@@ -889,8 +888,7 @@ export default function HomePage() {
                 <motion.div
                   key={e.id}
                   initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-60px" }}
+                  animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.07, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
                   data-carousel-card="true"
                   className="min-w-0 shrink-0 snap-start basis-[88%] sm:basis-[72%] lg:basis-[500px]"

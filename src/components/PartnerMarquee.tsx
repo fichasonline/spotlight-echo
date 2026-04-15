@@ -66,7 +66,7 @@ export function PartnerMarquee({ rooms }: PartnerMarqueeProps) {
       <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-background to-transparent" />
 
       <div className="py-2">
-        <div ref={trackRef} className="flex w-max gap-3">
+        <div ref={trackRef} className="flex w-max gap-3 pr-3">
           {doubled.map((room, i) => (
             <LogoCard key={`${room.logo}-${i}`} room={room} />
           ))}
