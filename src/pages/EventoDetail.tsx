@@ -58,13 +58,6 @@ function buildPdfPreviewUrl(url: string) {
   return `/api/pdf-proxy?url=${encodeURIComponent(normalized)}`;
 }
 
-function buildMobilePdfPreviewUrl(url: string) {
-  const proxyPath = buildPdfPreviewUrl(url);
-  const origin = typeof window !== "undefined" ? window.location.origin : SITE_URL;
-  const absoluteProxyUrl = new URL(proxyPath, origin).toString();
-  return `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(absoluteProxyUrl)}`;
-}
-
 export default function EventoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const isMobile = useIsMobile();
@@ -247,18 +240,36 @@ export default function EventoDetailPage() {
       );
 
       if (!pdfUrl) return linkNode;
-      const previewUrl = useMobilePdfPreview
-        ? buildMobilePdfPreviewUrl(pdfUrl)
-        : buildPdfPreviewUrl(pdfUrl);
+      if (useMobilePdfPreview) {
+        return (
+          <span className="my-2 inline-flex w-full flex-col gap-2">
+            {linkNode}
+            <span className="inline-flex w-full items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-3 py-2">
+              <span className="text-xs text-muted-foreground">
+                En móvil abrimos el PDF en el visor nativo para evitar errores de iframe.
+              </span>
+              <a
+                href={resolvedHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-primary/35 px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:border-primary/60 hover:bg-primary/10"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Abrir PDF
+              </a>
+            </span>
+          </span>
+        );
+      }
 
       return (
         <span className="my-2 inline-flex w-full flex-col gap-2">
           {linkNode}
           <span className="block overflow-hidden rounded-lg border border-border bg-white">
             <iframe
-              src={previewUrl}
-              title={useMobilePdfPreview ? "Previsualización de PDF en móvil" : "Previsualización de PDF"}
-              className={useMobilePdfPreview ? "h-[420px] w-full" : "h-[560px] w-full"}
+              src={buildPdfPreviewUrl(pdfUrl)}
+              title="Previsualización de PDF"
+              className="h-[560px] w-full"
               loading="lazy"
               referrerPolicy="no-referrer"
             />
