@@ -162,7 +162,7 @@ export function PartnerMarquee({ rooms }: PartnerMarqueeProps) {
 
 function LogoCard({ room }: { room: PartnerRoom }) {
   const cardClassName =
-    "group relative flex h-[86px] w-[210px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/12 bg-[#140f1b] p-3 shadow-[0_14px_32px_rgba(0,0,0,0.2)] transition-transform duration-300 ease-out hover:-translate-y-1 hover:scale-[1.03] hover:border-accent/45 hover:shadow-[0_18px_40px_rgba(143,60,249,0.25)]";
+    "group relative flex h-[86px] w-[210px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/12 bg-[#140f1b] p-3 shadow-[0_14px_32px_rgba(0,0,0,0.2)] transition-[border-color,box-shadow] duration-300 ease-out hover:border-accent/45 hover:shadow-[0_18px_40px_rgba(143,60,249,0.25)]";
 
   const content = (
     <>
@@ -188,7 +188,6 @@ function LogoCard({ room }: { room: PartnerRoom }) {
         rel="noreferrer noopener"
         aria-label={room.alt ? `Abrir oferta de ${room.alt}` : "Abrir oferta de sala"}
         className={`${cardClassName} cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
-        style={{ willChange: "transform" }}
       >
         {content}
       </a>
@@ -196,7 +195,7 @@ function LogoCard({ room }: { room: PartnerRoom }) {
   }
 
   return (
-    <div className={`${cardClassName} cursor-default`} style={{ willChange: "transform" }}>
+    <div className={`${cardClassName} cursor-default`}>
       {content}
     </div>
   );
