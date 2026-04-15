@@ -122,23 +122,12 @@ export function PartnerMarquee({ rooms }: PartnerMarqueeProps) {
     if (canHover) pauseRef.current = false;
   };
 
-  const handlePointerDown = () => {
-    pauseRef.current = true;
-  };
-
-  const handlePointerUp = () => {
-    pauseRef.current = false;
-  };
-
   return (
     <div
       ref={containerRef}
       className="relative overflow-x-clip"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
     >
       <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-background via-background/88 to-transparent sm:w-16" />
       <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background via-background/88 to-transparent sm:w-16" />
