@@ -236,7 +236,6 @@ export default function EventoDetailPage() {
       );
 
       if (!pdfUrl) return linkNode;
-      if (isMobile) return linkNode;
 
       return (
         <span className="my-2 inline-flex w-full flex-col gap-2">
@@ -244,8 +243,8 @@ export default function EventoDetailPage() {
           <span className="block overflow-hidden rounded-lg border border-border bg-white">
             <iframe
               src={buildPdfPreviewUrl(pdfUrl)}
-              title="Previsualización de PDF"
-              className="h-[560px] w-full"
+              title={isMobile ? "Previsualización de PDF en móvil" : "Previsualización de PDF"}
+              className={isMobile ? "h-[420px] w-full" : "h-[560px] w-full"}
               loading="lazy"
               referrerPolicy="no-referrer"
             />
