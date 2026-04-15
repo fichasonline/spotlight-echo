@@ -59,13 +59,19 @@ function buildPdfPreviewUrl(url: string) {
 }
 
 function buildMobilePdfPreviewUrl(url: string) {
-  const normalized = normalizeUrl(url);
-  return `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(normalized)}`;
+  const proxyPath = buildPdfPreviewUrl(url);
+  const origin = typeof window !== "undefined" ? window.location.origin : SITE_URL;
+  const absoluteProxyUrl = new URL(proxyPath, origin).toString();
+  return `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(absoluteProxyUrl)}`;
 }
 
 export default function EventoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const isMobile = useIsMobile();
+  const isLikelyMobileDevice =
+    typeof navigator !== "undefined" &&
+    /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
+  const useMobilePdfPreview = isMobile || isLikelyMobileDevice;
   const [event, setEvent] = useState<Event | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -241,7 +247,9 @@ export default function EventoDetailPage() {
       );
 
       if (!pdfUrl) return linkNode;
-      const previewUrl = isMobile ? buildMobilePdfPreviewUrl(pdfUrl) : buildPdfPreviewUrl(pdfUrl);
+      const previewUrl = useMobilePdfPreview
+        ? buildMobilePdfPreviewUrl(pdfUrl)
+        : buildPdfPreviewUrl(pdfUrl);
 
       return (
         <span className="my-2 inline-flex w-full flex-col gap-2">
@@ -249,8 +257,8 @@ export default function EventoDetailPage() {
           <span className="block overflow-hidden rounded-lg border border-border bg-white">
             <iframe
               src={previewUrl}
-              title={isMobile ? "Previsualización de PDF en móvil" : "Previsualización de PDF"}
-              className={isMobile ? "h-[420px] w-full" : "h-[560px] w-full"}
+              title={useMobilePdfPreview ? "Previsualización de PDF en móvil" : "Previsualización de PDF"}
+              className={useMobilePdfPreview ? "h-[420px] w-full" : "h-[560px] w-full"}
               loading="lazy"
               referrerPolicy="no-referrer"
             />
