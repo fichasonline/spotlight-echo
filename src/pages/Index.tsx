@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { SupportChatWidget } from "@/components/SupportChatWidget";
+import { AIChatWidget } from "@/components/AIChatWidget";
 import { CryptoTicker } from "@/components/CryptoTicker";
 import { BannerMedia } from "@/components/BannerMedia";
 import { Button } from "@/components/ui/button";
@@ -1135,6 +1136,8 @@ export default function HomePage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AIChatWidget autoOpen />
     </div>
   );
 }
