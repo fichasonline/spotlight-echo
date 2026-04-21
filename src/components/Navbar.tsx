@@ -13,6 +13,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X, LogOut, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SupportChatWidget } from "@/components/SupportChatWidget";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTheme } from "@/contexts/ThemeContext";
 
 function getInitial(name: string | null | undefined) {
   const cleanName = name?.trim();
@@ -22,6 +24,7 @@ function getInitial(name: string | null | undefined) {
 
 export function Navbar() {
   const { user, profile, isAnonymous, isAdmin, isStaff, signOut } = useAuth();
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -47,11 +50,16 @@ export function Navbar() {
     <nav className="sticky top-0 z-50 border-b border-primary/25 bg-background/90 backdrop-blur-xl">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link to="/" className="group flex items-center">
-          <img
-            src="/logo_fichas.png"
-            alt="Fichas Online"
-            className="h-8 w-auto object-contain drop-shadow-[0_0_14px_hsl(273_66%_66%_/_0.35)] transition-transform duration-300 group-hover:scale-[1.02] md:h-9"
-          />
+          <span className={cn(
+            "flex items-center transition-all duration-300",
+            theme === "light" && "rounded-lg bg-[#1a0f2e] px-2 py-1"
+          )}>
+            <img
+              src="/logo_fichas.png"
+              alt="Fichas Online"
+              className="h-8 w-auto object-contain drop-shadow-[0_0_14px_hsl(273_66%_66%_/_0.35)] transition-transform duration-300 group-hover:scale-[1.02] md:h-9"
+            />
+          </span>
         </Link>
 
         {/* Desktop links */}
@@ -78,6 +86,7 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <SupportChatWidget triggerVariant="header" />
 
           <div className="hidden md:flex items-center gap-3">

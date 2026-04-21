@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type RefObject } from "react";
 import { Link } from "react-router-dom";
+import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { SupportChatWidget } from "@/components/SupportChatWidget";
@@ -322,6 +323,8 @@ function PortraitBannerSlot({
 
 /* ─── Page ────────────────────────────────────────────────────── */
 export default function HomePage() {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const [articles, setArticles]           = useState<Article[]>([]);
   const [events, setEvents]               = useState<Event[]>([]);
   const [banners, setBanners]             = useState<Record<string, HomeBanner>>({});
@@ -580,8 +583,9 @@ export default function HomePage() {
         <div
           className="pointer-events-none absolute inset-0 z-0"
           style={{
-            background:
-              "radial-gradient(circle at 50% 38%, rgba(86,49,116,0.45), rgba(14,9,19,0.82) 54%, #09060f 100%)",
+            background: isDark
+              ? "radial-gradient(circle at 50% 38%, rgba(86,49,116,0.45), rgba(14,9,19,0.82) 54%, #09060f 100%)"
+              : "rgba(255,255,255,0.78)",
           }}
         />
         {/* Ambient glow blobs */}
@@ -613,14 +617,14 @@ export default function HomePage() {
                   </span>
                   <span className="hero-line block lg:whitespace-nowrap">
                     <span className="text-[#8f3cf9]">Y COMUNIDAD</span>{" "}
-                    <span className="text-white">EN UN</span>
+                    <span className={isDark ? "text-white" : "text-gray-900"}>EN UN</span>
                   </span>
-                  <span className="hero-line block text-white lg:whitespace-nowrap">
+                  <span className={`hero-line block lg:whitespace-nowrap ${isDark ? "text-white" : "text-gray-900"}`}>
                     SOLO LUGAR
                   </span>
                 </h1>
 
-                <p className="hero-sub mt-6 max-w-[560px] text-sm font-semibold uppercase tracking-[0.03em] text-white/42 md:text-[15px]">
+                <p className={`hero-sub mt-6 max-w-[560px] text-sm font-semibold uppercase tracking-[0.03em] md:text-[15px] ${isDark ? "text-white/42" : "text-gray-500"}`}>
                   Todo el ecosistema de Fichas Online en un solo lugar
                 </p>
 
@@ -691,7 +695,7 @@ export default function HomePage() {
         {/* Latest articles */}
         <section>
           {articles.length > 3 && (
-            <div className="mb-3 flex items-center justify-center gap-2 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white/40 lg:justify-end">
+            <div className="mb-3 flex items-center justify-center gap-2 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-muted-foreground lg:justify-end">
               <span>Se mueve solo</span>
               <motion.span
                 aria-hidden="true"
@@ -711,12 +715,12 @@ export default function HomePage() {
             transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
             className="mb-5 flex items-center justify-between gap-4"
           >
-            <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-white">
+            <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-foreground">
               Ultimas noticias
             </p>
             <Link
               to="/noticias"
-              className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/20 px-4 py-2 text-[0.72rem] font-black uppercase tracking-[0.08em] text-white transition-colors hover:border-primary/50 hover:bg-primary/30"
+              className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/20 px-4 py-2 text-[0.72rem] font-black uppercase tracking-[0.08em] text-foreground transition-colors hover:border-primary/50 hover:bg-primary/30"
             >
               <Newspaper className="h-4 w-4" />
               Fichas News
@@ -747,51 +751,47 @@ export default function HomePage() {
               >
                 <Link
                   to={`/noticias/${a.slug}`}
-                  className="group flex h-full overflow-hidden rounded-[30px] border border-white/20 bg-[#E7E7E7] p-[14px] shadow-[0_22px_45px_rgba(0,0,0,0.22)] lg:h-[490px]"
+                  className="group relative flex h-full min-h-[420px] overflow-hidden rounded-[24px] shadow-[0_8px_32px_rgba(0,0,0,0.18)] transition-shadow duration-300 hover:shadow-[0_16px_48px_rgba(0,0,0,0.26)] lg:h-[490px]"
                 >
-                  <div className="flex h-full w-full flex-col">
-                  <div className="shrink-0 overflow-hidden rounded-[24px] bg-[#d8d8de] lg:h-[308px]">
+                  {/* Full-bleed image */}
+                  <div className="absolute inset-0">
                     {a.image_url ? (
                       <BannerMedia
                         src={a.image_url}
                         alt={a.headline}
-                        className="aspect-[0.92] h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03] lg:aspect-auto"
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
                         loading="lazy"
                       />
                     ) : (
-                      <div className="flex aspect-[0.92] h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(157,78,221,0.45),_rgba(28,19,38,0.96)_72%)] p-6 text-center lg:aspect-auto">
-                        <div>
-                          <p className="font-display text-3xl font-black uppercase leading-[0.88] tracking-[-0.05em] text-white">
-                            Fichas
-                            <br />
-                            Online
-                          </p>
-                          <p className="mt-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-white/55">
-                            Ultimas noticias
-                          </p>
-                        </div>
-                      </div>
+                      <div className="h-full w-full bg-[radial-gradient(circle_at_top,_rgba(157,78,221,0.55),_rgba(18,12,28,0.98)_72%)]" />
                     )}
                   </div>
 
-                  <div className="flex min-h-0 flex-1 items-center justify-center px-4 pb-4 pt-5 text-center">
-                    <h3 className="font-display line-clamp-4 text-[1.5rem] font-black uppercase leading-[0.9] tracking-[-0.04em] text-[#5f5f66]">
+                  {/* Gradient overlay — texto legible siempre */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+
+                  {/* Date badge top-right */}
+                  {a.published_at && (
+                    <span className="absolute right-4 top-4 z-10 rounded-full bg-black/50 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-white/80 backdrop-blur-sm">
+                      {format(parseDateValue(a.published_at), "d MMM yyyy", { locale: es })}
+                    </span>
+                  )}
+
+                  {/* Text at bottom */}
+                  <div className="relative z-10 mt-auto p-5">
+                    <h3 className="font-display line-clamp-3 text-[1.25rem] font-black uppercase leading-[0.95] tracking-[-0.03em] text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] lg:text-[1.35rem]">
                       {a.summary || a.headline}
                     </h3>
-                  </div>
-
-                  {a.published_at && (
-                    <p className="px-4 pb-4 text-center text-[0.7rem] font-bold uppercase tracking-[0.16em] text-[#8a8a93]">
-                      {format(parseDateValue(a.published_at), "d MMM yyyy", { locale: es })}
-                    </p>
-                  )}
+                    <span className="mt-3 inline-flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-[0.12em] text-white/60 transition-colors group-hover:text-white/90">
+                      Leer más <ArrowRight className="h-3 w-3" />
+                    </span>
                   </div>
                 </Link>
               </motion.div>
             ))}
             {articles.length === 0 && (
-              <div className="w-full rounded-[30px] border border-dashed border-white/15 bg-white/[0.03] px-6 py-14 text-center">
-                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-white/55">
+              <div className="w-full rounded-[30px] border border-dashed border-border bg-muted/30 px-6 py-14 text-center">
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   No hay noticias publicadas aun.
                 </p>
               </div>
@@ -820,7 +820,7 @@ export default function HomePage() {
             <div className="mt-6 flex justify-center xl:hidden">
               <Link
                 to="/noticias"
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white transition-colors hover:border-primary/35 hover:bg-primary/10"
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-5 py-3 text-sm font-semibold text-foreground transition-colors hover:border-primary/35 hover:bg-primary/10"
               >
                 Ver todas las noticias <ArrowRight className="h-4 w-4" />
               </Link>
@@ -848,12 +848,12 @@ export default function HomePage() {
             transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
             className="mb-3 flex items-center justify-between gap-4"
           >
-            <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-white">
+            <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-foreground">
               Calendario
             </p>
             <Link
               to="/calendario"
-              className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-2 text-[0.72rem] font-black uppercase tracking-[0.08em] text-white transition-colors hover:border-accent/45 hover:bg-accent/15"
+              className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-2 text-[0.72rem] font-black uppercase tracking-[0.08em] text-foreground transition-colors hover:border-accent/45 hover:bg-accent/15"
             >
               <Calendar className="h-4 w-4" />
               Ver calendario
@@ -861,7 +861,7 @@ export default function HomePage() {
           </motion.div>
 
           {eventsCarouselCount > 1 && (
-            <div className="mb-4 flex items-center justify-center gap-2 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white/40 lg:justify-end">
+            <div className="mb-4 flex items-center justify-center gap-2 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-muted-foreground lg:justify-end">
               <span className="hidden lg:inline">Se mueve solo</span>
               <span className="hidden lg:inline">•</span>
               <span>Deslizá para ver más eventos</span>
@@ -905,7 +905,7 @@ export default function HomePage() {
                   >
                     <Link
                       to={`/eventos/${e.id}`}
-                      className="group flex min-h-[136px] items-center gap-4 rounded-[18px] border border-white/12 bg-[#130e18] p-3 shadow-[0_18px_36px_rgba(0,0,0,0.22)] transition-colors hover:border-accent/35"
+                      className="group flex min-h-[136px] items-center gap-4 rounded-[18px] border border-border bg-card p-3 shadow-[0_18px_36px_rgba(0,0,0,0.10)] transition-colors hover:border-accent/35"
                     >
                       <div className="flex h-[98px] w-[114px] shrink-0 flex-col items-center justify-center rounded-[18px] bg-[linear-gradient(180deg,#b956ff_0%,#8f3cf9_100%)] text-white shadow-[0_12px_30px_rgba(143,60,249,0.35)]">
                         <span className="text-[3.15rem] font-black leading-none tracking-[-0.08em]">
@@ -918,7 +918,7 @@ export default function HomePage() {
 
                       <div className="min-w-0 flex-1 pr-2">
                         <div className="mb-2 flex items-start justify-between gap-3">
-                          <h3 className="font-display line-clamp-2 text-[1.05rem] font-black uppercase leading-[0.9] tracking-[-0.04em] text-white lg:text-[1.15rem]">
+                          <h3 className="font-display line-clamp-2 text-[1.05rem] font-black uppercase leading-[0.9] tracking-[-0.04em] text-foreground lg:text-[1.15rem]">
                             {e.name}
                           </h3>
                           {isLive && (
@@ -932,7 +932,7 @@ export default function HomePage() {
                           )}
                         </div>
 
-                        <p className="line-clamp-2 text-[0.9rem] font-medium uppercase leading-[1.02] tracking-[0.01em] text-white/32 lg:text-[1rem]">
+                        <p className="line-clamp-2 text-[0.9rem] font-medium uppercase leading-[1.02] tracking-[0.01em] text-muted-foreground lg:text-[1rem]">
                           {location || "Evento destacado en fichas online"}
                         </p>
                       </div>
@@ -950,7 +950,7 @@ export default function HomePage() {
                       <div className="h-[136px]">
                         <BannerSlot
                           banner={banners["content_vertical"]}
-                          className="h-full w-full rounded-[18px] border border-white/12 bg-[#130e18] shadow-[0_18px_36px_rgba(0,0,0,0.22)]"
+                          className="h-full w-full rounded-[18px] border border-border bg-card shadow-[0_18px_36px_rgba(0,0,0,0.10)]"
                           onAction={setActiveBanner}
                         />
                       </div>
@@ -960,8 +960,8 @@ export default function HomePage() {
               );
             })}
             {events.length === 0 && (
-              <div className="w-full rounded-[24px] border border-dashed border-white/15 bg-white/[0.03] px-6 py-14 text-center">
-                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-white/55">
+              <div className="w-full rounded-[24px] border border-dashed border-border bg-muted/30 px-6 py-14 text-center">
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   No hay eventos en curso ni proximos.
                 </p>
               </div>
@@ -996,7 +996,7 @@ export default function HomePage() {
             transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
             className="mb-5 flex items-center justify-between gap-4"
           >
-            <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-white">
+            <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-foreground">
               Consegui el mejor deal para tu sala
             </p>
           </motion.div>
@@ -1013,7 +1013,7 @@ export default function HomePage() {
             transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
             className="mb-5 flex items-center justify-between gap-4"
           >
-            <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-white">
+            <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-foreground">
               Seguinos en redes
             </p>
           </motion.div>

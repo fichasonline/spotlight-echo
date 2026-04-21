@@ -129,7 +129,7 @@ export function PartnerMarquee({ rooms }: PartnerMarqueeProps) {
 
 function LogoCard({ room }: { room: PartnerRoom }) {
   const cardClassName =
-    "group relative flex h-[86px] w-[210px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/12 bg-[#140f1b] p-3 shadow-[0_14px_32px_rgba(0,0,0,0.2)] transition-[border-color,box-shadow] duration-300 ease-out hover:border-accent/45 hover:shadow-[0_18px_40px_rgba(143,60,249,0.25)]";
+    "group relative flex h-[86px] w-[210px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-purple-900/30 bg-[#140f1b] p-3 shadow-[0_14px_32px_rgba(0,0,0,0.2)] transition-[border-color,box-shadow] duration-300 ease-out hover:border-accent/45 hover:shadow-[0_18px_40px_rgba(143,60,249,0.25)]";
 
   const content = (
     <>

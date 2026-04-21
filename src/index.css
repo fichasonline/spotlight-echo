@@ -77,6 +77,51 @@
   .dark {
     /* Dark theme is default for this brand. */
   }
+
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+
+    --card: 0 0% 97%;
+    --card-foreground: 0 0% 9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+
+    --primary: 273 58% 38%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 273 30% 92%;
+    --secondary-foreground: 273 58% 25%;
+
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 40%;
+
+    --accent: 273 58% 38%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 273 58% 44%;
+
+    --sidebar-background: 0 0% 97%;
+    --sidebar-foreground: 0 0% 9%;
+    --sidebar-primary: 273 58% 38%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 273 30% 92%;
+    --sidebar-accent-foreground: 273 58% 25%;
+    --sidebar-border: 0 0% 88%;
+    --sidebar-ring: 273 58% 44%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(273 58% 38%), hsl(273 66% 56%));
+    --gradient-accent: linear-gradient(135deg, hsl(273 58% 38%), hsl(0 0% 9%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 97%), hsl(0 0% 100%));
+    --shadow-glow: 0 0 26px hsl(273 58% 50% / 0.2);
+    --shadow-card: 0 8px 28px hsl(0 0% 0% / 0.1);
+  }
 }
 
 @layer base {

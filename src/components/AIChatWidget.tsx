@@ -96,11 +96,11 @@ export function AIChatWidget({ autoOpen = false }: AIChatWidgetProps) {
     return () => clearTimeout(timeout);
   }, [autoOpen]);
 
-  // Scroll to bottom when messages change and panel is open
+  // Scroll to bottom when messages or typing indicator change and panel is open
   useEffect(() => {
     if (!open) return;
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, open]);
+  }, [messages, open, sending]);
 
   const fetchMessages = useCallback(async (tId: string, vToken: string) => {
     const { data } = await (supabase as any).rpc("get_support_thread_messages", {
@@ -241,6 +241,24 @@ export function AIChatWidget({ autoOpen = false }: AIChatWidgetProps) {
                 </div>
               );
             })}
+            {sending && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="mr-auto flex max-w-[85%] items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground"
+              >
+                <span>Junior esta escribiendo...</span>
+                <span className="flex items-center gap-1" aria-hidden="true">
+                  {[0, 140, 280].map((delay) => (
+                    <span
+                      key={delay}
+                      className="h-1.5 w-1.5 rounded-full bg-muted-foreground/80 animate-bounce"
+                      style={{ animationDelay: `${delay}ms`, animationDuration: "900ms" }}
+                    />
+                  ))}
+                </span>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
