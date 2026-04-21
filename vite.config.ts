@@ -25,6 +25,192 @@ function isPrivateOrLocalHost(hostname: string) {
   return false;
 }
 
+function escapeRegExp(raw: string) {
+  return raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function decodeHtmlEntities(raw: string) {
+  return raw
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&#x27;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&nbsp;/gi, " ");
+}
+
+function normalizeMetaText(raw: string | null | undefined) {
+  if (!raw) return null;
+  const decoded = decodeHtmlEntities(raw).replace(/\s+/g, " ").trim();
+  return decoded || null;
+}
+
+function extractMetaContentByAttr(html: string, attrName: string, attrValue: string) {
+  const escaped = escapeRegExp(attrValue);
+  const patterns = [
+    new RegExp(
+      `<meta[^>]*\\b${attrName}\\s*=\\s*["']${escaped}["'][^>]*\\bcontent\\s*=\\s*["']([^"']+)["'][^>]*>`,
+      "i",
+    ),
+    new RegExp(
+      `<meta[^>]*\\bcontent\\s*=\\s*["']([^"']+)["'][^>]*\\b${attrName}\\s*=\\s*["']${escaped}["'][^>]*>`,
+      "i",
+    ),
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    const candidate = normalizeMetaText(match?.[1]);
+    if (candidate) return candidate;
+  }
+
+  return null;
+}
+
+function extractTitleFromHtml(html: string) {
+  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  return normalizeMetaText(match?.[1]);
+}
+
+function absolutizeUrl(candidate: string | null, baseUrl: string) {
+  if (!candidate) return null;
+  try {
+    const absolute = new URL(candidate, baseUrl);
+    if (!["http:", "https:"].includes(absolute.protocol)) return null;
+    return absolute.toString();
+  } catch {
+    return null;
+  }
+}
+
+function buildHtmlPreview(html: string, finalUrl: string) {
+  const title =
+    extractMetaContentByAttr(html, "property", "og:title") ??
+    extractMetaContentByAttr(html, "name", "twitter:title") ??
+    extractTitleFromHtml(html);
+
+  const description =
+    extractMetaContentByAttr(html, "property", "og:description") ??
+    extractMetaContentByAttr(html, "name", "twitter:description") ??
+    extractMetaContentByAttr(html, "name", "description");
+
+  const siteName =
+    extractMetaContentByAttr(html, "property", "og:site_name") ??
+    extractMetaContentByAttr(html, "name", "application-name");
+
+  const imageCandidate =
+    extractMetaContentByAttr(html, "property", "og:image") ??
+    extractMetaContentByAttr(html, "name", "twitter:image") ??
+    extractMetaContentByAttr(html, "itemprop", "image");
+
+  const hostname = new URL(finalUrl).hostname.replace(/^www\./i, "");
+
+  return {
+    url: finalUrl,
+    finalUrl,
+    title: title ?? hostname,
+    description,
+    image: absolutizeUrl(imageCandidate, finalUrl),
+    siteName,
+  };
+}
+
+function linkPreviewDevPlugin(): Plugin {
+  return {
+    name: "link-preview-dev",
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        if (!req.url?.startsWith("/api/link-preview")) return next();
+
+        if (req.method !== "GET") {
+          res.statusCode = 405;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.end(JSON.stringify({ error: "Method not allowed" }));
+          return;
+        }
+
+        const parsed = new URL(req.url, "http://localhost");
+        const rawUrl = getSingleQueryValue(parsed.searchParams.getAll("url"));
+        if (!rawUrl) {
+          res.statusCode = 400;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.end(JSON.stringify({ error: "Missing url query param" }));
+          return;
+        }
+
+        let targetUrl: URL;
+        try {
+          targetUrl = new URL(rawUrl);
+        } catch {
+          res.statusCode = 400;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.end(JSON.stringify({ error: "Invalid URL" }));
+          return;
+        }
+
+        if (!["http:", "https:"].includes(targetUrl.protocol) || isPrivateOrLocalHost(targetUrl.hostname)) {
+          res.statusCode = 400;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.end(JSON.stringify({ error: "URL host is not allowed" }));
+          return;
+        }
+
+        try {
+          const upstream = await fetch(targetUrl.toString(), {
+            redirect: "follow",
+            headers: {
+              Accept: "text/html,application/xhtml+xml,image/*;q=0.9,*/*;q=0.7",
+              "User-Agent": "Mozilla/5.0 (compatible; FichasLinkPreviewDev/1.0)",
+            },
+          });
+
+          if (!upstream.ok) {
+            res.statusCode = upstream.status;
+            res.setHeader("Content-Type", "application/json; charset=utf-8");
+            res.end(JSON.stringify({ error: "Failed to fetch URL metadata", status: upstream.status }));
+            return;
+          }
+
+          const finalUrl = upstream.url || targetUrl.toString();
+          const contentType = (upstream.headers.get("content-type") || "").toLowerCase();
+
+          let payload;
+          if (contentType.startsWith("image/")) {
+            const hostname = new URL(finalUrl).hostname.replace(/^www\./i, "");
+            payload = {
+              url: finalUrl,
+              finalUrl,
+              title: hostname,
+              description: null,
+              image: finalUrl,
+              siteName: hostname,
+            };
+          } else {
+            const html = (await upstream.text()).slice(0, 220_000);
+            payload = buildHtmlPreview(html, finalUrl);
+          }
+
+          res.statusCode = 200;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.setHeader("Cache-Control", "public, max-age=900");
+          res.setHeader("X-Content-Type-Options", "nosniff");
+          res.end(JSON.stringify(payload));
+        } catch (error) {
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.end(
+            JSON.stringify({
+              error: "Failed to build link preview",
+              details: error instanceof Error ? error.message : String(error),
+            }),
+          );
+        }
+      });
+    },
+  };
+}
+
 function pdfProxyDevPlugin(): Plugin {
   return {
     name: "pdf-proxy-dev",
@@ -126,7 +312,7 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
-  plugins: [react(), mode === "development" && componentTagger(), pdfProxyDevPlugin()].filter(Boolean),
+  plugins: [react(), mode === "development" && componentTagger(), pdfProxyDevPlugin(), linkPreviewDevPlugin()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

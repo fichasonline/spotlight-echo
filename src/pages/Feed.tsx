@@ -98,6 +98,20 @@ interface TrendingTopic {
   lastSeenAt: number;
 }
 
+interface LinkPreviewData {
+  url: string;
+  finalUrl: string;
+  title: string | null;
+  description: string | null;
+  image: string | null;
+  siteName: string | null;
+}
+
+interface LinkPreviewState {
+  status: "loading" | "ready" | "error";
+  data?: LinkPreviewData;
+}
+
 type FeedSort = "recent" | "most-liked";
 type FetchPostsOptions = { showLoading?: boolean; showErrorToast?: boolean };
 
@@ -106,8 +120,9 @@ const FEED_SELECT = `
   post_likes(user_id),
   comments(id, content, created_at, is_deleted, author_id)
 `;
-const HASHTAG_SPLIT_REGEX = /(#[\p{L}\p{N}_]{2,40})/gu;
+const CONTENT_TOKEN_SPLIT_REGEX = /(https?:\/\/[^\s<>)"]+|#[\p{L}\p{N}_]{2,40})/gu;
 const HASHTAG_ONLY_REGEX = /^#[\p{L}\p{N}_]{2,40}$/u;
+const URL_ONLY_REGEX = /^https?:\/\/[^\s<>)"]+$/iu;
 
 function displayHandle(name: string | null | undefined) {
   if (!name?.trim()) return "usuario";
@@ -128,6 +143,33 @@ function extractHashtags(content: string) {
   return Array.from(content.matchAll(/#([\p{L}\p{N}_]{2,40})/gu), (match) =>
     match[1].toLowerCase()
   );
+}
+
+function normalizeContentText(content: string) {
+  return content.replace(/\\n/g, "\n");
+}
+
+function sanitizeHttpUrl(rawUrl: string) {
+  try {
+    const parsed = new URL(rawUrl);
+    if (!["http:", "https:"].includes(parsed.protocol)) return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function extractFirstUrl(content: string) {
+  const match = normalizeContentText(content).match(/https?:\/\/[^\s<>)"]+/i);
+  return match?.[0] ?? null;
+}
+
+function getUrlHost(rawUrl: string) {
+  try {
+    return new URL(rawUrl).hostname.replace(/^www\./i, "");
+  } catch {
+    return rawUrl;
+  }
 }
 
 function normalizeTag(rawTag: string) {
@@ -237,6 +279,7 @@ export default function FeedPage() {
   const [sortBy, setSortBy] = useState<FeedSort>("recent");
   const lastPostTime = useRef<number>(0);
   const [commentTexts, setCommentTexts] = useState<Record<string, string>>({});
+  const [linkPreviewByUrl, setLinkPreviewByUrl] = useState<Record<string, LinkPreviewState>>({});
   const [reportTarget, setReportTarget] = useState<{ type: string; id: string } | null>(null);
   const [reportReason, setReportReason] = useState("");
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
@@ -489,6 +532,70 @@ export default function FeedPage() {
     });
   }, [posts, searchText, sortBy]);
 
+  const postPreviewUrlById = useMemo(() => {
+    const map: Record<string, string> = {};
+    visiblePosts.forEach((post) => {
+      const firstUrl = extractFirstUrl(post.content);
+      if (!firstUrl) return;
+      const safeUrl = sanitizeHttpUrl(firstUrl);
+      if (!safeUrl) return;
+      map[post.id] = safeUrl;
+    });
+    return map;
+  }, [visiblePosts]);
+
+  const previewUrls = useMemo(
+    () => Array.from(new Set(Object.values(postPreviewUrlById))).slice(0, 24),
+    [postPreviewUrlById]
+  );
+
+  useEffect(() => {
+    const urlsToFetch = previewUrls.filter((url) => !linkPreviewByUrl[url]);
+    if (urlsToFetch.length === 0) return;
+
+    const controllers: AbortController[] = [];
+
+    urlsToFetch.forEach((url) => {
+      setLinkPreviewByUrl((prev) =>
+        prev[url]
+          ? prev
+          : {
+              ...prev,
+              [url]: { status: "loading" },
+            }
+      );
+
+      const controller = new AbortController();
+      controllers.push(controller);
+
+      void fetch(`/api/link-preview?url=${encodeURIComponent(url)}`, {
+        signal: controller.signal,
+      })
+        .then(async (response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return (await response.json()) as LinkPreviewData;
+        })
+        .then((data) => {
+          setLinkPreviewByUrl((prev) => ({
+            ...prev,
+            [url]: {
+              status: "ready",
+              data,
+            },
+          }));
+        })
+        .catch(() => {
+          if (controller.signal.aborted) return;
+          setLinkPreviewByUrl((prev) => ({
+            ...prev,
+            [url]: { status: "error" },
+          }));
+        });
+    });
+
+    return () => controllers.forEach((controller) => controller.abort());
+  }, [linkPreviewByUrl, previewUrls]);
+
   const timelineStats = useMemo(() => {
     const likes = visiblePosts.reduce((acc, p) => acc + p.post_likes.length, 0);
     const comments = visiblePosts.reduce((acc, p) => acc + p.comments.length, 0);
@@ -551,9 +658,25 @@ export default function FeedPage() {
     setSearchText(`#${normalizedTag}`);
   }, []);
 
-  const renderContentWithHashtags = useCallback(
+  const renderRichContent = useCallback(
     (content: string) =>
-      content.replace(/\\n/g, "\n").split(HASHTAG_SPLIT_REGEX).map((chunk, index) => {
+      normalizeContentText(content).split(CONTENT_TOKEN_SPLIT_REGEX).map((chunk, index) => {
+        if (URL_ONLY_REGEX.test(chunk)) {
+          const safeUrl = sanitizeHttpUrl(chunk);
+          if (!safeUrl) return <span key={`${chunk}-${index}`}>{chunk}</span>;
+          return (
+            <a
+              key={`${chunk}-${index}`}
+              href={safeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary underline underline-offset-2 break-all hover:text-primary/90"
+            >
+              {chunk}
+            </a>
+          );
+        }
+
         if (!HASHTAG_ONLY_REGEX.test(chunk)) {
           return <span key={`${chunk}-${index}`}>{chunk}</span>;
         }
@@ -807,6 +930,11 @@ export default function FeedPage() {
                     const canDeletePost = isOwner || isAdmin;
                     const showComments = expandedComments.has(post.id);
                     const comments = post.comments.filter((comment) => !comment.is_deleted || isAdmin);
+                    const postPreviewUrl = postPreviewUrlById[post.id];
+                    const previewState = postPreviewUrl ? linkPreviewByUrl[postPreviewUrl] : undefined;
+                    const previewData = previewState?.status === "ready" ? previewState.data : undefined;
+                    const previewHref = previewData?.finalUrl || postPreviewUrl || null;
+                    const previewHost = previewHref ? getUrlHost(previewHref) : null;
 
                     if (post.is_deleted && !isAdmin) return null;
 
@@ -855,8 +983,40 @@ export default function FeedPage() {
                             </div>
 
                             <p className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-relaxed text-foreground/95">
-                              {renderContentWithHashtags(post.content)}
+                              {renderRichContent(post.content)}
                             </p>
+                            {postPreviewUrl && previewHref && (
+                              <a
+                                href={previewHref}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-3 block overflow-hidden rounded-xl border border-border/70 bg-card/70 transition-colors hover:bg-card"
+                              >
+                                {previewState?.status === "loading" ? (
+                                  <div className="aspect-[1.91/1] animate-pulse bg-muted/60" />
+                                ) : (
+                                  previewData?.image && (
+                                    <img
+                                      src={previewData.image}
+                                      alt={previewData.title || "Vista previa del enlace"}
+                                      loading="lazy"
+                                      className="aspect-[1.91/1] w-full object-cover"
+                                    />
+                                  )
+                                )}
+                                <div className="space-y-1 p-3">
+                                  <p className="line-clamp-2 text-sm font-semibold text-foreground">
+                                    {previewData?.title || previewData?.siteName || previewHost || "Abrir enlace"}
+                                  </p>
+                                  {previewData?.description && (
+                                    <p className="line-clamp-2 text-xs text-muted-foreground">
+                                      {previewData.description}
+                                    </p>
+                                  )}
+                                  {previewHost && <p className="text-[11px] text-muted-foreground">{previewHost}</p>}
+                                </div>
+                              </a>
+                            )}
 
                             <div className="mt-3 flex items-center gap-1 text-muted-foreground">
                               <Button
@@ -951,7 +1111,7 @@ export default function FeedPage() {
                                               </p>
                                             ) : (
                                               <p className="mt-1 whitespace-pre-wrap break-words text-sm text-foreground/90">
-                                                {renderContentWithHashtags(c.content)}
+                                                {renderRichContent(c.content)}
                                               </p>
                                             )}
                                           </div>
