@@ -74,9 +74,11 @@ export function AIChatWidget({ autoOpen = false }: AIChatWidgetProps) {
   const [messages, setMessages] = useState<AIMessage[]>([WELCOME_MESSAGE]);
   const [messageText, setMessageText] = useState("");
   const [sending, setSending] = useState(false);
+  const [waitingForReply, setWaitingForReply] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [visitorToken, setVisitorToken] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const sentAtRef = useRef<string | null>(null);
 
   // Load existing session from localStorage
   useEffect(() => {
@@ -100,7 +102,7 @@ export function AIChatWidget({ autoOpen = false }: AIChatWidgetProps) {
   useEffect(() => {
     if (!open) return;
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, open, sending]);
+  }, [messages, open, sending, waitingForReply]);
 
   const fetchMessages = useCallback(async (tId: string, vToken: string) => {
     const { data } = await (supabase as any).rpc("get_support_thread_messages", {
@@ -109,6 +111,15 @@ export function AIChatWidget({ autoOpen = false }: AIChatWidgetProps) {
     });
     if (!Array.isArray(data)) return;
     setMessages([WELCOME_MESSAGE, ...(data as AIMessage[])]);
+    if (sentAtRef.current) {
+      const hasNewReply = (data as AIMessage[]).some(
+        (m) => m.sender_type === "staff" && m.created_at > sentAtRef.current!,
+      );
+      if (hasNewReply) {
+        setWaitingForReply(false);
+        sentAtRef.current = null;
+      }
+    }
   }, []);
 
   // Poll for new messages while panel is open and thread exists
@@ -126,6 +137,8 @@ export function AIChatWidget({ autoOpen = false }: AIChatWidgetProps) {
       if (!text || sending) return;
 
       setSending(true);
+      setWaitingForReply(true);
+      sentAtRef.current = new Date().toISOString();
       setMessageText("");
 
       // Optimistic message
@@ -160,6 +173,7 @@ export function AIChatWidget({ autoOpen = false }: AIChatWidgetProps) {
       }
 
       setSending(false);
+      // waitingForReply stays true until fetchMessages detects a new staff reply
     },
     [fetchMessages, messageText, sending, threadId, visitorToken],
   );
@@ -241,7 +255,7 @@ export function AIChatWidget({ autoOpen = false }: AIChatWidgetProps) {
                 </div>
               );
             })}
-            {sending && (
+            {(sending || waitingForReply) && (
               <div
                 role="status"
                 aria-live="polite"
