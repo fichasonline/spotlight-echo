@@ -3,14 +3,23 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { isChatLead, isLandingLead } from "@/lib/support-leads";
-import { Newspaper, Calendar, Flag, Users, MessageCircle, ContactRound, Image } from "lucide-react";
+import { Newspaper, Calendar, Flag, Users, MessageCircle, ContactRound, Image, Instagram } from "lucide-react";
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({ articles: 0, events: 0, reports: 0, users: 0, chats: 0, leads: 0, chatLeads: 0 });
+  const [stats, setStats] = useState({
+    articles: 0,
+    events: 0,
+    reports: 0,
+    users: 0,
+    chats: 0,
+    leads: 0,
+    chatLeads: 0,
+    instagramPending: 0,
+  });
 
   useEffect(() => {
     const fetch = async () => {
-      const [a, e, r, u, openThreads, allLeads] = await Promise.all([
+      const [a, e, r, u, openThreads, allLeads, instagramPending] = await Promise.all([
         supabase.from("articles").select("id", { count: "exact", head: true }),
         supabase.from("events").select("id", { count: "exact", head: true }),
         supabase.from("reports").select("id", { count: "exact", head: true }).eq("status", "pending"),
@@ -22,6 +31,12 @@ export default function AdminDashboard() {
         (supabase as any)
           .from("support_leads")
           .select("id, source"),
+        supabase
+          .from("articles")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "published")
+          .eq("instagram_selected", true)
+          .eq("instagram_published", false),
       ]);
 
       const openLeadIds = new Set(
@@ -42,6 +57,7 @@ export default function AdminDashboard() {
         leads: ((allLeads.data ?? []) as { id: string; source: string | null }[])
           .filter((lead) => isLandingLead(lead) && !openLeadIds.has(lead.id))
           .length,
+        instagramPending: instagramPending.count ?? 0,
       });
     };
     fetch();
@@ -55,6 +71,7 @@ export default function AdminDashboard() {
     { label: "Usuarios", value: stats.users, icon: Users, to: "#", color: "text-muted-foreground" },
     { label: "Leads landing", value: stats.leads, icon: ContactRound, to: "/admin/leads", color: "text-primary" },
     { label: "Leads chat", value: stats.chatLeads, icon: ContactRound, to: "/admin/chat-leads", color: "text-accent" },
+    { label: "IG noticias", value: stats.instagramPending, icon: Instagram, to: "/admin/noticias/instagram", color: "text-primary" },
     { label: "Banners home", value: 4, icon: Image, to: "/admin/banners", color: "text-primary" },
   ];
 

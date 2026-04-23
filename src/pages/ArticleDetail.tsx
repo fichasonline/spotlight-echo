@@ -6,7 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { parseDateValue } from "@/lib/date";
 import { ArticleComments } from "@/components/ArticleComments";
 import {
@@ -26,8 +26,6 @@ interface Article {
   summary: string | null;
   body_markdown: string | null;
   published_at: string | null;
-  source_name: string | null;
-  source_url: string | null;
   image_url: string | null;
 }
 
@@ -41,7 +39,7 @@ export default function ArticleDetailPage() {
     setIsLoaded(false);
     supabase
       .from("articles")
-      .select("*")
+      .select("id, created_at, headline, summary, body_markdown, published_at, image_url")
       .eq("slug", slug)
       .eq("status", "published")
       .maybeSingle()
@@ -186,15 +184,6 @@ export default function ArticleDetailPage() {
         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-8">
           {article.published_at && (
             <span>{format(parseDateValue(article.published_at), "d MMMM yyyy", { locale: es })}</span>
-          )}
-          {article.source_name && (
-            <span className="flex items-center gap-1">
-              Fuente: {article.source_url ? (
-                <a href={article.source_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
-                  {article.source_name} <ExternalLink className="h-3 w-3" />
-                </a>
-              ) : article.source_name}
-            </span>
           )}
         </div>
 

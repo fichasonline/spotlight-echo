@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     if (type === 'article') {
       // Noticias: articles (needs_review/draft/published)
-      // Fields: slug, headline, summary, body_markdown, status, source_name, source_url, created_by
+      // Fields: slug, headline, summary, body_markdown, status, created_by
       const slug = data.slug || data.headline.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       
       result = await supabase.from('articles').insert({
@@ -42,8 +42,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         summary: data.summary || null,
         body_markdown: data.body_markdown || null,
         status: data.status || 'needs_review',
-        source_name: data.source_name || null,
-        source_url: data.source_url || null,
         created_by: data.created_by || null,
       }).select();
     } else if (type === 'post') {

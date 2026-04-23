@@ -20,6 +20,7 @@ const FeedPage = lazy(() => import("./pages/Feed"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminEventos = lazy(() => import("./pages/admin/AdminEventos"));
 const AdminNoticias = lazy(() => import("./pages/admin/AdminNoticias"));
+const AdminNoticiasInstagram = lazy(() => import("./pages/admin/AdminNoticiasInstagram"));
 const AdminModeracion = lazy(() => import("./pages/admin/AdminModeracion"));
 const AdminLeads = lazy(() => import("./pages/admin/AdminLeads"));
 const AdminChatLeads = lazy(() => import("./pages/admin/AdminChatLeads"));
@@ -76,6 +77,14 @@ const App = () => (
                     element={
                       <AdminRoute>
                         <AdminNoticias />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/noticias/instagram"
+                    element={
+                      <AdminRoute>
+                        <AdminNoticiasInstagram />
                       </AdminRoute>
                     }
                   />

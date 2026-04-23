@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navbar } from "@/components/Navbar";
@@ -20,7 +21,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Check, X, Pencil, Trash2 } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { Check, Instagram, Pencil, Plus, Trash2, X } from "lucide-react";
+import { parseDateValue } from "@/lib/date";
 
 interface Article {
   id: string;
@@ -30,12 +34,27 @@ interface Article {
   body_markdown: string | null;
   status: string;
   created_at: string;
-  source_name: string | null;
-  source_url: string | null;
+  published_at: string | null;
   image_url: string | null;
+  instagram_selected: boolean;
+  instagram_published: boolean;
+  instagram_order: number | null;
 }
 
-const emptyForm = { slug: "", headline: "", summary: "", body_markdown: "", source_name: "", source_url: "", image_url: "" };
+const emptyForm = { slug: "", headline: "", summary: "", body_markdown: "", image_url: "" };
+
+function sortInstagramArticles(articles: Article[]) {
+  return [...articles].sort((left, right) => {
+    const leftOrder = left.instagram_order ?? Number.MAX_SAFE_INTEGER;
+    const rightOrder = right.instagram_order ?? Number.MAX_SAFE_INTEGER;
+
+    if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+
+    const leftTime = parseDateValue(left.published_at || left.created_at).getTime();
+    const rightTime = parseDateValue(right.published_at || right.created_at).getTime();
+    return rightTime - leftTime;
+  });
+}
 
 export default function AdminNoticias() {
   const { user } = useAuth();
@@ -51,14 +70,23 @@ export default function AdminNoticias() {
   const fetchArticles = async () => {
     const { data } = await supabase
       .from("articles")
-      .select("id, slug, headline, summary, body_markdown, status, created_at, source_name, source_url, image_url")
+      .select("id, slug, headline, summary, body_markdown, status, created_at, published_at, image_url, instagram_selected, instagram_published, instagram_order")
       .order("created_at", { ascending: false });
     if (data) setArticles(data);
   };
 
-  useEffect(() => { fetchArticles(); }, []);
+  useEffect(() => {
+    void fetchArticles();
+  }, []);
 
-  const filtered = articles.filter((a) => a.status === tab);
+  const filtered = articles.filter((article) => article.status === tab);
+  const publishedArticles = articles.filter((article) => article.status === "published");
+  const instagramPendingArticles = sortInstagramArticles(
+    publishedArticles.filter((article) => article.instagram_selected && !article.instagram_published),
+  );
+  const instagramPublishedArticles = sortInstagramArticles(
+    publishedArticles.filter((article) => article.instagram_selected && article.instagram_published),
+  );
   const buildSlug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
   const handleSaveArticle = async () => {
@@ -72,8 +100,8 @@ export default function AdminNoticias() {
       slug,
       summary: form.summary || null,
       body_markdown: form.body_markdown || null,
-      source_name: form.source_name || null,
-      source_url: form.source_url || null,
+      source_name: null,
+      source_url: null,
       image_url: form.image_url || null,
       headline: form.headline,
     };
@@ -82,13 +110,15 @@ export default function AdminNoticias() {
       ? await supabase.from("articles").update(payload).eq("id", editId)
       : await supabase.from("articles").insert({ ...payload, created_by: user?.id });
 
-    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else {
-      setOpen(false);
-      setForm(emptyForm);
-      setEditId(null);
-      fetchArticles();
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
     }
+
+    setOpen(false);
+    setForm(emptyForm);
+    setEditId(null);
+    void fetchArticles();
   };
 
   const handleEdit = (article: Article) => {
@@ -97,8 +127,6 @@ export default function AdminNoticias() {
       headline: article.headline,
       summary: article.summary ?? "",
       body_markdown: article.body_markdown ?? "",
-      source_name: article.source_name ?? "",
-      source_url: article.source_url ?? "",
       image_url: article.image_url ?? "",
     });
     setEditId(article.id);
@@ -107,12 +135,12 @@ export default function AdminNoticias() {
 
   const handleApprove = async (id: string) => {
     await supabase.from("articles").update({ status: "published", published_at: new Date().toISOString() }).eq("id", id);
-    fetchArticles();
+    void fetchArticles();
   };
 
   const handleReject = async (id: string) => {
     await supabase.from("articles").update({ status: "rejected" }).eq("id", id);
-    fetchArticles();
+    void fetchArticles();
   };
 
   const handleDelete = async (article: Article) => {
@@ -136,7 +164,97 @@ export default function AdminNoticias() {
       title: "Artículo eliminado",
       description: "El artículo publicado fue eliminado correctamente.",
     });
-    fetchArticles();
+    void fetchArticles();
+  };
+
+  const resequenceInstagramOrders = async (queue: Article[]) => {
+    if (queue.length === 0) return true;
+
+    const results = await Promise.all(
+      queue.map((article, index) =>
+        supabase
+          .from("articles")
+          .update({ instagram_order: index + 1 })
+          .eq("id", article.id),
+      ),
+    );
+
+    const failedResult = results.find((result) => result.error);
+    if (failedResult?.error) {
+      toast({
+        title: "No se pudo reordenar Instagram",
+        description: failedResult.error.message,
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleToggleInstagramSelection = async (article: Article) => {
+    if (!article.instagram_selected) {
+      const nextOrder = instagramPendingArticles.length + 1;
+      const { error } = await supabase
+        .from("articles")
+        .update({
+          instagram_selected: true,
+          instagram_published: false,
+          instagram_order: nextOrder,
+        })
+        .eq("id", article.id);
+
+      if (error) {
+        toast({
+          title: "No se pudo agregar a Instagram",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Agregada a Instagram",
+        description: "La noticia quedó seleccionada para publicar en Instagram.",
+      });
+      void fetchArticles();
+      return;
+    }
+
+    const sourceQueue = sortInstagramArticles(
+      (article.instagram_published ? instagramPublishedArticles : instagramPendingArticles).filter(
+        (entry) => entry.id !== article.id,
+      ),
+    );
+
+    const [updateResult, resequenceOk] = await Promise.all([
+      supabase
+        .from("articles")
+        .update({
+          instagram_selected: false,
+          instagram_published: false,
+          instagram_order: null,
+        })
+        .eq("id", article.id),
+      resequenceInstagramOrders(sourceQueue),
+    ]);
+
+    if (updateResult.error) {
+      toast({
+        title: "No se pudo quitar de Instagram",
+        description: updateResult.error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!resequenceOk) return;
+
+    toast({
+      title: "Quitada de Instagram",
+      description: "La noticia dejó de estar seleccionada para Instagram.",
+    });
+    void fetchArticles();
   };
 
   const statusColors: Record<string, string> = {
@@ -149,33 +267,77 @@ export default function AdminNoticias() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <h1 className="text-3xl font-display font-bold">Gestión de noticias</h1>
-          <div className="flex gap-2">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-display font-bold">Gestión de noticias</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Aquí gestionás artículos y marcás cuáles van a Instagram. El generador vive en una vista separada.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" asChild>
+              <Link to="/admin/noticias/instagram">
+                <Instagram className="mr-2 h-4 w-4" />
+                Instagram noticias
+              </Link>
+            </Button>
 
-            <Dialog open={open} onOpenChange={(o) => {
-              setOpen(o);
-              if (!o) {
-                setForm(emptyForm);
-                setEditId(null);
-              }
-            }}>
+            <Dialog
+              open={open}
+              onOpenChange={(nextOpen) => {
+                setOpen(nextOpen);
+                if (!nextOpen) {
+                  setForm(emptyForm);
+                  setEditId(null);
+                }
+              }}
+            >
               <DialogTrigger asChild>
-                <Button><Plus className="h-4 w-4 mr-1" /> Nuevo artículo</Button>
+                <Button>
+                  <Plus className="mr-1 h-4 w-4" />
+                  Nuevo artículo
+                </Button>
               </DialogTrigger>
               <DialogContent className="max-w-lg">
-                <DialogHeader><DialogTitle>{editId ? "Editar artículo" : "Nuevo artículo"}</DialogTitle></DialogHeader>
+                <DialogHeader>
+                  <DialogTitle>{editId ? "Editar artículo" : "Nuevo artículo"}</DialogTitle>
+                </DialogHeader>
                 <div className="space-y-3">
-                  <div><Label>Titular</Label><Input value={form.headline} onChange={(e) => setForm({ ...form, headline: e.target.value })} /></div>
-                  <div><Label>Slug (opcional)</Label><Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="auto-generado" /></div>
-                  <div><Label>Resumen</Label><Textarea value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} rows={2} /></div>
-                  <div><Label>Cuerpo (Markdown)</Label><Textarea value={form.body_markdown} onChange={(e) => setForm({ ...form, body_markdown: e.target.value })} rows={6} /></div>
-                  <div><Label>URL imagen (portada)</Label><Input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="https://..." /></div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div><Label>Fuente</Label><Input value={form.source_name} onChange={(e) => setForm({ ...form, source_name: e.target.value })} /></div>
-                    <div><Label>URL fuente</Label><Input value={form.source_url} onChange={(e) => setForm({ ...form, source_url: e.target.value })} /></div>
+                  <div>
+                    <Label>Titular</Label>
+                    <Input value={form.headline} onChange={(e) => setForm({ ...form, headline: e.target.value })} />
                   </div>
-                  <Button onClick={handleSaveArticle} className="w-full">{editId ? "Guardar cambios" : "Crear artículo"}</Button>
+                  <div>
+                    <Label>Slug (opcional)</Label>
+                    <Input
+                      value={form.slug}
+                      onChange={(e) => setForm({ ...form, slug: e.target.value })}
+                      placeholder="auto-generado"
+                    />
+                  </div>
+                  <div>
+                    <Label>Resumen</Label>
+                    <Textarea value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} rows={2} />
+                  </div>
+                  <div>
+                    <Label>Cuerpo (Markdown)</Label>
+                    <Textarea
+                      value={form.body_markdown}
+                      onChange={(e) => setForm({ ...form, body_markdown: e.target.value })}
+                      rows={6}
+                    />
+                  </div>
+                  <div>
+                    <Label>URL imagen (portada)</Label>
+                    <Input
+                      value={form.image_url}
+                      onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+                      placeholder="https://..."
+                    />
+                  </div>
+                  <Button onClick={handleSaveArticle} className="w-full">
+                    {editId ? "Guardar cambios" : "Crear artículo"}
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -191,36 +353,58 @@ export default function AdminNoticias() {
 
           <TabsContent value={tab} className="mt-4">
             <div className="space-y-3">
-              {filtered.map((a) => (
-                <div key={a.id} className="bg-card border border-border rounded-lg p-4 flex items-center justify-between">
+              {filtered.map((article) => (
+                <div key={article.id} className="flex items-center justify-between rounded-lg border border-border bg-card p-4">
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-foreground truncate">{a.headline}</h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge className={statusColors[a.status]}>{a.status}</Badge>
-                      {a.source_name && <span className="text-xs text-muted-foreground">{a.source_name}</span>}
+                    <h3 className="truncate font-semibold text-foreground">{article.headline}</h3>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Badge className={statusColors[article.status]}>{article.status}</Badge>
+                      {article.status === "published" && article.instagram_selected && (
+                        <Badge variant="outline" className="border-primary/25 bg-primary/10 text-primary">
+                          {article.instagram_published ? "IG publicada" : "IG pendiente"}
+                        </Badge>
+                      )}
+                      {article.status === "published" && article.instagram_selected && article.instagram_order !== null && (
+                        <Badge variant="outline">IG #{article.instagram_order}</Badge>
+                      )}
+                      {article.published_at && (
+                        <span className="text-xs text-muted-foreground">
+                          {format(parseDateValue(article.published_at), "d MMM yyyy", { locale: es })}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div className="flex gap-2 ml-3">
-                    <Button size="sm" variant="ghost" onClick={() => handleEdit(a)} title="Editar">
+                  <div className="ml-3 flex gap-2">
+                    {article.status === "published" && (
+                      <Button
+                        size="sm"
+                        variant={article.instagram_selected ? "secondary" : "outline"}
+                        onClick={() => void handleToggleInstagramSelection(article)}
+                      >
+                        <Instagram className="mr-2 h-4 w-4" />
+                        {article.instagram_selected ? "Seleccionada IG" : "Seleccionar IG"}
+                      </Button>
+                    )}
+                    <Button size="sm" variant="ghost" onClick={() => handleEdit(article)} title="Editar">
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    {a.status === "needs_review" && (
-                      <Button size="sm" variant="ghost" onClick={() => handleApprove(a.id)} title="Aprobar">
+                    {article.status === "needs_review" && (
+                      <Button size="sm" variant="ghost" onClick={() => handleApprove(article.id)} title="Aprobar">
                         <Check className="h-4 w-4 text-primary" />
                       </Button>
                     )}
-                    {a.status === "needs_review" && (
-                      <Button size="sm" variant="ghost" onClick={() => handleReject(a.id)} title="Rechazar">
+                    {article.status === "needs_review" && (
+                      <Button size="sm" variant="ghost" onClick={() => handleReject(article.id)} title="Rechazar">
                         <X className="h-4 w-4 text-destructive" />
                       </Button>
                     )}
-                    {a.status === "published" && (
+                    {article.status === "published" && (
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setDeleteTarget(a)}
+                        onClick={() => setDeleteTarget(article)}
                         title="Eliminar"
-                        disabled={deletingId === a.id}
+                        disabled={deletingId === article.id}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -228,7 +412,9 @@ export default function AdminNoticias() {
                   </div>
                 </div>
               ))}
-              {filtered.length === 0 && <p className="text-muted-foreground text-center py-8">No hay artículos en esta categoría.</p>}
+              {filtered.length === 0 && (
+                <p className="py-8 text-center text-muted-foreground">No hay artículos en esta categoría.</p>
+              )}
             </div>
           </TabsContent>
         </Tabs>

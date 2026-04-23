@@ -50,9 +50,7 @@ curl -X POST https://www.fichasonline.uy/api/publish \
       "headline": "Gran torneo en Montevideo este fin de semana",
       "summary": "El Casino Central recibe el UY Poker Open 2026...",
       "body_markdown": "# Contenido en Markdown...\n\nMás detalles aquí.",
-      "status": "needs_review",
-      "source_url": "https://...",
-      "source_name": "Poker Uruguay"
+      "status": "needs_review"
     }
   }'
 ```
@@ -125,14 +123,12 @@ curl -X POST https://www.fichasonline.uy/api/publish \
 
 ## Schema real de la DB (Supabase)
 
-### articles
+### articles (campos usados por la app)
 - `slug` (string, unique)
 - `headline` (string)
 - `summary` (string, nullable)
 - `body_markdown` (string, nullable)
 - `status` (string: needs_review/draft/published)
-- `source_name` (string, nullable)
-- `source_url` (string, nullable)
 - `created_by` (uuid, nullable)
 - `created_at` (timestamp)
 

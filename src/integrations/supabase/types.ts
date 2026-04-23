@@ -22,6 +22,9 @@ export type Database = {
           headline: string
           id: string
           image_url: string | null
+          instagram_order: number | null
+          instagram_published: boolean
+          instagram_selected: boolean
           published_at: string | null
           slug: string
           source_name: string | null
@@ -36,6 +39,9 @@ export type Database = {
           headline: string
           id?: string
           image_url?: string | null
+          instagram_order?: number | null
+          instagram_published?: boolean
+          instagram_selected?: boolean
           published_at?: string | null
           slug: string
           source_name?: string | null
@@ -50,6 +56,9 @@ export type Database = {
           headline?: string
           id?: string
           image_url?: string | null
+          instagram_order?: number | null
+          instagram_published?: boolean
+          instagram_selected?: boolean
           published_at?: string | null
           slug?: string
           source_name?: string | null
