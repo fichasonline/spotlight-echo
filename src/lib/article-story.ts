@@ -95,7 +95,6 @@ export type ArticleStoryDownloadInput = {
   concepts: string[];
   dateLabel: string;
   url: string;
-  urlLabel: string;
   imageUrl?: string | null;
 };
 
@@ -294,15 +293,14 @@ function drawWatermark(
   ctx.clip();
 
   if (vectorImage) {
+    const watermarkWidth = panelWidth - 236;
+    const watermarkScale = watermarkWidth / vectorImage.width;
+    const watermarkHeight = vectorImage.height * watermarkScale;
+    const watermarkX = panelX + (panelWidth - watermarkWidth) / 2;
+    const watermarkY = panelY + panelHeight - watermarkHeight + 18;
+
     ctx.globalAlpha = 0.18;
-    drawContainedImage(
-      ctx,
-      vectorImage,
-      panelX + 118,
-      panelY + panelHeight - 392,
-      panelWidth - 236,
-      320,
-    );
+    ctx.drawImage(vectorImage, watermarkX, watermarkY, watermarkWidth, watermarkHeight);
     ctx.restore();
     return;
   }
@@ -367,10 +365,6 @@ export function getArticleStorySummary(article: Pick<StoryArticleRecord, "summar
 
 export function getArticleStoryUrl(slug: string, baseUrl = SITE_URL) {
   return buildAbsoluteUrl(`/noticias/${slug}`, baseUrl);
-}
-
-export function getArticleStoryUrlLabel(url: string) {
-  return url.replace(/^https?:\/\//, "").replace(/\/+$/, "");
 }
 
 export function getArticleStoryDateLabel(article: Pick<StoryArticleRecord, "published_at" | "created_at">) {
@@ -564,20 +558,6 @@ export async function createArticleStoryPngBlob(input: ArticleStoryDownloadInput
   const ctaLabel = "LEE LA NOTA:";
   const ctaLabelWidth = ctx.measureText(ctaLabel).width;
   ctx.fillText(ctaLabel, panelX + panelWidth / 2 - ctaLabelWidth / 2, ctaLabelY);
-
-  const pillX = panelX + 150;
-  const pillY = ctaLabelY + 58;
-  const pillWidth = panelWidth - 300;
-  const pillHeight = 106;
-  const pillGradient = ctx.createLinearGradient(pillX, pillY, pillX + pillWidth, pillY + pillHeight);
-  pillGradient.addColorStop(0, "rgba(90, 19, 140, 0.96)");
-  pillGradient.addColorStop(1, "rgba(116, 35, 176, 0.96)");
-  roundedRectPath(ctx, pillX, pillY, pillWidth, pillHeight, 46);
-  ctx.fillStyle = pillGradient;
-  ctx.fill();
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
 
   const blob = await canvasToBlob(canvas);
   return { blob, usedArticleImage };

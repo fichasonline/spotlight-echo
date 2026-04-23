@@ -5,7 +5,6 @@ import {
   getArticleStoryDateLabel,
   getArticleStorySummary,
   getArticleStoryUrl,
-  getArticleStoryUrlLabel,
 } from "@/lib/article-story";
 
 const baseArticle = {
@@ -35,7 +34,6 @@ describe("article-story helpers", () => {
   it("builds production article urls", () => {
     const url = getArticleStoryUrl(baseArticle.slug);
     expect(url).toBe("https://www.fichasonline.uy/noticias/wsop-circuit-montevideo");
-    expect(getArticleStoryUrlLabel(url)).toBe("www.fichasonline.uy/noticias/wsop-circuit-montevideo");
   });
 
   it("generates a ready-to-copy caption with hashtags", () => {

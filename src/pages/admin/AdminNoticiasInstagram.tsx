@@ -34,7 +34,6 @@ import {
   getArticleStoryDateLabel,
   getArticleStorySummary,
   getArticleStoryUrl,
-  getArticleStoryUrlLabel,
 } from "@/lib/article-story";
 
 interface Article {
@@ -205,7 +204,6 @@ export default function AdminNoticiasInstagram() {
         concepts: nextConcepts,
         dateLabel: getArticleStoryDateLabel(article),
         url: getArticleStoryUrl(article.slug),
-        urlLabel: getArticleStoryUrlLabel(getArticleStoryUrl(article.slug)),
         imageUrl: article.image_url,
       });
 
