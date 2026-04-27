@@ -194,13 +194,14 @@ export default function ArticleDetailPage() {
         {article.body_markdown && (
           <div
             className="
-              prose prose-invert prose-base max-w-none
-              prose-headings:font-display prose-headings:tracking-tight
+              prose prose-base max-w-none dark:prose-invert
+              prose-headings:font-display prose-headings:tracking-tight prose-headings:text-foreground
               prose-p:leading-7 prose-p:text-foreground/90
-              prose-li:leading-7
+              prose-li:leading-7 prose-li:text-foreground/90
               prose-a:text-primary hover:prose-a:text-accent
               prose-strong:text-foreground
               prose-blockquote:border-primary/40 prose-blockquote:text-foreground/80
+              prose-code:text-foreground
               prose-hr:border-border
             "
           >

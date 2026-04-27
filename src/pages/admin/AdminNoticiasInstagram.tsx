@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -88,6 +89,7 @@ async function copyToClipboard(text: string) {
 export default function AdminNoticiasInstagram() {
   const { toast } = useToast();
   const [articles, setArticles] = useState<Article[]>([]);
+  const [activeTab, setActiveTab] = useState("queue");
   const [articleToAddId, setArticleToAddId] = useState("");
   const [storyArticleId, setStoryArticleId] = useState("");
   const [storyHeadline, setStoryHeadline] = useState("");
@@ -134,7 +136,7 @@ export default function AdminNoticiasInstagram() {
   const instagramPublishedArticles = sortInstagramArticles(
     articles.filter((article) => article.instagram_selected && article.instagram_published),
   );
-  const instagramStoryArticles = [...instagramPendingArticles, ...instagramPublishedArticles];
+  const instagramStoryArticles = instagramPendingArticles;
   const selectedStoryArticle = instagramStoryArticles.find((article) => article.id === storyArticleId) ?? null;
   const storyConcepts = Array.from(
     new Set(
@@ -287,6 +289,11 @@ export default function AdminNoticiasInstagram() {
       conceptsText: nextConceptsText,
       silent: true,
     });
+  };
+
+  const handleOpenStoryGenerator = (articleId: string) => {
+    handleStoryArticleSelect(articleId);
+    setActiveTab("generator");
   };
 
   const resequenceInstagramOrders = async (queue: Article[]) => {
@@ -521,200 +528,150 @@ export default function AdminNoticiasInstagram() {
           </div>
         </div>
 
-        <section className="mb-8 rounded-2xl border border-border bg-card/90 p-5 shadow-[var(--shadow-card)]">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-                <Plus className="h-3.5 w-3.5" />
-                Agregar noticias
-              </div>
-              <h2 className="mt-3 text-xl font-display font-bold">Seleccionar para Instagram</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Solo las noticias publicadas y agregadas acá entran a la cola editorial.
-              </p>
-            </div>
-            <Badge variant="outline">{availableArticles.length} disponibles</Badge>
-          </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-5">
+          <TabsList className="grid h-auto w-full grid-cols-3 gap-1 p-1 sm:w-auto sm:inline-grid">
+            <TabsTrigger value="queue" className="gap-2 whitespace-nowrap">
+              <ListOrdered className="h-4 w-4" />
+              Cola
+              <Badge variant="outline" className="ml-1 h-5 px-1.5 text-[11px]">
+                {instagramPendingArticles.length}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="generator" className="gap-2 whitespace-nowrap">
+              <Instagram className="h-4 w-4" />
+              Generador
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-2 whitespace-nowrap">
+              <CheckCircle2 className="h-4 w-4" />
+              Historial
+              <Badge variant="outline" className="ml-1 h-5 px-1.5 text-[11px]">
+                {instagramPublishedArticles.length}
+              </Badge>
+            </TabsTrigger>
+          </TabsList>
 
-          {availableArticles.length > 0 ? (
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-              <div>
-                <Label>Noticia publicada disponible</Label>
-                <Select value={articleToAddId} onValueChange={setArticleToAddId}>
-                  <SelectTrigger className="mt-2">
-                    <SelectValue placeholder="Selecciona una noticia" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableArticles.map((article) => (
-                      <SelectItem key={article.id} value={article.id}>
-                        {article.headline}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={() => void handleAddToInstagram()} disabled={!articleToAddId}>
-                <Instagram className="mr-2 h-4 w-4" />
-                Agregar a pendientes
-              </Button>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-              No hay más noticias publicadas disponibles para agregar a Instagram.
-            </div>
-          )}
-        </section>
-
-        <div className="mb-8 grid gap-4 lg:grid-cols-2">
-          <section className="rounded-2xl border border-border bg-card/90 p-5 shadow-[var(--shadow-card)]">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-                  <ListOrdered className="h-3.5 w-3.5" />
-                  Cola pendiente
-                </div>
-                <h2 className="mt-3 text-xl font-display font-bold">Pendientes de publicar</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Estas son las que salen primero en el generador.</p>
-              </div>
-              <Badge variant="outline">{instagramPendingArticles.length}</Badge>
-            </div>
-
-            <div className="space-y-3">
-              {instagramPendingArticles.map((article, index) => (
-                <div key={article.id} className="rounded-lg border border-border bg-background/50 px-3 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium text-foreground line-clamp-2">{article.headline}</p>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="outline">Orden {index + 1}</Badge>
-                        {article.published_at && (
-                          <span>{format(parseDateValue(article.published_at), "d MMM yyyy", { locale: es })}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => void handleMoveInstagramArticle(article, -1)}
-                        disabled={index === 0}
-                        title="Subir"
-                      >
-                        <ArrowUp className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => void handleMoveInstagramArticle(article, 1)}
-                        disabled={index === instagramPendingArticles.length - 1}
-                        title="Bajar"
-                      >
-                        <ArrowDown className="h-4 w-4" />
-                      </Button>
-                    </div>
+          <TabsContent value="queue" className="mt-0 space-y-5">
+            <section className="rounded-xl border border-border bg-card/90 p-5 shadow-[var(--shadow-card)]">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                    <Plus className="h-3.5 w-3.5" />
+                    Agregar noticias
                   </div>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => handleStoryArticleSelect(article.id)}>
-                      <Instagram className="mr-2 h-4 w-4" />
-                      Abrir en generador
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => void handleSetInstagramPublished(article, true)}>
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      Marcar publicada
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => void handleToggleInstagramSelection(article)}>
-                      <X className="mr-2 h-4 w-4" />
-                      Quitar
-                    </Button>
-                  </div>
+                  <h2 className="mt-3 text-xl font-display font-bold">Seleccionar para Instagram</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Solo las noticias publicadas y agregadas acá entran a la cola editorial.
+                  </p>
                 </div>
-              ))}
+                <Badge variant="outline">{availableArticles.length} disponibles</Badge>
+              </div>
 
-              {instagramPendingArticles.length === 0 && (
+              {availableArticles.length > 0 ? (
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                  <div>
+                    <Label>Noticia publicada disponible</Label>
+                    <Select value={articleToAddId} onValueChange={setArticleToAddId}>
+                      <SelectTrigger className="mt-2">
+                        <SelectValue placeholder="Selecciona una noticia" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableArticles.map((article) => (
+                          <SelectItem key={article.id} value={article.id}>
+                            {article.headline}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button onClick={() => void handleAddToInstagram()} disabled={!articleToAddId}>
+                    <Instagram className="mr-2 h-4 w-4" />
+                    Agregar a pendientes
+                  </Button>
+                </div>
+              ) : (
                 <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-                  No hay noticias pendientes para Instagram.
+                  No hay más noticias publicadas disponibles para agregar a Instagram.
                 </div>
               )}
-            </div>
-          </section>
+            </section>
 
-          <section className="rounded-2xl border border-border bg-card/90 p-5 shadow-[var(--shadow-card)]">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-muted-foreground/20 bg-muted/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Historial
+            <section className="rounded-xl border border-border bg-card/90 p-5 shadow-[var(--shadow-card)]">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                    <ListOrdered className="h-3.5 w-3.5" />
+                    Cola pendiente
+                  </div>
+                  <h2 className="mt-3 text-xl font-display font-bold">Pendientes de publicar</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Estas son las que salen primero en el generador.</p>
                 </div>
-                <h2 className="mt-3 text-xl font-display font-bold">Ya publicadas en Instagram</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Quedan separadas para no mezclarse con las pendientes.</p>
+                <Badge variant="outline">{instagramPendingArticles.length}</Badge>
               </div>
-              <Badge variant="outline">{instagramPublishedArticles.length}</Badge>
-            </div>
 
-            <div className="space-y-3">
-              {instagramPublishedArticles.map((article, index) => (
-                <div key={article.id} className="rounded-lg border border-border bg-background/50 px-3 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium text-foreground line-clamp-2">{article.headline}</p>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="outline">Orden {index + 1}</Badge>
-                        {article.published_at && (
-                          <span>{format(parseDateValue(article.published_at), "d MMM yyyy", { locale: es })}</span>
-                        )}
+              <div className="grid gap-3 xl:grid-cols-2">
+                {instagramPendingArticles.map((article, index) => (
+                  <div key={article.id} className="rounded-lg border border-border bg-background/50 px-3 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground line-clamp-2">{article.headline}</p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <Badge variant="outline">Orden {index + 1}</Badge>
+                          {article.published_at && (
+                            <span>{format(parseDateValue(article.published_at), "d MMM yyyy", { locale: es })}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => void handleMoveInstagramArticle(article, -1)}
+                          disabled={index === 0}
+                          title="Subir"
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => void handleMoveInstagramArticle(article, 1)}
+                          disabled={index === instagramPendingArticles.length - 1}
+                          title="Bajar"
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => void handleMoveInstagramArticle(article, -1)}
-                        disabled={index === 0}
-                        title="Subir"
-                      >
-                        <ArrowUp className="h-4 w-4" />
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => handleOpenStoryGenerator(article.id)}>
+                        <Instagram className="mr-2 h-4 w-4" />
+                        Abrir en generador
                       </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => void handleMoveInstagramArticle(article, 1)}
-                        disabled={index === instagramPublishedArticles.length - 1}
-                        title="Bajar"
-                      >
-                        <ArrowDown className="h-4 w-4" />
+                      <Button size="sm" variant="outline" onClick={() => void handleSetInstagramPublished(article, true)}>
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Marcar publicada
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => void handleToggleInstagramSelection(article)}>
+                        <X className="mr-2 h-4 w-4" />
+                        Quitar
                       </Button>
                     </div>
                   </div>
+                ))}
 
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => handleStoryArticleSelect(article.id)}>
-                      <Instagram className="mr-2 h-4 w-4" />
-                      Abrir en generador
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => void handleSetInstagramPublished(article, false)}>
-                      <RotateCcw className="mr-2 h-4 w-4" />
-                      Volver a pendientes
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => void handleToggleInstagramSelection(article)}>
-                      <X className="mr-2 h-4 w-4" />
-                      Quitar
-                    </Button>
+                {instagramPendingArticles.length === 0 && (
+                  <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground xl:col-span-2">
+                    No hay noticias pendientes para Instagram.
                   </div>
-                </div>
-              ))}
+                )}
+              </div>
+            </section>
+          </TabsContent>
 
-              {instagramPublishedArticles.length === 0 && (
-                <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-                  Todavía no marcaste noticias como publicadas en Instagram.
-                </div>
-              )}
-            </div>
-          </section>
-        </div>
-
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_380px]">
-          <section className="rounded-2xl border border-border bg-card/90 p-5 shadow-[var(--shadow-card)]">
+          <TabsContent value="generator" className="mt-0">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_380px]">
+              <section className="rounded-xl border border-border bg-card/90 p-5 shadow-[var(--shadow-card)]">
             <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
@@ -839,9 +796,9 @@ export default function AdminNoticiasInstagram() {
                 </div>
               </div>
             )}
-          </section>
+              </section>
 
-          <section className="rounded-2xl border border-border bg-card/90 p-5 shadow-[var(--shadow-card)]">
+              <section className="rounded-xl border border-border bg-card/90 p-5 shadow-[var(--shadow-card)]">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-display font-bold">Preview</h2>
@@ -884,8 +841,83 @@ export default function AdminNoticiasInstagram() {
                 Cuando agregues noticias a la cola, acá vas a ver la preview de la story.
               </div>
             )}
-          </section>
-        </div>
+              </section>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="history" className="mt-0">
+            <section className="rounded-xl border border-border bg-card/90 p-5 shadow-[var(--shadow-card)]">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-muted-foreground/20 bg-muted/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Historial
+                  </div>
+                  <h2 className="mt-3 text-xl font-display font-bold">Ya publicadas en Instagram</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Quedan separadas de la cola para revisar lo publicado sin tapar el trabajo pendiente.
+                  </p>
+                </div>
+                <Badge variant="outline">{instagramPublishedArticles.length}</Badge>
+              </div>
+
+              <div className="grid gap-3 xl:grid-cols-2">
+                {instagramPublishedArticles.map((article, index) => (
+                  <div key={article.id} className="rounded-lg border border-border bg-background/50 px-3 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground line-clamp-2">{article.headline}</p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <Badge variant="outline">Orden {index + 1}</Badge>
+                          {article.published_at && (
+                            <span>{format(parseDateValue(article.published_at), "d MMM yyyy", { locale: es })}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => void handleMoveInstagramArticle(article, -1)}
+                          disabled={index === 0}
+                          title="Subir"
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => void handleMoveInstagramArticle(article, 1)}
+                          disabled={index === instagramPublishedArticles.length - 1}
+                          title="Bajar"
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => void handleSetInstagramPublished(article, false)}>
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                        Volver a pendientes
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => void handleToggleInstagramSelection(article)}>
+                        <X className="mr-2 h-4 w-4" />
+                        Quitar
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+
+                {instagramPublishedArticles.length === 0 && (
+                  <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground xl:col-span-2">
+                    Todavía no marcaste noticias como publicadas en Instagram.
+                  </div>
+                )}
+              </div>
+            </section>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
