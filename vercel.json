@@ -31,8 +31,24 @@
       "destination": "/api/news-sitemap"
     },
     {
+      "source": "/sitemaps/salas.xml",
+      "destination": "/api/sitemap-salas"
+    },
+    {
       "source": "/rss.xml",
       "destination": "/api/rss"
+    },
+    {
+      "source": "/noticias/:slug",
+      "destination": "/api/og-render"
+    },
+    {
+      "source": "/eventos/:id",
+      "destination": "/api/og-render"
+    },
+    {
+      "source": "/salas/:slug",
+      "destination": "/api/og-render"
     },
     {
       "source": "/(.*)",

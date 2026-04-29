@@ -45,7 +45,11 @@ export default function NoticiasPage() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-display font-bold mb-6">Noticias</h1>
+        <h1 className="text-3xl font-display font-bold mb-3">Noticias de poker</h1>
+        <p className="text-muted-foreground max-w-2xl mb-6">
+          Las últimas noticias del mundo del poker: torneos en vivo, resultados, novedades de salas online
+          como GG Poker, ACR y PokerStars, deals, y toda la actualidad del poker en Uruguay y el mundo.
+        </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {articles.map((a, index) => (

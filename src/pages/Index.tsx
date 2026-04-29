@@ -1,20 +1,16 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type RefObject } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject, type RefObject } from "react";
 import { Link } from "react-router-dom";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
-import { SupportChatWidget } from "@/components/SupportChatWidget";
-import { AIChatWidget } from "@/components/AIChatWidget";
+import { LazySupportChatWidget } from "@/components/LazySupportChatWidget";
+import { LazyAIChatWidget } from "@/components/LazyAIChatWidget";
 import { CryptoTicker } from "@/components/CryptoTicker";
 import { BannerMedia } from "@/components/BannerMedia";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { motion } from "framer-motion";
 import { PartnerMarquee } from "@/components/PartnerMarquee";
-import gsap from "gsap";
-import { useGSAP } from "@gsap/react";
-gsap.registerPlugin(useGSAP);
 import { Calendar, Newspaper, MessageSquare, ArrowRight, Send, Instagram, Copy, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -343,13 +339,6 @@ export default function HomePage() {
   useVerticalScrollPassthrough(articlesScrollerRef);
   useVerticalScrollPassthrough(eventsScrollerRef);
 
-  // Hero & banner animation refs
-  const heroRef           = useRef<HTMLElement>(null);
-  const leftBannerRef     = useRef<HTMLDivElement>(null);
-  const rightBannerRef    = useRef<HTMLDivElement>(null);
-  const topMobileRef      = useRef<HTMLDivElement>(null);
-  const bottomDesktopRef  = useRef<HTMLDivElement>(null);
-  const bottomMobileRef   = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL?.trim() || "https://instagram.com/fichasonlineuy";
@@ -497,56 +486,6 @@ export default function HomePage() {
     return () => { cancelled = true; clearTimeout(timeout); };
   }, []);
 
-  /* ── Hero title entrance (GSAP) ───────────────────────────────── */
-  useGSAP(() => {
-    const mm = gsap.matchMedia();
-    mm.add(
-      { reduceMotion: "(prefers-reduced-motion: reduce)", motion: "(prefers-reduced-motion: no-preference)" },
-      (ctx) => {
-        const { reduceMotion } = ctx.conditions as { reduceMotion: boolean; motion: boolean };
-        if (reduceMotion) {
-          gsap.set(".hero-line, .hero-sub, .hero-cta", { autoAlpha: 1 });
-          return;
-        }
-        gsap.timeline({ defaults: { ease: "power3.out" } })
-          .from(".hero-line", { autoAlpha: 0, y: 32, scale: 0.985, duration: 0.65, stagger: 0.1 })
-          .from(".hero-sub",  { autoAlpha: 0, y: 16, duration: 0.5 }, "-=0.38")
-          .from(".hero-cta",  { autoAlpha: 0, y: 12, duration: 0.45 }, "-=0.3");
-      }
-    );
-    return () => mm.revert();
-  }, { scope: heroRef });
-
-  /* ── Banner slots: hide before data, reveal after ─────────────── */
-  useLayoutEffect(() => {
-    const targets = [leftBannerRef, rightBannerRef, topMobileRef, bottomDesktopRef, bottomMobileRef]
-      .map((r) => r.current)
-      .filter(Boolean);
-    gsap.set(targets, { autoAlpha: 0, y: 8 });
-  }, []);
-
-  useEffect(() => {
-    if (!hasFetchedBanners) return;
-    const targets = [leftBannerRef, rightBannerRef, topMobileRef, bottomDesktopRef, bottomMobileRef]
-      .map((r) => r.current)
-      .filter(Boolean);
-    const mm = gsap.matchMedia();
-    mm.add(
-      { motion: "(prefers-reduced-motion: no-preference)", reduceMotion: "(prefers-reduced-motion: reduce)" },
-      (ctx) => {
-        const { reduceMotion } = ctx.conditions as { motion: boolean; reduceMotion: boolean };
-        gsap.to(targets, {
-          autoAlpha: 1,
-          y: 0,
-          duration: reduceMotion ? 0 : 0.55,
-          stagger:  reduceMotion ? 0 : 0.08,
-          ease: "power2.out",
-        });
-      }
-    );
-    return () => mm.revert();
-  }, [hasFetchedBanners]);
-
   useAutoHorizontalScroll({
     containerRef: articlesScrollerRef,
     pauseRef: newsAutoScrollPausedRef,
@@ -569,11 +508,10 @@ export default function HomePage() {
           HERO — fills the full remaining viewport height
       ══════════════════════════════════════════════════════════════ */}
       <section
-        ref={heroRef}
         className="relative overflow-hidden flex flex-col"
         style={{
           minHeight: "calc(100vh - 64px)",
-          backgroundImage: "url('/fondo.png')",
+          backgroundImage: "url('/fondo-1600.jpg')",
           backgroundSize: "cover",
           backgroundPosition: "center top",
           backgroundRepeat: "no-repeat",
@@ -599,7 +537,7 @@ export default function HomePage() {
         <div className="relative z-10 mx-auto flex w-full max-w-[1360px] flex-1 flex-col px-4 pb-3 pt-5 lg:px-6">
           <div className="flex flex-1 flex-col justify-center">
             <div className="flex flex-col items-center gap-4 lg:flex-row lg:items-center lg:justify-center lg:gap-4 xl:gap-7">
-              <div ref={leftBannerRef}>
+              <div className={hasFetchedBanners ? "banner-reveal is-visible" : "banner-reveal"}>
                 <PortraitBannerSlot
                   banner={banners["top_left"]}
                   className="hidden lg:flex"
@@ -629,11 +567,11 @@ export default function HomePage() {
                 </p>
 
                 <div className="hero-cta">
-                  <SupportChatWidget triggerVariant="hero" />
+                  <LazySupportChatWidget triggerVariant="hero" />
                 </div>
               </div>
 
-              <div ref={rightBannerRef}>
+              <div className={hasFetchedBanners ? "banner-reveal is-visible" : "banner-reveal"}>
                 <PortraitBannerSlot
                   banner={banners["top_right"]}
                   className="hidden lg:flex"
@@ -642,7 +580,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div ref={topMobileRef} className="mt-3 hidden grid-cols-2 gap-3 sm:grid lg:hidden">
+            <div className={`mt-3 hidden grid-cols-2 gap-3 sm:grid lg:hidden ${hasFetchedBanners ? "banner-reveal is-visible" : "banner-reveal"}`}>
               <BannerSlot
                 banner={banners["top_left"]}
                 className="aspect-[231/411] rounded-[24px]"
@@ -656,7 +594,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div ref={bottomDesktopRef} className="mt-5 hidden items-center justify-center gap-6 lg:flex">
+          <div className={`mt-5 hidden items-center justify-center gap-6 lg:flex ${hasFetchedBanners ? "banner-reveal is-visible" : "banner-reveal"}`}>
             <BannerSlot
               banner={banners["bottom_left"]}
               className="h-[182px] w-[572px] shrink-0 rounded-[24px] shadow-[0_18px_40px_rgba(0,0,0,0.28)]"
@@ -669,7 +607,7 @@ export default function HomePage() {
             />
           </div>
 
-          <div ref={bottomMobileRef} className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 lg:hidden">
+          <div className={`mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 lg:hidden ${hasFetchedBanners ? "banner-reveal is-visible" : "banner-reveal"}`}>
             <BannerSlot
               banner={banners["bottom_left"]}
               className="aspect-[572/182] rounded-[24px]"
@@ -697,23 +635,17 @@ export default function HomePage() {
           {articles.length > 3 && (
             <div className="mb-3 flex items-center justify-center gap-2 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-muted-foreground lg:justify-end">
               <span>Se mueve solo</span>
-              <motion.span
+              <span
                 aria-hidden="true"
-                className="inline-flex items-center"
-                animate={{ x: [0, 6, 0] }}
-                transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                className="nudge-x inline-flex items-center"
               >
                 <ArrowRight className="h-3.5 w-3.5" />
-              </motion.span>
+              </span>
               <span>También podés arrastrar</span>
             </div>
           )}
-          <motion.div
-            initial={{ opacity: 0, x: -16 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            className="mb-5 flex items-center justify-between gap-4"
+          <div
+            className="card-reveal mb-5 flex items-center justify-between gap-4"
           >
             <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-foreground">
               Ultimas noticias
@@ -725,7 +657,7 @@ export default function HomePage() {
               <Newspaper className="h-4 w-4" />
               Fichas News
             </Link>
-          </motion.div>
+          </div>
 
           <div className="relative">
             {articles.length > 3 && (
@@ -741,13 +673,11 @@ export default function HomePage() {
               {...newsScrollerInteractionProps}
             >
             {articles.map((a, i) => (
-              <motion.div
+              <div
                 key={a.id}
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: Math.min(i, 3) * 0.06, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                style={{ "--card-reveal-delay": `${Math.min(i, 3) * 60}ms` } as CSSProperties}
                 data-carousel-card="true"
-                className="min-w-0 shrink-0 snap-start basis-[84%] sm:basis-[68%] lg:basis-[371px]"
+                className="card-reveal min-w-0 shrink-0 snap-start basis-[84%] sm:basis-[68%] lg:basis-[371px]"
               >
                 <Link
                   to={`/noticias/${a.slug}`}
@@ -787,7 +717,7 @@ export default function HomePage() {
                     </span>
                   </div>
                 </Link>
-              </motion.div>
+              </div>
             ))}
             {articles.length === 0 && (
               <div className="w-full rounded-[30px] border border-dashed border-border bg-muted/30 px-6 py-14 text-center">
@@ -802,15 +732,14 @@ export default function HomePage() {
           {articles.length > 1 && (
             <div className="mt-3 flex justify-center gap-1.5 lg:hidden">
               {articles.map((_, i) => (
-                <motion.div
+                <div
                   key={i}
-                  animate={{
+                  style={{
                     width: i === activeArticleIndex ? 20 : 6,
                     opacity: i === activeArticleIndex ? 1 : 0.3,
                     backgroundColor: i === activeArticleIndex ? "rgb(143,60,249)" : "rgb(255,255,255)",
                   }}
-                  transition={{ duration: 0.3 }}
-                  className="h-1.5 rounded-full"
+                  className="h-1.5 rounded-full transition-all duration-300"
                 />
               ))}
             </div>
@@ -841,12 +770,8 @@ export default function HomePage() {
         {/* Upcoming events */}
         <section className="relative">
       
-          <motion.div
-            initial={{ opacity: 0, x: -16 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            className="mb-3 flex items-center justify-between gap-4"
+          <div
+            className="card-reveal mb-3 flex items-center justify-between gap-4"
           >
             <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-foreground">
               Calendario
@@ -858,21 +783,19 @@ export default function HomePage() {
               <Calendar className="h-4 w-4" />
               Ver calendario
             </Link>
-          </motion.div>
+          </div>
 
           {eventsCarouselCount > 1 && (
             <div className="mb-4 flex items-center justify-center gap-2 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-muted-foreground lg:justify-end">
               <span className="hidden lg:inline">Se mueve solo</span>
               <span className="hidden lg:inline">•</span>
               <span>Deslizá para ver más eventos</span>
-              <motion.span
+              <span
                 aria-hidden="true"
-                className="inline-flex items-center"
-                animate={{ x: [0, 6, 0] }}
-                transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                className="nudge-x inline-flex items-center"
               >
                 <ArrowRight className="h-3.5 w-3.5" />
-              </motion.span>
+              </span>
             </div>
           )}
 
@@ -896,12 +819,10 @@ export default function HomePage() {
               const monthLabel = format(parseDateValue(e.start_date), "MMM", { locale: es }).toUpperCase();
               return (
                 <Fragment key={e.id}>
-                  <motion.div
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: Math.min(i, 3) * 0.06, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                  <div
+                    style={{ "--card-reveal-delay": `${Math.min(i, 3) * 60}ms` } as CSSProperties}
                     data-carousel-card="true"
-                    className="min-w-0 shrink-0 snap-start basis-[88%] sm:basis-[72%] lg:basis-[500px]"
+                    className="card-reveal min-w-0 shrink-0 snap-start basis-[88%] sm:basis-[72%] lg:basis-[500px]"
                   >
                     <Link
                       to={`/eventos/${e.id}`}
@@ -937,15 +858,13 @@ export default function HomePage() {
                         </p>
                       </div>
                     </Link>
-                  </motion.div>
+                  </div>
 
                   {i === eventBannerInsertAfterIndex && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.07 + 0.04, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                    <div
+                      style={{ "--card-reveal-delay": `${i * 70 + 40}ms` } as CSSProperties}
                       data-carousel-card="true"
-                      className="min-w-0 shrink-0 snap-start basis-[88%] sm:basis-[72%] lg:basis-[500px]"
+                      className="card-reveal min-w-0 shrink-0 snap-start basis-[88%] sm:basis-[72%] lg:basis-[500px]"
                     >
                       <div className="h-[136px]">
                         <BannerSlot
@@ -954,7 +873,7 @@ export default function HomePage() {
                           onAction={setActiveBanner}
                         />
                       </div>
-                    </motion.div>
+                    </div>
                   )}
                 </Fragment>
               );
@@ -972,15 +891,14 @@ export default function HomePage() {
           {eventsCarouselCount > 1 && (
             <div className="mt-3 flex justify-center gap-1.5 lg:hidden">
               {Array.from({ length: eventsCarouselCount }).map((_, i) => (
-                <motion.div
+                <div
                   key={i}
-                  animate={{
+                  style={{
                     width: i === activeEventIndex ? 20 : 6,
                     opacity: i === activeEventIndex ? 1 : 0.3,
                     backgroundColor: i === activeEventIndex ? "rgb(143,60,249)" : "rgb(255,255,255)",
                   }}
-                  transition={{ duration: 0.3 }}
-                  className="h-1.5 rounded-full"
+                  className="h-1.5 rounded-full transition-all duration-300"
                 />
               ))}
             </div>
@@ -989,40 +907,32 @@ export default function HomePage() {
 
         {/* Partner rooms */}
         <section>
-          <motion.div
-            initial={{ opacity: 0, x: -16 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            className="mb-5 flex items-center justify-between gap-4"
+          <div
+            className="card-reveal mb-5 flex items-center justify-between gap-4"
           >
             <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-foreground">
               Consegui el mejor deal para tu sala
             </p>
-          </motion.div>
+          </div>
 
           <PartnerMarquee rooms={uniquePartnerRooms} />
         </section>
 
         {/* Social links */}
         <section>
-          <motion.div
-            initial={{ opacity: 0, x: -16 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            className="mb-5 flex items-center justify-between gap-4"
+          <div
+            className="card-reveal mb-5 flex items-center justify-between gap-4"
           >
             <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-foreground">
               Seguinos en redes
             </p>
-          </motion.div>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {socialLinks.map((social, i) => {
               const Icon = social.icon;
               const isDisabled = Boolean(social.disabled);
               return (
-                <motion.a
+                <a
                   key={social.label}
                   href={isDisabled ? undefined : social.href}
                   target={isDisabled ? undefined : "_blank"}
@@ -1031,11 +941,7 @@ export default function HomePage() {
                   aria-disabled={isDisabled}
                   tabIndex={isDisabled ? -1 : undefined}
                   onClick={isDisabled ? (e) => e.preventDefault() : undefined}
-                  initial={{ opacity: 0, y: 14 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.08, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                  whileHover={isDisabled ? {} : { y: -2 }}
+                  style={{ "--card-reveal-delay": `${i * 80}ms` } as CSSProperties}
                   className={`group flex items-center justify-between bg-card px-4 py-3 rounded-lg border border-border transition-colors sm:py-4 ${
                     isDisabled ? "cursor-not-allowed opacity-60" : "hover:border-primary/40"
                   }`}
@@ -1060,7 +966,7 @@ export default function HomePage() {
                         : "transition-transform group-hover:translate-x-1 group-hover:text-primary"
                     }`}
                   />
-                </motion.a>
+                </a>
               );
             })}
           </div>
@@ -1137,7 +1043,7 @@ export default function HomePage() {
         </DialogContent>
       </Dialog>
 
-      <AIChatWidget autoOpen />
+      <LazyAIChatWidget autoOpen />
     </div>
   );
 }

@@ -36,6 +36,7 @@ const SUPPORT_SESSION_KEY = "support_chat_session_v3";
 
 interface SupportChatWidgetProps {
   triggerVariant?: "floating" | "header" | "hero";
+  initialOpen?: boolean;
 }
 
 function parseSession(raw: string | null): PersistedSupportSession | null {
@@ -108,11 +109,11 @@ function renderMessageBody(raw: string) {
   return parts;
 }
 
-export function SupportChatWidget({ triggerVariant = "floating" }: SupportChatWidgetProps) {
+export function SupportChatWidget({ triggerVariant = "floating", initialOpen = false }: SupportChatWidgetProps) {
   const isMobile = useIsMobile();
   const { toast } = useToast();
 
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const [initializing, setInitializing] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);

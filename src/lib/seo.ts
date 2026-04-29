@@ -197,7 +197,7 @@ export function applySeo(config: SeoConfig) {
 
   upsertMetaByProperty("og:type", config.ogType ?? "website");
   upsertMetaByProperty("og:site_name", SITE_NAME);
-  upsertMetaByProperty("og:locale", "es_ES");
+  upsertMetaByProperty("og:locale", "es_UY");
   upsertMetaByProperty("og:title", config.title);
   upsertMetaByProperty("og:description", config.description);
   upsertMetaByProperty("og:url", canonicalUrl);

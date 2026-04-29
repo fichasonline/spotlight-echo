@@ -9,10 +9,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X, LogOut, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
-import { SupportChatWidget } from "@/components/SupportChatWidget";
+import { LazySupportChatWidget } from "@/components/LazySupportChatWidget";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -74,11 +73,7 @@ export function Navbar() {
               )}
             >
               {location.pathname === l.to && (
-                <motion.span
-                  layoutId="active-nav-pill"
-                  className="absolute inset-0 -z-10 rounded-full border border-primary/45 bg-primary/20"
-                  transition={{ type: "spring", stiffness: 320, damping: 30 }}
-                />
+                <span className="absolute inset-0 -z-10 rounded-full border border-primary/45 bg-primary/20 transition-all duration-200" />
               )}
               {l.label}
             </Link>
@@ -87,7 +82,7 @@ export function Navbar() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <SupportChatWidget triggerVariant="header" />
+          <LazySupportChatWidget triggerVariant="header" />
 
           <div className="hidden md:flex items-center gap-3">
             {user && !isAnonymous ? (
@@ -146,57 +141,45 @@ export function Navbar() {
       </div>
 
       {/* Mobile menu */}
-      <AnimatePresence initial={false}>
-        {mobileOpen && (
-          <motion.div
-            id="mobile-nav-menu"
-            className="overflow-hidden border-b border-primary/20 bg-card md:hidden"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-          >
-            <div className="px-4 pb-4 pt-2 space-y-1">
-              {links.map((l, index) => (
-                <motion.div
-                  key={l.to}
-                  initial={{ y: -6, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: -4, opacity: 0 }}
-                  transition={{ duration: 0.18, delay: index * 0.03 }}
-                >
-                  <Link
-                    to={l.to}
-                    className={cn(
-                      "block rounded-lg px-3 py-2 text-sm transition-colors",
-                      location.pathname === l.to
-                        ? "bg-primary/10 text-foreground border border-primary/30"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                    )}
-                  >
-                    {l.label}
-                  </Link>
-                </motion.div>
-              ))}
-              {user && !isAnonymous ? (
-                <button
-                  onClick={signOut}
-                  className="mt-2 block w-full rounded-lg px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10 transition-colors"
-                >
-                  Cerrar sesión
-                </button>
-              ) : (
+      {mobileOpen && (
+        <div
+          id="mobile-nav-menu"
+          className="mobile-nav-menu overflow-hidden border-b border-primary/20 bg-card md:hidden"
+        >
+          <div className="px-4 pb-4 pt-2 space-y-1">
+            {links.map((l) => (
+              <div key={l.to} className="mobile-nav-item">
                 <Link
-                  to="/auth"
-                  className="mt-2 block rounded-lg px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/10 transition-colors"
+                  to={l.to}
+                  className={cn(
+                    "block rounded-lg px-3 py-2 text-sm transition-colors",
+                    location.pathname === l.to
+                      ? "bg-primary/10 text-foreground border border-primary/30"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
                 >
-                  Iniciar sesión
+                  {l.label}
                 </Link>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              </div>
+            ))}
+            {user && !isAnonymous ? (
+              <button
+                onClick={signOut}
+                className="mt-2 block w-full rounded-lg px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                Cerrar sesión
+              </button>
+            ) : (
+              <Link
+                to="/auth"
+                className="mt-2 block rounded-lg px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/10 transition-colors"
+              >
+                Iniciar sesión
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

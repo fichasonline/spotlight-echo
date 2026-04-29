@@ -25,6 +25,8 @@ const AdminModeracion = lazy(() => import("./pages/admin/AdminModeracion"));
 const AdminLeads = lazy(() => import("./pages/admin/AdminLeads"));
 const AdminChatLeads = lazy(() => import("./pages/admin/AdminChatLeads"));
 const AdminBanners = lazy(() => import("./pages/admin/AdminBanners"));
+const SalasPage = lazy(() => import("./pages/Salas"));
+const SalaDetailPage = lazy(() => import("./pages/SalaDetail"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -48,6 +50,8 @@ const App = () => (
                   <Route path="/eventos/:id" element={<EventoDetailPage />} />
                   <Route path="/noticias" element={<NoticiasPage />} />
                   <Route path="/noticias/:slug" element={<ArticleDetailPage />} />
+                  <Route path="/salas" element={<SalasPage />} />
+                  <Route path="/salas/:slug" element={<SalaDetailPage />} />
                   <Route
                     path="/feed"
                     element={

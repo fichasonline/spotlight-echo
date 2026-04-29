@@ -7,6 +7,7 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
     "/sitemaps/pages.xml",
     "/sitemaps/articles.xml",
     "/sitemaps/events.xml",
+    "/sitemaps/salas.xml",
     "/news-sitemap.xml",
   ];
 

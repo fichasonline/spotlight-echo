@@ -146,7 +146,6 @@
     background-image:
       radial-gradient(circle at 14% -8%, hsl(273 58% 31% / 0.35), transparent 42%),
       radial-gradient(circle at 88% 0%, hsl(273 66% 56% / 0.22), transparent 38%);
-    background-attachment: fixed;
   }
 
   img {
@@ -188,9 +187,70 @@
   }
 }
 
+@keyframes age-gate-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes age-gate-panel-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes mobile-nav-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes nudge-x {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(6px, 0, 0);
+  }
+}
+
 @layer utilities {
   .partner-marquee-track {
     animation: partner-marquee-scroll var(--partner-marquee-duration, 28s) linear infinite;
+  }
+
+  .age-gate-backdrop {
+    animation: age-gate-fade-in 180ms ease-out both;
+  }
+
+  .age-gate-panel {
+    animation: age-gate-panel-in 220ms ease-out 80ms both;
+  }
+
+  .mobile-nav-menu {
+    animation: mobile-nav-in 180ms ease-out both;
+  }
+
+  .mobile-nav-item {
+    animation: card-reveal-up 180ms ease-out both;
+  }
+
+  .nudge-x {
+    animation: nudge-x 1.2s ease-in-out infinite;
   }
 
   .card-reveal {
@@ -198,6 +258,41 @@
     animation: card-reveal-up 480ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
     animation-delay: var(--card-reveal-delay, 0ms);
     will-change: transform, opacity;
+  }
+
+  .hero-line,
+  .hero-sub,
+  .hero-cta {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+    animation: card-reveal-up 620ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  .hero-line:nth-child(2) {
+    animation-delay: 90ms;
+  }
+
+  .hero-line:nth-child(3) {
+    animation-delay: 180ms;
+  }
+
+  .hero-sub {
+    animation-delay: 260ms;
+  }
+
+  .hero-cta {
+    animation-delay: 340ms;
+  }
+
+  .banner-reveal {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+    transition: opacity 420ms ease, transform 420ms ease;
+  }
+
+  .banner-reveal.is-visible {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
   }
 
   .text-gradient-primary {
@@ -231,5 +326,20 @@
   .card-reveal {
     opacity: 1;
     animation: none;
+  }
+
+  .hero-line,
+  .hero-sub,
+  .hero-cta,
+  .banner-reveal,
+  .age-gate-backdrop,
+  .age-gate-panel,
+  .mobile-nav-menu,
+  .mobile-nav-item,
+  .nudge-x {
+    opacity: 1;
+    transform: none;
+    animation: none;
+    transition: none;
   }
 }
