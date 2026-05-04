@@ -98,6 +98,27 @@ export type ArticleStoryDownloadInput = {
   imageUrl?: string | null;
 };
 
+export function getArticleStoryExportImageUrl(imageUrl: string | null | undefined, currentOrigin?: string) {
+  const rawUrl = imageUrl?.trim();
+  if (!rawUrl) return null;
+
+  if (rawUrl.startsWith("/")) return rawUrl;
+
+  const origin = currentOrigin ?? (typeof window !== "undefined" ? window.location.origin : SITE_URL);
+
+  try {
+    const absoluteUrl = new URL(rawUrl, origin);
+    const originUrl = new URL(origin);
+
+    if (!["http:", "https:"].includes(absoluteUrl.protocol)) return null;
+    if (absoluteUrl.origin === originUrl.origin) return absoluteUrl.toString();
+
+    return `/api/image-proxy?url=${encodeURIComponent(absoluteUrl.toString())}`;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeToken(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
@@ -328,7 +349,8 @@ function canvasToBlob(canvas: HTMLCanvasElement) {
 }
 
 async function loadExportableImage(url: string | null | undefined) {
-  if (!url) return null;
+  const exportableUrl = getArticleStoryExportImageUrl(url);
+  if (!exportableUrl) return null;
 
   return new Promise<HTMLImageElement | null>((resolve) => {
     const image = new Image();
@@ -336,7 +358,7 @@ async function loadExportableImage(url: string | null | undefined) {
     image.decoding = "async";
     image.onload = () => resolve(image);
     image.onerror = () => resolve(null);
-    image.src = url;
+    image.src = exportableUrl;
   });
 }
 

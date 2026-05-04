@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   extractArticleConcepts,
+  getArticleStoryExportImageUrl,
   getArticleStoryCaption,
   getArticleStoryDateLabel,
   getArticleStorySummary,
@@ -48,5 +49,18 @@ describe("article-story helpers", () => {
 
   it("formats the story date label in spanish", () => {
     expect(getArticleStoryDateLabel(baseArticle)).toBe("23 abr 2026");
+  });
+
+  it("routes external story images through the export proxy", () => {
+    const url = getArticleStoryExportImageUrl("https://example.com/portada.jpg", "https://www.fichasonline.uy");
+
+    expect(url).toBe("/api/image-proxy?url=https%3A%2F%2Fexample.com%2Fportada.jpg");
+  });
+
+  it("keeps same-origin story images direct", () => {
+    expect(getArticleStoryExportImageUrl("/portada.jpg", "https://www.fichasonline.uy")).toBe("/portada.jpg");
+    expect(getArticleStoryExportImageUrl("https://www.fichasonline.uy/portada.jpg", "https://www.fichasonline.uy")).toBe(
+      "https://www.fichasonline.uy/portada.jpg",
+    );
   });
 });

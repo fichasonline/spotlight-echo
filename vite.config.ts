@@ -4,6 +4,8 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
+const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+
 function getSingleQueryValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) return value[0];
   return value;
@@ -303,6 +305,108 @@ function pdfProxyDevPlugin(): Plugin {
   };
 }
 
+function imageProxyDevPlugin(): Plugin {
+  return {
+    name: "image-proxy-dev",
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        if (!req.url?.startsWith("/api/image-proxy")) return next();
+
+        if (req.method !== "GET") {
+          res.statusCode = 405;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.end(JSON.stringify({ error: "Method not allowed" }));
+          return;
+        }
+
+        const parsed = new URL(req.url, "http://localhost");
+        const rawUrl = getSingleQueryValue(parsed.searchParams.getAll("url"));
+
+        if (!rawUrl) {
+          res.statusCode = 400;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.end(JSON.stringify({ error: "Missing url query param" }));
+          return;
+        }
+
+        let targetUrl: URL;
+        try {
+          targetUrl = new URL(rawUrl);
+        } catch {
+          res.statusCode = 400;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.end(JSON.stringify({ error: "Invalid URL" }));
+          return;
+        }
+
+        if (!["http:", "https:"].includes(targetUrl.protocol) || isPrivateOrLocalHost(targetUrl.hostname)) {
+          res.statusCode = 400;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.end(JSON.stringify({ error: "URL host is not allowed" }));
+          return;
+        }
+
+        try {
+          const upstream = await fetch(targetUrl.toString(), {
+            redirect: "follow",
+            headers: {
+              Accept: "image/avif,image/webp,image/png,image/jpeg,image/gif,*/*;q=0.7",
+              "User-Agent": "Mozilla/5.0 (compatible; FichasImageProxyDev/1.0)",
+            },
+          });
+
+          if (!upstream.ok) {
+            res.statusCode = upstream.status;
+            res.setHeader("Content-Type", "application/json; charset=utf-8");
+            res.end(JSON.stringify({ error: "Failed to fetch upstream image", status: upstream.status }));
+            return;
+          }
+
+          const contentType = upstream.headers.get("content-type") || "";
+          if (!contentType.toLowerCase().startsWith("image/")) {
+            res.statusCode = 415;
+            res.setHeader("Content-Type", "application/json; charset=utf-8");
+            res.end(JSON.stringify({ error: "Upstream resource is not an image", contentType }));
+            return;
+          }
+
+          const contentLength = Number(upstream.headers.get("content-length") || "0");
+          if (contentLength > MAX_IMAGE_BYTES) {
+            res.statusCode = 413;
+            res.setHeader("Content-Type", "application/json; charset=utf-8");
+            res.end(JSON.stringify({ error: "Image is too large" }));
+            return;
+          }
+
+          const data = Buffer.from(await upstream.arrayBuffer());
+          if (data.byteLength > MAX_IMAGE_BYTES) {
+            res.statusCode = 413;
+            res.setHeader("Content-Type", "application/json; charset=utf-8");
+            res.end(JSON.stringify({ error: "Image is too large" }));
+            return;
+          }
+
+          res.statusCode = 200;
+          res.setHeader("Content-Type", contentType);
+          res.setHeader("Cache-Control", "public, max-age=900");
+          res.setHeader("X-Content-Type-Options", "nosniff");
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          res.end(data);
+        } catch (error) {
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.end(
+            JSON.stringify({
+              error: "Failed to proxy image",
+              details: error instanceof Error ? error.message : String(error),
+            }),
+          );
+        }
+      });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -312,7 +416,13 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
-  plugins: [react(), mode === "development" && componentTagger(), pdfProxyDevPlugin(), linkPreviewDevPlugin()].filter(Boolean),
+  plugins: [
+    react(),
+    mode === "development" && componentTagger(),
+    pdfProxyDevPlugin(),
+    imageProxyDevPlugin(),
+    linkPreviewDevPlugin(),
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
