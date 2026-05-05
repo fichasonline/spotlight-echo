@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { MessageCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,12 @@ export function LazySupportChatWidget({ triggerVariant = "floating" }: LazySuppo
     setInitialOpen(true);
     void loadWidget();
   };
+
+  useEffect(() => {
+    if (Widget && initialOpen) {
+      setInitialOpen(false);
+    }
+  }, [Widget, initialOpen]);
 
   if (Widget) {
     return <Widget triggerVariant={triggerVariant} initialOpen={initialOpen} />;

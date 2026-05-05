@@ -600,7 +600,6 @@ export default function AdminEventos() {
               </div>
             </div>
           ))}
-          {events.length === 0 && <p className="text-muted-foreground text-center py-8">No hay eventos.</p>}
         </div>
       </div>
     </div>

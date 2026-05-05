@@ -81,9 +81,7 @@ export default function NoticiasPage() {
           ))}
         </div>
 
-        {articles.length === 0 && (
-          <p className="text-muted-foreground text-center py-12">No hay noticias publicadas.</p>
-        )}
+     
 
         {hasMore && articles.length > 0 && (
           <div className="text-center mt-8">

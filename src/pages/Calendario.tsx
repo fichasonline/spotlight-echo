@@ -131,9 +131,7 @@ export default function CalendarioPage() {
               </div>
             </Link>
           ))}
-          {events.length === 0 && (
-            <p className="text-muted-foreground col-span-full text-center py-12">No hay eventos para los filtros seleccionados.</p>
-          )}
+     
         </div>
       </div>
     </div>

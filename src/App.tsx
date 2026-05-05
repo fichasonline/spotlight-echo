@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AgeGate } from "@/components/AgeGate";
 import { ProtectedRoute, AdminRoute, StaffRoute } from "@/components/ProtectedRoute";
 import { RouteSeo } from "@/components/RouteSeo";
+import Footer from "@/components/Footer";
 
 const Index = lazy(() => import("./pages/Index"));
 const AuthPage = lazy(() => import("./pages/Auth"));
@@ -25,6 +26,7 @@ const AdminModeracion = lazy(() => import("./pages/admin/AdminModeracion"));
 const AdminLeads = lazy(() => import("./pages/admin/AdminLeads"));
 const AdminChatLeads = lazy(() => import("./pages/admin/AdminChatLeads"));
 const AdminBanners = lazy(() => import("./pages/admin/AdminBanners"));
+const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
 const SalasPage = lazy(() => import("./pages/Salas"));
 const SalaDetailPage = lazy(() => import("./pages/SalaDetail"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -42,7 +44,7 @@ const App = () => (
           <AuthProvider>
             <RouteSeo />
             <div>
-              <Suspense fallback={<div className="min-h-[40vh]" aria-hidden />}>
+              <Suspense >
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<AuthPage />} />
@@ -124,8 +126,17 @@ const App = () => (
                       </AdminRoute>
                     }
                   />
+                  <Route
+                    path="/admin/usuarios"
+                    element={
+                      <AdminRoute>
+                        <AdminUsers />
+                      </AdminRoute>
+                    }
+                  />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
+                <Footer />
               </Suspense>
             </div>
           </AuthProvider>

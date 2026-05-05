@@ -68,7 +68,7 @@ export default function AdminDashboard() {
     { label: "Eventos", value: stats.events, icon: Calendar, to: "/admin/eventos", color: "text-accent" },
     { label: "Reportes pendientes", value: stats.reports, icon: Flag, to: "/admin/moderacion", color: "text-destructive" },
     { label: "Chats abiertos", value: stats.chats, icon: MessageCircle, to: "/admin/moderacion", color: "text-primary" },
-    { label: "Usuarios", value: stats.users, icon: Users, to: "#", color: "text-muted-foreground" },
+    { label: "Usuarios", value: stats.users, icon: Users, to: "/admin/usuarios", color: "text-muted-foreground" },
     { label: "Leads landing", value: stats.leads, icon: ContactRound, to: "/admin/leads", color: "text-primary" },
     { label: "Leads chat", value: stats.chatLeads, icon: ContactRound, to: "/admin/chat-leads", color: "text-accent" },
     { label: "IG noticias", value: stats.instagramPending, icon: Instagram, to: "/admin/noticias/instagram", color: "text-primary" },

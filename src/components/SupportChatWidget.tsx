@@ -118,6 +118,12 @@ export function SupportChatWidget({ triggerVariant = "floating", initialOpen = f
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
 
+  useEffect(() => {
+    if (initialOpen) {
+      setOpen(true);
+    }
+  }, [initialOpen]);
+
   const [threadId, setThreadId] = useState<string | null>(null);
   const [visitorToken, setVisitorToken] = useState<string | null>(null);
 
