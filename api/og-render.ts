@@ -235,7 +235,7 @@ async function renderSala(slug: string, res: VercelResponse) {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!isBot(req)) {
-    res.setHeader("Location", req.url || "/");
+    res.setHeader("Location", "/");
     return res.status(302).send("");
   }
 

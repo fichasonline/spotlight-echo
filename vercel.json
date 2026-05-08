@@ -40,14 +40,17 @@
     },
     {
       "source": "/noticias/:slug",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|facebot|twitterbot|linkedinbot|slackbot|whatsapp|telegrambot|googlebot|bingbot|applebot|discordbot|vkshare|pinterest|tumblr|redditbot|embedly|quora|outbrain|w3c_validator|skypeuripreview|nuzzel).*" }],
       "destination": "/api/og-render"
     },
     {
       "source": "/eventos/:id",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|facebot|twitterbot|linkedinbot|slackbot|whatsapp|telegrambot|googlebot|bingbot|applebot|discordbot|vkshare|pinterest|tumblr|redditbot|embedly|quora|outbrain|w3c_validator|skypeuripreview|nuzzel).*" }],
       "destination": "/api/og-render"
     },
     {
       "source": "/salas/:slug",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|facebot|twitterbot|linkedinbot|slackbot|whatsapp|telegrambot|googlebot|bingbot|applebot|discordbot|vkshare|pinterest|tumblr|redditbot|embedly|quora|outbrain|w3c_validator|skypeuripreview|nuzzel).*" }],
       "destination": "/api/og-render"
     },
     {
