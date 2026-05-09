@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MapPin, Calendar as CalIcon } from "lucide-react";
-import { parseDateValue } from "@/lib/date";
+import { parseDateValue, getLocalDateISO } from "@/lib/date";
 
 interface Event {
   id: string;
@@ -24,6 +24,7 @@ export default function CalendarioPage() {
   const [monthFilter, setMonthFilter] = useState<string>("all");
   const [countryFilter, setCountryFilter] = useState<string>("all");
   const [countries, setCountries] = useState<string[]>([]);
+  const today = getLocalDateISO();
 
   useEffect(() => {
     const fetch = async () => {
@@ -96,27 +97,57 @@ export default function CalendarioPage() {
           </Select>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {events.map((e, index) => (
+        {(() => {
+          const liveEvents = events.filter((e) => {
+            const end = e.end_date ?? e.start_date;
+            return e.start_date <= today && end >= today;
+          });
+          const upcomingEvents = events.filter((e) => {
+            const end = e.end_date ?? e.start_date;
+            return !(e.start_date <= today && end >= today);
+          });
+
+          const EventCard = ({ e, index, live }: { e: Event; index: number; live: boolean }) => (
             <Link
               key={e.id}
               to={`/eventos/${e.id}`}
               style={{ "--card-reveal-delay": `${Math.min(index, 9) * 45}ms` } as CSSProperties}
-              className="card-reveal touch-manipulation bg-card border border-border rounded-lg p-5 transition-colors group hover:border-accent/40 active:border-accent/45"
+              className={`card-reveal touch-manipulation rounded-lg p-5 transition-all group ${
+                live
+                  ? "bg-card border border-red-500/40 shadow-[0_0_24px_rgba(239,68,68,0.12)] hover:border-red-500/65 hover:shadow-[0_0_32px_rgba(239,68,68,0.2)]"
+                  : "bg-card border border-border hover:border-accent/40 active:border-accent/45"
+              }`}
             >
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-12 h-12 bg-accent/10 rounded-lg flex flex-col items-center justify-center">
-                  <span className="text-[10px] text-accent font-semibold uppercase">
+                <div
+                  className={`flex-shrink-0 w-12 h-12 rounded-lg flex flex-col items-center justify-center ${
+                    live ? "bg-red-500/15" : "bg-accent/10"
+                  }`}
+                >
+                  <span className={`text-[10px] font-semibold uppercase ${live ? "text-red-400" : "text-accent"}`}>
                     {format(parseDateValue(e.start_date), "MMM", { locale: es })}
                   </span>
-                  <span className="text-base font-bold text-accent">
+                  <span className={`text-base font-bold ${live ? "text-red-400" : "text-accent"}`}>
                     {format(parseDateValue(e.start_date), "d")}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-display font-semibold text-foreground transition-colors truncate group-hover:text-accent group-active:text-accent">
-                    {e.name}
-                  </h3>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h3 className={`font-display font-semibold text-foreground transition-colors truncate ${
+                      live ? "group-hover:text-red-400" : "group-hover:text-accent group-active:text-accent"
+                    }`}>
+                      {e.name}
+                    </h3>
+                    {live && (
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-red-500/35 bg-red-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-400">
+                        <span className="relative flex h-2 w-2">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                        </span>
+                        En vivo
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                     <MapPin className="h-3 w-3" />
                     {[e.venue, e.city, e.country].filter(Boolean).join(" · ")}
@@ -130,9 +161,54 @@ export default function CalendarioPage() {
                 </div>
               </div>
             </Link>
-          ))}
-     
-        </div>
+          );
+
+          return (
+            <>
+              {liveEvents.length > 0 && (
+                <div className="mb-8">
+                  <div className="flex items-center gap-2.5 mb-4">
+                    <span className="relative flex h-3 w-3">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
+                    </span>
+                    <span className="text-[0.72rem] font-black uppercase tracking-[0.18em] text-red-400">
+                      Eventos en vivo ahora
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {liveEvents.map((e, i) => (
+                      <EventCard key={e.id} e={e} index={i} live />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {upcomingEvents.length > 0 && (
+                <div>
+                  {liveEvents.length > 0 && (
+                    <p className="text-[0.72rem] font-black uppercase tracking-[0.18em] text-muted-foreground mb-4">
+                      Próximos eventos
+                    </p>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {upcomingEvents.map((e, i) => (
+                      <EventCard key={e.id} e={e} index={i} live={false} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {events.length === 0 && (
+                <div className="rounded-[24px] border border-dashed border-border bg-muted/30 px-6 py-14 text-center">
+                  <p className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    No hay eventos publicados.
+                  </p>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );

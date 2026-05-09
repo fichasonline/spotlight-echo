@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject, type RefObject } from "react";
+import { HomeSplashScreen } from "@/components/HomeSplashScreen";
 import { Link } from "react-router-dom";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -326,6 +327,7 @@ export default function HomePage() {
   const [banners, setBanners]             = useState<Record<string, HomeBanner>>({});
   const [activeBanner, setActiveBanner]   = useState<HomeBanner | null>(null);
   const [hasFetchedBanners, setHasFetchedBanners] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
   const today                   = getLocalDateISO();
   const articlesScrollerRef     = useRef<HTMLDivElement | null>(null);
   const eventsScrollerRef       = useRef<HTMLDivElement | null>(null);
@@ -436,6 +438,11 @@ export default function HomePage() {
   };
 
   useEffect(() => {
+    const t = setTimeout(() => setSplashDone(true), 900);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     // Safety valve: if fetch takes > 1200ms, reveal banner slots anyway
     // so the layout doesn't sit invisible forever.
@@ -502,6 +509,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen overflow-x-clip bg-background">
+      <HomeSplashScreen visible={!splashDone || !hasFetchedBanners} />
       <Navbar />
 
       {/* ══════════════════════════════════════════════════════════════

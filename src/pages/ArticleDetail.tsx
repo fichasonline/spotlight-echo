@@ -3,7 +3,9 @@ import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import ReactMarkdown from "react-markdown";
+import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ArrowLeft } from "lucide-react";
@@ -18,6 +20,60 @@ import {
   stripMarkdown,
   truncateText,
 } from "@/lib/seo";
+
+function getVideoEmbedUrl(url: string): string | null {
+  const ytMatch = url.match(
+    /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/
+  );
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+
+  const twitchVideoMatch = url.match(/twitch\.tv\/videos\/(\d+)/);
+  if (twitchVideoMatch)
+    return `https://player.twitch.tv/?video=${twitchVideoMatch[1]}&parent=${window.location.hostname}&autoplay=false`;
+
+  const twitchChannelMatch = url.match(/twitch\.tv\/(?!videos\/)([A-Za-z0-9_]+)/);
+  if (twitchChannelMatch)
+    return `https://player.twitch.tv/?channel=${twitchChannelMatch[1]}&parent=${window.location.hostname}&autoplay=false`;
+
+  return null;
+}
+
+const markdownComponents: Components = {
+  a: ({ href, children, ...props }) => {
+    const url = href || "";
+    const embedUrl = getVideoEmbedUrl(url);
+    if (embedUrl) {
+      return (
+        <span className="block my-4 not-prose">
+          <span className="block text-sm font-medium text-muted-foreground mb-1.5">{children}</span>
+          <span className="relative block w-full overflow-hidden rounded-lg border border-border bg-black" style={{ paddingBottom: "56.25%" }}>
+            <iframe
+              src={embedUrl}
+              title={typeof children === "string" ? children : "Video"}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+              allowFullScreen
+              className="absolute inset-0 h-full w-full"
+            />
+          </span>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors mt-1"
+          >
+            <ExternalLink className="h-3 w-3 shrink-0" />
+            Abrir en nueva pestaña
+          </a>
+        </span>
+      );
+    }
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" {...props}>
+        {children}
+      </a>
+    );
+  },
+};
 
 interface Article {
   id: string;
@@ -205,7 +261,7 @@ export default function ArticleDetailPage() {
               prose-hr:border-border
             "
           >
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
               {article.image_url
                 ? article.body_markdown.replace(
                     new RegExp(`!\\[[^\\]]*\\]\\(${article.image_url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\)`, "g"),

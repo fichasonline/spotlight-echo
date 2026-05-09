@@ -53,6 +53,26 @@ function isPdfUrl(url: string) {
   return /\.pdf(?:$|[?#])/i.test(url);
 }
 
+function getVideoEmbedUrl(url: string): string | null {
+  // YouTube: watch?v=ID, youtu.be/ID, shorts/ID
+  const ytMatch = url.match(
+    /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/
+  );
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+
+  // Twitch video: twitch.tv/videos/ID
+  const twitchVideoMatch = url.match(/twitch\.tv\/videos\/(\d+)/);
+  if (twitchVideoMatch)
+    return `https://player.twitch.tv/?video=${twitchVideoMatch[1]}&parent=${window.location.hostname}&autoplay=false`;
+
+  // Twitch channel: twitch.tv/CHANNEL (not videos/)
+  const twitchChannelMatch = url.match(/twitch\.tv\/(?!videos\/)([A-Za-z0-9_]+)/);
+  if (twitchChannelMatch)
+    return `https://player.twitch.tv/?channel=${twitchChannelMatch[1]}&parent=${window.location.hostname}&autoplay=false`;
+
+  return null;
+}
+
 function buildPdfPreviewUrl(url: string) {
   const normalized = normalizeUrl(url);
   return `/api/pdf-proxy?url=${encodeURIComponent(normalized)}`;
@@ -370,21 +390,51 @@ export default function EventoDetailPage() {
         {usefulLinks.length > 0 && (
           <div className="mb-6">
             <h2 className="text-xl font-display font-bold mb-3">Links útiles</h2>
-            <ul className="space-y-2">
-              {usefulLinks.map((link, i) => (
-                <li key={`${link.url}-${i}`}>
-                  <a
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-sm text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:text-accent break-all"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                    {link.label || link.url}
-                  </a>
-                </li>
-              ))}
-            </ul>
+            <div className="space-y-4">
+              {usefulLinks.map((link, i) => {
+                const embedUrl = getVideoEmbedUrl(link.url);
+                if (embedUrl) {
+                  return (
+                    <div key={`${link.url}-${i}`} className="space-y-1.5">
+                      {link.label && (
+                        <p className="text-sm font-medium text-muted-foreground">{link.label}</p>
+                      )}
+                      <div className="relative w-full overflow-hidden rounded-lg border border-border bg-black" style={{ paddingBottom: "56.25%" }}>
+                        <iframe
+                          src={embedUrl}
+                          title={link.label || "Video"}
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                          allowFullScreen
+                          className="absolute inset-0 h-full w-full"
+                        />
+                      </div>
+                      <a
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        <ExternalLink className="h-3 w-3 shrink-0" />
+                        Abrir en nueva pestaña
+                      </a>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={`${link.url}-${i}`}>
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-sm text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:text-accent break-all"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                      {link.label || link.url}
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
