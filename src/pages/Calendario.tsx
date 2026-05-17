@@ -98,16 +98,29 @@ export default function CalendarioPage() {
         </div>
 
         {(() => {
-          const liveEvents = events.filter((e) => {
-            const end = e.end_date ?? e.start_date;
-            return e.start_date <= today && end >= today;
-          });
-          const upcomingEvents = events.filter((e) => {
-            const end = e.end_date ?? e.start_date;
-            return !(e.start_date <= today && end >= today);
-          });
+          const getEventEndDate = (event: Event) => event.end_date ?? event.start_date;
+          const isEventLive = (event: Event) => event.start_date <= today && getEventEndDate(event) >= today;
+          const isEventPast = (event: Event) => getEventEndDate(event) < today;
 
-          const EventCard = ({ e, index, live }: { e: Event; index: number; live: boolean }) => (
+          const liveEvents = events.filter(isEventLive);
+          const upcomingEvents = events.filter((event) => event.start_date > today);
+          const pastEvents = events
+            .filter(isEventPast)
+            .sort((a, b) => getEventEndDate(b).localeCompare(getEventEndDate(a)));
+
+          const EventCard = ({
+            e,
+            index,
+            status,
+          }: {
+            e: Event;
+            index: number;
+            status: "live" | "upcoming" | "past";
+          }) => {
+            const live = status === "live";
+            const past = status === "past";
+
+            return (
             <Link
               key={e.id}
               to={`/eventos/${e.id}`}
@@ -115,26 +128,32 @@ export default function CalendarioPage() {
               className={`card-reveal touch-manipulation rounded-lg p-5 transition-all group ${
                 live
                   ? "bg-card border border-red-500/40 shadow-[0_0_24px_rgba(239,68,68,0.12)] hover:border-red-500/65 hover:shadow-[0_0_32px_rgba(239,68,68,0.2)]"
+                  : past
+                    ? "bg-muted/20 border border-border/70 text-muted-foreground hover:border-border"
                   : "bg-card border border-border hover:border-accent/40 active:border-accent/45"
               }`}
             >
               <div className="flex items-start gap-3">
                 <div
                   className={`flex-shrink-0 w-12 h-12 rounded-lg flex flex-col items-center justify-center ${
-                    live ? "bg-red-500/15" : "bg-accent/10"
+                    live ? "bg-red-500/15" : past ? "bg-muted" : "bg-accent/10"
                   }`}
                 >
-                  <span className={`text-[10px] font-semibold uppercase ${live ? "text-red-400" : "text-accent"}`}>
+                  <span className={`text-[10px] font-semibold uppercase ${live ? "text-red-400" : past ? "text-muted-foreground" : "text-accent"}`}>
                     {format(parseDateValue(e.start_date), "MMM", { locale: es })}
                   </span>
-                  <span className={`text-base font-bold ${live ? "text-red-400" : "text-accent"}`}>
+                  <span className={`text-base font-bold ${live ? "text-red-400" : past ? "text-muted-foreground" : "text-accent"}`}>
                     {format(parseDateValue(e.start_date), "d")}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     <h3 className={`font-display font-semibold text-foreground transition-colors truncate ${
-                      live ? "group-hover:text-red-400" : "group-hover:text-accent group-active:text-accent"
+                      live
+                        ? "group-hover:text-red-400"
+                        : past
+                          ? "text-muted-foreground group-hover:text-foreground"
+                          : "group-hover:text-accent group-active:text-accent"
                     }`}>
                       {e.name}
                     </h3>
@@ -145,6 +164,11 @@ export default function CalendarioPage() {
                           <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
                         </span>
                         En vivo
+                      </span>
+                    )}
+                    {past && (
+                      <span className="inline-flex shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        Finalizado
                       </span>
                     )}
                   </div>
@@ -161,7 +185,8 @@ export default function CalendarioPage() {
                 </div>
               </div>
             </Link>
-          );
+            );
+          };
 
           return (
             <>
@@ -178,22 +203,35 @@ export default function CalendarioPage() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {liveEvents.map((e, i) => (
-                      <EventCard key={e.id} e={e} index={i} live />
+                      <EventCard key={e.id} e={e} index={i} status="live" />
                     ))}
                   </div>
                 </div>
               )}
 
               {upcomingEvents.length > 0 && (
-                <div>
-                  {liveEvents.length > 0 && (
+                <div className="mb-8">
+                  {(liveEvents.length > 0 || pastEvents.length > 0) && (
                     <p className="text-[0.72rem] font-black uppercase tracking-[0.18em] text-muted-foreground mb-4">
                       Próximos eventos
                     </p>
                   )}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {upcomingEvents.map((e, i) => (
-                      <EventCard key={e.id} e={e} index={i} live={false} />
+                      <EventCard key={e.id} e={e} index={i} status="upcoming" />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {pastEvents.length > 0 && (
+                <div>
+                  <p className="text-[0.72rem] font-black uppercase tracking-[0.18em] text-muted-foreground mb-4">
+                    Eventos pasados
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {pastEvents.map((e, i) => (
+                      <EventCard key={e.id} e={e} index={i} status="past" />
                     ))}
                   </div>
                 </div>

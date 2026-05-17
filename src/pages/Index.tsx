@@ -5,7 +5,6 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { LazySupportChatWidget } from "@/components/LazySupportChatWidget";
-import { LazyAIChatWidget } from "@/components/LazyAIChatWidget";
 import { CryptoTicker } from "@/components/CryptoTicker";
 import { BannerMedia } from "@/components/BannerMedia";
 import { Button } from "@/components/ui/button";
@@ -1050,8 +1049,6 @@ export default function HomePage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <LazyAIChatWidget autoOpen />
     </div>
   );
 }
