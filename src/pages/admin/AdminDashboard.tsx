@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { isChatLead, isLandingLead } from "@/lib/support-leads";
-import { Newspaper, Calendar, Flag, Users, MessageCircle, ContactRound, Image, Instagram } from "lucide-react";
+import { Newspaper, Calendar, Flag, Users, MessageCircle, ContactRound, Image, Instagram, Radio, Sparkles } from "lucide-react";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -15,11 +15,13 @@ export default function AdminDashboard() {
     leads: 0,
     chatLeads: 0,
     instagramPending: 0,
+    liveblogs: 0,
+    storiesPending: 0,
   });
 
   useEffect(() => {
     const fetch = async () => {
-      const [a, e, r, u, openThreads, allLeads, instagramPending] = await Promise.all([
+      const [a, e, r, u, openThreads, allLeads, instagramPending, liveblogs, storiesPending] = await Promise.all([
         supabase.from("articles").select("id", { count: "exact", head: true }),
         supabase.from("events").select("id", { count: "exact", head: true }),
         supabase.from("reports").select("id", { count: "exact", head: true }).eq("status", "pending"),
@@ -37,6 +39,14 @@ export default function AdminDashboard() {
           .eq("status", "published")
           .eq("instagram_selected", true)
           .eq("instagram_published", false),
+        (supabase as any)
+          .from("social_sources")
+          .select("id", { count: "exact", head: true }),
+        (supabase as any)
+          .from("social_posts")
+          .select("id", { count: "exact", head: true })
+          .eq("format", "story")
+          .in("status", ["needs_approval", "draft"]),
       ]);
 
       const openLeadIds = new Set(
@@ -58,6 +68,8 @@ export default function AdminDashboard() {
           .filter((lead) => isLandingLead(lead) && !openLeadIds.has(lead.id))
           .length,
         instagramPending: instagramPending.count ?? 0,
+        liveblogs: liveblogs.count ?? 0,
+        storiesPending: storiesPending.count ?? 0,
       });
     };
     fetch();
@@ -72,6 +84,8 @@ export default function AdminDashboard() {
     { label: "Leads landing", value: stats.leads, icon: ContactRound, to: "/admin/leads", color: "text-primary" },
     { label: "Leads chat", value: stats.chatLeads, icon: ContactRound, to: "/admin/chat-leads", color: "text-accent" },
     { label: "IG noticias", value: stats.instagramPending, icon: Instagram, to: "/admin/noticias/instagram", color: "text-primary" },
+    { label: "Liveblogs", value: stats.liveblogs, icon: Radio, to: "/admin/liveblogs", color: "text-accent" },
+    { label: "Stories en cola", value: stats.storiesPending, icon: Sparkles, to: "/admin/stories", color: "text-primary" },
     { label: "Banners home", value: 4, icon: Image, to: "/admin/banners", color: "text-primary" },
   ];
 

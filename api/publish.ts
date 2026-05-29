@@ -8,6 +8,13 @@ const supabase = createClient(
 
 const PUBLISHER_TOKEN = process.env.PUBLISHER_TOKEN;
 
+type SocialAssetInput = {
+  url: string;
+  asset_type?: 'image' | 'video';
+  order_index?: number;
+  metadata?: Record<string, unknown>;
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS preflight
   if (req.method === 'OPTIONS') {
@@ -68,8 +75,72 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         links: data.links || null,
         gallery: data.gallery || null,
       }).select();
+    } else if (type === 'social_post') {
+      const assets = Array.isArray(data.assets) ? data.assets as SocialAssetInput[] : [];
+      const shouldQueue = data.create_job !== false && (data.status || 'needs_approval') === 'queued';
+
+      result = await supabase
+        .from('social_posts')
+        .insert({
+          platform: data.platform || 'instagram',
+          format: data.format || 'carousel',
+          headline: data.headline || null,
+          caption: data.caption,
+          hashtags: Array.isArray(data.hashtags) ? data.hashtags : [],
+          status: data.status || 'needs_approval',
+          scheduled_at: data.scheduled_at || null,
+          metadata: data.metadata || {},
+        })
+        .select()
+        .single();
+
+      if (result.error) {
+        return res.status(400).json({ error: 'Could not create social post', details: result.error.message });
+      }
+
+      const socialPost = result.data;
+      let insertedAssets = null;
+      let queuedJob = null;
+
+      if (assets.length > 0) {
+        const assetRows = assets.map((asset, index) => ({
+          post_id: socialPost.id,
+          asset_type: asset.asset_type || 'image',
+          url: asset.url,
+          order_index: asset.order_index || index + 1,
+          metadata: asset.metadata || {},
+        }));
+
+        const assetsResult = await supabase.from('social_assets').insert(assetRows).select();
+        if (assetsResult.error) {
+          return res.status(400).json({ error: 'Could not create social assets', details: assetsResult.error.message });
+        }
+        insertedAssets = assetsResult.data;
+      }
+
+      if (shouldQueue) {
+        const jobResult = await supabase
+          .from('social_publish_jobs')
+          .insert({ post_id: socialPost.id, status: 'queued' })
+          .select()
+          .single();
+
+        if (jobResult.error) {
+          return res.status(400).json({ error: 'Could not queue social publish job', details: jobResult.error.message });
+        }
+        queuedJob = jobResult.data;
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          post: socialPost,
+          assets: insertedAssets,
+          job: queuedJob,
+        },
+      });
     } else {
-      return res.status(400).json({ error: 'Invalid type. Use: article, post, or event' });
+      return res.status(400).json({ error: 'Invalid type. Use: article, post, event, or social_post' });
     }
 
     res.setHeader('Access-Control-Allow-Origin', '*');

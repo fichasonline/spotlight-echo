@@ -18,10 +18,13 @@ const EventoDetailPage = lazy(() => import("./pages/EventoDetail"));
 const NoticiasPage = lazy(() => import("./pages/Noticias"));
 const ArticleDetailPage = lazy(() => import("./pages/ArticleDetail"));
 const FeedPage = lazy(() => import("./pages/Feed"));
+const SorteoTvPage = lazy(() => import("./pages/SorteoTv"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminEventos = lazy(() => import("./pages/admin/AdminEventos"));
 const AdminNoticias = lazy(() => import("./pages/admin/AdminNoticias"));
 const AdminNoticiasInstagram = lazy(() => import("./pages/admin/AdminNoticiasInstagram"));
+const AdminLiveblogs = lazy(() => import("./pages/admin/AdminLiveblogs"));
+const AdminStoriesQueue = lazy(() => import("./pages/admin/AdminStoriesQueue"));
 const AdminModeracion = lazy(() => import("./pages/admin/AdminModeracion"));
 const AdminLeads = lazy(() => import("./pages/admin/AdminLeads"));
 const AdminChatLeads = lazy(() => import("./pages/admin/AdminChatLeads"));
@@ -54,6 +57,7 @@ const App = () => (
                   <Route path="/noticias/:slug" element={<ArticleDetailPage />} />
                   <Route path="/salas" element={<SalasPage />} />
                   <Route path="/salas/:slug" element={<SalaDetailPage />} />
+                  <Route path="/sorteotv" element={<SorteoTvPage />} />
                   <Route
                     path="/feed"
                     element={
@@ -91,6 +95,22 @@ const App = () => (
                     element={
                       <AdminRoute>
                         <AdminNoticiasInstagram />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/liveblogs"
+                    element={
+                      <AdminRoute>
+                        <AdminLiveblogs />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/stories"
+                    element={
+                      <AdminRoute>
+                        <AdminStoriesQueue />
                       </AdminRoute>
                     }
                   />

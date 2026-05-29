@@ -269,6 +269,26 @@ export function getDefaultSeoConfig(pathname: string): SeoConfig {
     };
   }
 
+  if (pathname === "/sorteotv") {
+    return {
+      title: `Sorteo TV 65" 4K | ${SITE_NAME}`,
+      description:
+        "Participá gratis por una TV 65 pulgadas 4K de Fichas Online. Seguí la cuenta, dale Me Gusta al post oficial y comentá etiquetando a un amigo.",
+      path: pathname,
+      robots: INDEX,
+      structuredData: {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        name: `Sorteo TV 65" 4K | ${SITE_NAME}`,
+        description:
+          "Sorteo de una TV 65 pulgadas 4K válido para Uruguay, organizado por Fichas Online.",
+        url: buildAbsoluteUrl(pathname, SITE_URL),
+        inLanguage: "es",
+        isPartOf: { "@id": `${SITE_URL}/#website` },
+      },
+    };
+  }
+
   if (pathname.startsWith("/noticias/")) {
     return {
       title: `Artículo | ${SITE_NAME}`,

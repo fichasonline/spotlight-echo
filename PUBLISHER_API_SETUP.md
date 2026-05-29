@@ -12,13 +12,25 @@ Vercel Serverless Function que permite publicar contenido en Supabase.
 **Body:**
 ```json
 {
-  "type": "article|post|event",
+  "type": "article|post|event|social_post",
   "data": { ... }
 }
 ```
 
 ### 2. `vercel.json`
 Actualizado para excluir `/api/*` del rewrite a index.html.
+
+### 3. `social-cm`
+
+Supabase queda como contrato de contenido y cola. Open Cloud, con acceso directo a la base y credenciales de Meta, es quien debe:
+
+1. leer `social_publish_jobs` con `status = 'queued'`
+2. cargar el post desde `social_posts`
+3. cargar imágenes desde `social_assets`
+4. publicar en Instagram usando Graph API
+5. escribir `published`/`failed`, `remote_media_id`, `remote_permalink` y errores en Supabase
+
+La web no necesita correr un worker ni publicar por su cuenta.
 
 ---
 
@@ -90,6 +102,74 @@ curl -X POST https://www.fichasonline.uy/api/publish \
   }'
 ```
 
+### Crear carrusel de Instagram
+```bash
+curl -X POST https://www.fichasonline.uy/api/publish \
+  -H "Authorization: Bearer fichas_pub_xyz" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "social_post",
+    "data": {
+      "platform": "instagram",
+      "format": "carousel",
+      "headline": "Torneo destacado",
+      "caption": "Este finde se juega fuerte en Montevideo.",
+      "hashtags": ["FichasUy", "PokerUruguay"],
+      "status": "queued",
+      "scheduled_at": "2026-05-19T21:00:00-03:00",
+      "assets": [
+        {
+          "asset_type": "image",
+          "url": "https://ownmyadhrsdypoimywha.supabase.co/storage/v1/object/public/social/slide-1.png",
+          "order_index": 1
+        },
+        {
+          "asset_type": "image",
+          "url": "https://ownmyadhrsdypoimywha.supabase.co/storage/v1/object/public/social/slide-2.png",
+          "order_index": 2
+        }
+      ]
+    }
+  }'
+```
+
+Ese request crea `social_posts`, `social_assets` y, si `status` es `queued`, también `social_publish_jobs`.
+
+Si Open Cloud tiene acceso directo a Supabase, puede insertar exactamente esos mismos registros sin pasar por `/api/publish`.
+
+### SQL directo para Open Cloud
+```sql
+WITH new_post AS (
+  INSERT INTO public.social_posts (
+    platform,
+    format,
+    headline,
+    caption,
+    hashtags,
+    status,
+    scheduled_at
+  )
+  VALUES (
+    'instagram',
+    'carousel',
+    'Torneo destacado',
+    'Este finde se juega fuerte en Montevideo.',
+    ARRAY['FichasUy', 'PokerUruguay'],
+    'queued',
+    '2026-05-19T21:00:00-03:00'
+  )
+  RETURNING id
+),
+new_assets AS (
+  INSERT INTO public.social_assets (post_id, asset_type, url, order_index)
+  SELECT id, 'image', 'https://example.com/slide-1.png', 1 FROM new_post
+  UNION ALL
+  SELECT id, 'image', 'https://example.com/slide-2.png', 2 FROM new_post
+)
+INSERT INTO public.social_publish_jobs (post_id, status)
+SELECT id, 'queued' FROM new_post;
+```
+
 ---
 
 ## Próximos pasos
@@ -137,6 +217,29 @@ curl -X POST https://www.fichasonline.uy/api/publish \
 - `author_id` (uuid, nullable)
 - `is_deleted` (boolean)
 - `created_at` (timestamp)
+
+### social_posts
+- `platform` (`instagram`)
+- `format` (`carousel`/`image`/`story`)
+- `headline` (string, nullable)
+- `caption` (string)
+- `hashtags` (text[])
+- `status` (`needs_approval`/`queued`/`publishing`/`published`/`failed`/`cancelled`)
+- `scheduled_at` (timestamp, nullable)
+- `remote_media_id` / `remote_permalink` (nullable)
+
+### social_assets
+- `post_id` (uuid)
+- `asset_type` (`image`/`video`)
+- `url` (public URL)
+- `order_index` (integer)
+- `remote_container_id` (nullable)
+
+### social_publish_jobs
+- `post_id` (uuid)
+- `status` (`queued`/`processing`/`published`/`failed`/`cancelled`)
+- `attempts` (integer)
+- `last_error` (nullable)
 
 ### events
 - `name` (string)
