@@ -36,7 +36,7 @@ const steps = [
 
 export default function SorteoTv() {
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="min-h-screen bg-[#f7f3fb] text-foreground dark:bg-background">
       <Navbar />
 
       <section className="relative overflow-hidden border-b border-primary/20">
@@ -136,7 +136,7 @@ export default function SorteoTv() {
         </div>
       </section>
 
-      <section id="como-participar" className="border-b border-border/70 bg-card/35">
+      <section id="como-participar" className="border-b border-border/70 bg-[#f4eef9] dark:bg-card/35">
         <div className="container mx-auto px-4 py-14">
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-sm font-black uppercase tracking-[0.18em] text-primary">3 pasos</p>
@@ -149,7 +149,10 @@ export default function SorteoTv() {
             {steps.map((step, index) => {
               const Icon = step.icon;
               return (
-                <article key={step.title} className="rounded-lg border border-border bg-background/68 p-6 shadow-card">
+                <article
+                  key={step.title}
+                  className="rounded-lg border border-border bg-white p-6 shadow-[0_14px_34px_hsl(273_30%_25%_/_0.09)] dark:bg-background/68 dark:shadow-card"
+                >
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
                     <Icon className="h-6 w-6" />
                   </div>
@@ -163,8 +166,8 @@ export default function SorteoTv() {
             })}
           </div>
 
-          <div className="mx-auto mt-8 max-w-3xl rounded-lg border border-amber-300/30 bg-amber-300/10 p-5 text-center">
-            <p className="text-lg font-bold text-foreground">
+          <div className="mx-auto mt-8 max-w-3xl rounded-lg border border-amber-300/55 bg-amber-50 p-5 text-center shadow-[0_12px_28px_hsl(38_92%_50%_/_0.12)] dark:border-amber-300/30 dark:bg-amber-300/10 dark:shadow-none">
+            <p className="text-lg font-bold text-amber-950 dark:text-foreground">
               Cuantos más comentarios dejes, más chances tenés. Recordá: siempre 1 etiqueta por comentario.
             </p>
           </div>
@@ -180,9 +183,9 @@ export default function SorteoTv() {
         </div>
       </section>
 
-      <section className="bg-background">
+      <section className="bg-white dark:bg-background">
         <div className="container mx-auto grid gap-6 px-4 py-12 md:grid-cols-[0.9fr_1.1fr]">
-          <div className="rounded-lg border border-primary/25 bg-primary/10 p-6">
+          <div className="rounded-lg border border-primary/20 bg-[#f4eafa] p-6 shadow-[0_14px_34px_hsl(273_30%_25%_/_0.08)] dark:border-primary/25 dark:bg-primary/10 dark:shadow-none">
             <Gift className="h-9 w-9 text-primary" />
             <h2 className="mt-4 text-3xl font-black">El sorteo</h2>
             <p className="mt-4 leading-7 text-muted-foreground">
@@ -190,7 +193,7 @@ export default function SorteoTv() {
             </p>
           </div>
 
-          <div className="rounded-lg border border-border bg-card p-6">
+          <div className="rounded-lg border border-border bg-white p-6 shadow-[0_14px_34px_hsl(273_30%_25%_/_0.08)] dark:bg-card dark:shadow-none">
             <h2 className="text-2xl font-black">Bases</h2>
             <ul className="mt-5 space-y-3 text-muted-foreground">
               <li className="flex gap-3">
