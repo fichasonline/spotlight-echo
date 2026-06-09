@@ -433,6 +433,7 @@ async function loadComments(
       : await metaGet<MetaCollection<MetaComment>>(`${mediaId}/comments`, {
           fields: "id,text,timestamp,username,like_count",
           limit: 100,
+          order: "chronological",
         });
 
     const pageComments = response.data || [];
@@ -696,34 +697,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           throw new HttpError(400, "No hay participantes elegibles para sortear.");
         }
 
-        const winner =
-          action === "draw"
-            ? await drawWinner(payload.participants, payload.igUserId)
-            : undefined;
-
-        if (action === "draw" && !winner) {
-          throw new HttpError(
-            400,
-            "No se pudo encontrar un ganador que siga el perfil de Instagram. Intenta nuevamente.",
-          );
+        let winner: GiveawayParticipant | null = null;
+        if (action === "draw") {
+          winner = await drawWinner(payload.participants, payload.igUserId);
+          if (!winner) {
+            throw new HttpError(
+              400,
+              "No se pudo encontrar un ganador que siga el perfil de Instagram. Intenta nuevamente.",
+            );
+          }
         }
 
-        const winnerWithTimestamp = winner
-          ? { ...winner, drawnAt: new Date().toISOString() }
-          : undefined;
-
-        writeStreamEvent(res, {
-          type: "result",
+        const result = {
+          type: "result" as const,
           success: true,
           action,
-          ...payload,
-          ...(winnerWithTimestamp ? { winner: winnerWithTimestamp } : {}),
-        });
+          media: payload.media,
+          stats: payload.stats,
+          participants: payload.participants,
+          ...(winner ? { winner: { ...winner, drawnAt: new Date().toISOString() } } : {}),
+        };
+
+        writeStreamEvent(res, result);
         return res.end();
       } catch (streamError) {
         const status = streamError instanceof HttpError ? streamError.status : 500;
         const message = streamError instanceof Error ? streamError.message : "Error inesperado.";
 
+        console.error("Stream error:", message, streamError);
         writeStreamEvent(res, {
           type: "error",
           success: false,
