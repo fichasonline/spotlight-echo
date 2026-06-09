@@ -532,7 +532,7 @@ function buildPostUrl(media: MetaMedia, fallback?: string) {
 
 async function drawWinner(
   participants: GiveawayParticipant[],
-  businessAccountId: string,
+  businessAccountId?: string,
   maxAttempts = 100,
 ): Promise<GiveawayParticipant | null> {
   const tried = new Set<string>();
@@ -544,8 +544,14 @@ async function drawWinner(
     if (tried.has(winnerId)) continue;
     tried.add(winnerId);
 
-    const follows = await checkUserFollowsAccount(winner.normalizedUsername, businessAccountId);
-    if (follows) {
+    // Validar followers solo si está disponible el businessAccountId
+    if (businessAccountId) {
+      const follows = await checkUserFollowsAccount(winner.normalizedUsername, businessAccountId);
+      if (follows) {
+        return winner;
+      }
+    } else {
+      // Si no hay validación de followers, devolver el primer ganador
       return winner;
     }
   }
@@ -584,7 +590,14 @@ async function buildGiveawayPayload(
   });
 
   const participantData = buildParticipants(comments, media, body.excludedUsernames || []);
-  const igUser = await resolveIgUser();
+
+  let igUserId: string | undefined;
+  try {
+    const igUser = await resolveIgUser();
+    igUserId = igUser.id;
+  } catch {
+    // Si no se puede resolver el user, simplemente continuar sin validación de followers
+  }
 
   return {
     media: {
@@ -604,7 +617,7 @@ async function buildGiveawayPayload(
       maxCommentPagesReached: maxPagesReached,
     },
     participants: participantData.participants,
-    igUserId: igUser.id,
+    igUserId,
   };
 }
 
