@@ -417,6 +417,10 @@ async function resolveMedia(input: GiveawayRequestBody) {
   return findMediaByShortcode(shortcode);
 }
 
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function loadComments(
   mediaId: string,
   onProgress?: (progress: GiveawayProgress) => void,
@@ -451,6 +455,11 @@ async function loadComments(
       totalComments,
       message: "Cargando comentarios",
     });
+
+    // Pequeño delay para evitar rate limiting de Meta
+    if (nextUrl) {
+      await sleep(50);
+    }
   } while (nextUrl);
 
   return {
