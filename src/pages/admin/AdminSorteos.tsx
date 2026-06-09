@@ -69,10 +69,20 @@ type GiveawayProgress = {
   message?: string;
 };
 
+type CommentEvent = {
+  type: "comment";
+  id: string;
+  username: string;
+  text: string;
+  timestamp: string | null;
+  likeCount: number;
+};
+
 type GiveawayStreamEvent =
   | ({ type: "progress" } & GiveawayProgress)
   | ({ type: "result" } & GiveawayResponse)
-  | { type: "error"; success: false; status?: number; error: string };
+  | ({ type: "error"; success: false; status?: number; error: string })
+  | CommentEvent;
 
 function parseExcludedUsernames(raw: string) {
   return raw
@@ -113,6 +123,7 @@ function StatBox({ label, value }: { label: string; value: number | string }) {
 async function readGiveawayStream(
   response: Response,
   onProgress: (progress: GiveawayProgress) => void,
+  onComment?: (comment: CommentEvent) => void,
 ) {
   if (!response.body) {
     throw new Error("La respuesta no contiene stream de progreso.");
@@ -129,6 +140,11 @@ async function readGiveawayStream(
 
     if (event.type === "progress") {
       onProgress(event);
+      return;
+    }
+
+    if (event.type === "comment") {
+      onComment?.(event);
       return;
     }
 
@@ -165,6 +181,7 @@ export default function AdminSorteos() {
   const [excludedRaw, setExcludedRaw] = useState("");
   const [loadingAction, setLoadingAction] = useState<"load" | "draw" | null>(null);
   const [loadingProgress, setLoadingProgress] = useState<GiveawayProgress | null>(null);
+  const [recentComments, setRecentComments] = useState<CommentEvent[]>([]);
   const [result, setResult] = useState<GiveawayResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -190,6 +207,7 @@ export default function AdminSorteos() {
       commentsFetched: 0,
       message: "Resolviendo post",
     });
+    setRecentComments([]);
     setError(null);
 
     try {
@@ -209,7 +227,9 @@ export default function AdminSorteos() {
 
       const contentType = response.headers.get("content-type") || "";
       const payload = contentType.includes("application/x-ndjson")
-        ? await readGiveawayStream(response, setLoadingProgress)
+        ? await readGiveawayStream(response, setLoadingProgress, (comment) => {
+            setRecentComments((prev) => [comment, ...prev].slice(0, 50));
+          })
         : ((await response.json()) as GiveawayResponse);
 
       if (!response.ok || payload.success === false) {
@@ -333,29 +353,54 @@ export default function AdminSorteos() {
                 </div>
 
                 {loadingAction && loadingProgress ? (
-                  <div className="rounded-lg border border-border bg-muted/30 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          {loadingAction === "draw" ? "Preparando sorteo" : "Cargando comentarios"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {loadingProgress.message || "Leyendo Instagram"}
-                          {typeof loadingProgress.pagesRead === "number"
-                            ? ` · pagina ${loadingProgress.pagesRead}`
-                            : ""}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-display text-2xl font-bold text-foreground">
-                          {loadingProgress.commentsFetched}
-                          {typeof loadingProgress.totalComments === "number"
-                            ? `/${loadingProgress.totalComments}`
-                            : ""}
-                        </p>
-                        <p className="text-xs text-muted-foreground">comentarios</p>
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-border bg-muted/30 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {loadingAction === "draw" ? "Preparando sorteo" : "Cargando comentarios"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {loadingProgress.message || "Leyendo Instagram"}
+                            {typeof loadingProgress.pagesRead === "number"
+                              ? ` · pagina ${loadingProgress.pagesRead}`
+                              : ""}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-display text-2xl font-bold text-foreground">
+                            {loadingProgress.commentsFetched}
+                            {typeof loadingProgress.totalComments === "number"
+                              ? `/${loadingProgress.totalComments}`
+                              : ""}
+                          </p>
+                          <p className="text-xs text-muted-foreground">comentarios</p>
+                        </div>
                       </div>
                     </div>
+
+                    {recentComments.length > 0 && loadingAction === "load" ? (
+                      <div className="max-h-64 overflow-y-auto rounded-lg border border-border bg-card">
+                        <div className="space-y-2 p-3">
+                          {recentComments.map((comment) => (
+                            <div
+                              key={comment.id}
+                              className="flex gap-3 border-b border-border pb-2 last:border-0"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate font-medium text-sm">@{comment.username}</p>
+                                <p className="break-words text-xs text-muted-foreground line-clamp-2">
+                                  {comment.text || "-"}
+                                </p>
+                                {comment.likeCount > 0 && (
+                                  <p className="text-xs text-muted-foreground mt-1">❤️ {comment.likeCount}</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </CardContent>
@@ -370,16 +415,6 @@ export default function AdminSorteos() {
               </div>
             ) : null}
 
-            {stats?.maxCommentPagesReached ? (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Limite alcanzado</AlertTitle>
-                <AlertDescription>
-                  Se cargo el maximo configurado de paginas de comentarios. Sube META_GIVEAWAY_MAX_COMMENT_PAGES si
-                  necesitás cubrir mas comentarios.
-                </AlertDescription>
-              </Alert>
-            ) : null}
 
             <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
               <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

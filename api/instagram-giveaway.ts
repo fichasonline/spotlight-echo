@@ -5,8 +5,6 @@ import { createClient } from "@supabase/supabase-js";
 const DEFAULT_GRAPH_VERSION = "v25.0";
 const GRAPH_VERSION = process.env.META_GRAPH_VERSION || DEFAULT_GRAPH_VERSION;
 const GRAPH_BASE_URL = `https://graph.facebook.com/${GRAPH_VERSION}`;
-const MAX_MEDIA_PAGES = Number(process.env.META_GIVEAWAY_MAX_MEDIA_PAGES || 2000);
-const MAX_COMMENT_PAGES = Number(process.env.META_GIVEAWAY_MAX_COMMENT_PAGES || 5000);
 
 type GiveawayAction = "load" | "draw";
 
@@ -393,11 +391,11 @@ async function findMediaByShortcode(shortcode: string) {
     if (match) return match;
 
     nextUrl = response.paging?.next;
-  } while (nextUrl && pagesRead < MAX_MEDIA_PAGES);
+  } while (nextUrl);
 
   throw new HttpError(
     404,
-    `No encontre ese post entre los ultimos medios de @${igUser.username || igUser.id}. Si es un post viejo, usa el media ID o aumenta META_GIVEAWAY_MAX_MEDIA_PAGES.`,
+    `No encontre ese post entre los ultimos medios de @${igUser.username || igUser.id}.`,
   );
 }
 
@@ -422,6 +420,7 @@ async function resolveMedia(input: GiveawayRequestBody) {
 async function loadComments(
   mediaId: string,
   onProgress?: (progress: GiveawayProgress) => void,
+  onComment?: (comment: MetaComment) => void,
   totalComments?: number | null,
 ) {
   const comments: MetaComment[] = [];
@@ -436,7 +435,12 @@ async function loadComments(
           limit: 100,
         });
 
-    comments.push(...(response.data || []));
+    const pageComments = response.data || [];
+    for (const comment of pageComments) {
+      comments.push(comment);
+      onComment?.(comment);
+    }
+
     pagesRead += 1;
     nextUrl = response.paging?.next;
     onProgress?.({
@@ -446,11 +450,11 @@ async function loadComments(
       totalComments,
       message: "Cargando comentarios",
     });
-  } while (nextUrl && pagesRead < MAX_COMMENT_PAGES);
+  } while (nextUrl);
 
   return {
     comments,
-    maxPagesReached: Boolean(nextUrl),
+    maxPagesReached: false,
   };
 }
 
@@ -552,6 +556,7 @@ async function drawWinner(
 async function buildGiveawayPayload(
   body: GiveawayRequestBody,
   onProgress?: (progress: GiveawayProgress) => void,
+  onComment?: (comment: MetaComment) => void,
 ) {
   onProgress?.({
     phase: "resolving_media",
@@ -570,7 +575,7 @@ async function buildGiveawayPayload(
     message: "Cargando comentarios",
   });
 
-  const { comments, maxPagesReached } = await loadComments(media.id, onProgress, totalComments);
+  const { comments, maxPagesReached } = await loadComments(media.id, onProgress, onComment, totalComments);
   onProgress?.({
     phase: "finalizing",
     commentsFetched: comments.length,
@@ -654,12 +659,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       startProgressStream(res);
 
       try {
-        const payload = await buildGiveawayPayload(body, (progress) => {
-          writeStreamEvent(res, {
-            type: "progress",
-            ...progress,
-          });
-        });
+        const payload = await buildGiveawayPayload(
+          body,
+          (progress) => {
+            writeStreamEvent(res, {
+              type: "progress",
+              ...progress,
+            });
+          },
+          (comment) => {
+            writeStreamEvent(res, {
+              type: "comment",
+              id: comment.id,
+              username: displayUsername(comment.username),
+              text: comment.text || "",
+              timestamp: comment.timestamp || null,
+              likeCount: comment.like_count || 0,
+            });
+          },
+        );
 
         if (action === "draw" && payload.participants.length === 0) {
           throw new HttpError(400, "No hay participantes elegibles para sortear.");
