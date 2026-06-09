@@ -11,8 +11,8 @@ Crear una herramienta privada para administradores de Fichas.uy que permita pega
 - Endpoint server-side: `/api/instagram-giveaway`.
 - El token de Meta vive solo en variables de entorno (`META_API` o `META_ACCESS_TOKEN`).
 - El frontend nunca recibe ni guarda el token.
-- El sorteo considera una participacion por username de Instagram.
-- Comentarios duplicados del mismo username se deduplican.
+- El sorteo considera una participacion por comentario elegible de Instagram.
+- Un mismo username puede tener varias chances si hizo varios comentarios.
 - La cuenta autora del post se excluye automaticamente cuando Meta devuelve su username.
 - La validacion automatica de "sigue a la cuenta" queda fuera del MVP porque la API oficial de Instagram no expone lista de seguidores ni un chequeo follower-by-user.
 
@@ -22,7 +22,7 @@ Crear una herramienta privada para administradores de Fichas.uy que permita pega
 2. Pega una URL de Instagram o un media ID.
 3. La pagina llama al endpoint con la sesion Supabase del admin.
 4. El endpoint valida el JWT, verifica rol `admin`, resuelve el media y lee comentarios desde Meta.
-5. La pagina muestra total de comentarios, participantes unicos y muestra una tabla.
+5. La pagina muestra progreso mientras carga comentarios, total de comentarios, chances elegibles, usuarios unicos y una tabla.
 6. El admin presiona "Elegir ganador".
 7. El endpoint vuelve a cargar comentarios y elige un ganador con aleatoriedad del servidor.
 8. La pagina muestra username, comentario y link del post.

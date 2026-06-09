@@ -30,7 +30,7 @@ type GiveawayParticipant = {
   text: string;
   timestamp: string | null;
   likeCount: number | null;
-  entries: number;
+  entryNumber: number;
 };
 
 type GiveawayMedia = {
@@ -45,8 +45,8 @@ type GiveawayMedia = {
 
 type GiveawayStats = {
   commentsFetched: number;
-  uniqueParticipants: number;
-  duplicateComments: number;
+  eligibleComments: number;
+  uniqueCommenters: number;
   excludedComments: number;
   maxCommentPagesReached: boolean;
 };
@@ -60,6 +60,19 @@ type GiveawayResponse = {
   winner?: GiveawayParticipant & { drawnAt: string };
   error?: string;
 };
+
+type GiveawayProgress = {
+  phase: "resolving_media" | "loading_comments" | "finalizing";
+  commentsFetched: number;
+  pagesRead?: number;
+  totalComments?: number | null;
+  message?: string;
+};
+
+type GiveawayStreamEvent =
+  | ({ type: "progress" } & GiveawayProgress)
+  | ({ type: "result" } & GiveawayResponse)
+  | { type: "error"; success: false; status?: number; error: string };
 
 function parseExcludedUsernames(raw: string) {
   return raw
@@ -97,12 +110,61 @@ function StatBox({ label, value }: { label: string; value: number | string }) {
   );
 }
 
+async function readGiveawayStream(
+  response: Response,
+  onProgress: (progress: GiveawayProgress) => void,
+) {
+  if (!response.body) {
+    throw new Error("La respuesta no contiene stream de progreso.");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result: GiveawayResponse | null = null;
+
+  const handleLine = (line: string) => {
+    if (!line.trim()) return;
+    const event = JSON.parse(line) as GiveawayStreamEvent;
+
+    if (event.type === "progress") {
+      onProgress(event);
+      return;
+    }
+
+    if (event.type === "error") {
+      throw new Error(event.error || "No se pudo ejecutar el sorteo.");
+    }
+
+    if (event.type === "result") {
+      result = event;
+    }
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    for (const line of lines) handleLine(line);
+
+    if (done) break;
+  }
+
+  if (buffer.trim()) handleLine(buffer);
+  if (!result) throw new Error("El sorteo termino sin devolver resultado.");
+
+  return result;
+}
+
 export default function AdminSorteos() {
   const { session } = useAuth();
   const { toast } = useToast();
   const [postUrl, setPostUrl] = useState("");
   const [excludedRaw, setExcludedRaw] = useState("");
   const [loadingAction, setLoadingAction] = useState<"load" | "draw" | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState<GiveawayProgress | null>(null);
   const [result, setResult] = useState<GiveawayResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -123,6 +185,11 @@ export default function AdminSorteos() {
     }
 
     setLoadingAction(action);
+    setLoadingProgress({
+      phase: "resolving_media",
+      commentsFetched: 0,
+      message: "Resolviendo post",
+    });
     setError(null);
 
     try {
@@ -136,10 +203,14 @@ export default function AdminSorteos() {
           action,
           postUrl: postUrl.trim(),
           excludedUsernames,
+          streamProgress: true,
         }),
       });
 
-      const payload = (await response.json()) as GiveawayResponse;
+      const contentType = response.headers.get("content-type") || "";
+      const payload = contentType.includes("application/x-ndjson")
+        ? await readGiveawayStream(response, setLoadingProgress)
+        : ((await response.json()) as GiveawayResponse);
 
       if (!response.ok || payload.success === false) {
         throw new Error(payload.error || "No se pudo ejecutar el sorteo.");
@@ -151,7 +222,7 @@ export default function AdminSorteos() {
         description:
           action === "draw"
             ? `@${payload.winner?.username ?? "ganador"} fue elegido al azar.`
-            : `${payload.stats?.uniqueParticipants ?? 0} participantes unicos encontrados.`,
+            : `${payload.stats?.eligibleComments ?? 0} comentarios elegibles encontrados.`,
       });
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Error inesperado.";
@@ -163,12 +234,14 @@ export default function AdminSorteos() {
       });
     } finally {
       setLoadingAction(null);
+      setLoadingProgress(null);
     }
   };
 
   const copyWinner = async () => {
     if (!result?.winner) return;
     const lines = [
+      `Chance: #${result.winner.entryNumber}`,
       `Ganador: @${result.winner.username}`,
       `Comentario: ${result.winner.text || "-"}`,
       result.media?.postUrl ? `Post: ${result.media.postUrl}` : "",
@@ -200,7 +273,7 @@ export default function AdminSorteos() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-xl">Nuevo sorteo</CardTitle>
-                <CardDescription>Una chance por username de Instagram.</CardDescription>
+                <CardDescription>Una chance por cada comentario de Instagram.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -258,14 +331,41 @@ export default function AdminSorteos() {
                     Elegir ganador
                   </Button>
                 </div>
+
+                {loadingAction && loadingProgress ? (
+                  <div className="rounded-lg border border-border bg-muted/30 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {loadingAction === "draw" ? "Preparando sorteo" : "Cargando comentarios"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {loadingProgress.message || "Leyendo Instagram"}
+                          {typeof loadingProgress.pagesRead === "number"
+                            ? ` · pagina ${loadingProgress.pagesRead}`
+                            : ""}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-display text-2xl font-bold text-foreground">
+                          {loadingProgress.commentsFetched}
+                          {typeof loadingProgress.totalComments === "number"
+                            ? `/${loadingProgress.totalComments}`
+                            : ""}
+                        </p>
+                        <p className="text-xs text-muted-foreground">comentarios</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
 
             {stats ? (
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <StatBox label="Comentarios" value={stats.commentsFetched} />
-                <StatBox label="Participantes" value={stats.uniqueParticipants} />
-                <StatBox label="Duplicados" value={stats.duplicateComments} />
+                <StatBox label="Comentarios leidos" value={stats.commentsFetched} />
+                <StatBox label="Chances" value={stats.eligibleComments} />
+                <StatBox label="Usuarios unicos" value={stats.uniqueCommenters} />
                 <StatBox label="Excluidos" value={stats.excludedComments} />
               </div>
             ) : null}
@@ -286,7 +386,7 @@ export default function AdminSorteos() {
                 <div>
                   <h2 className="font-display text-xl font-semibold">Participantes</h2>
                   <p className="text-sm text-muted-foreground">
-                    {participants.length > 0 ? `${participants.length} usernames unicos` : "Sin comentarios cargados"}
+                    {participants.length > 0 ? `${participants.length} comentarios elegibles` : "Sin comentarios cargados"}
                   </p>
                 </div>
                 <Badge variant="outline">
@@ -304,18 +404,20 @@ export default function AdminSorteos() {
                   <Table className="min-w-[760px] table-fixed text-sm">
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-[90px]">Chance</TableHead>
                         <TableHead className="w-[180px]">Usuario</TableHead>
                         <TableHead>Comentario</TableHead>
-                        <TableHead className="w-[90px] text-right">Entradas</TableHead>
                         <TableHead className="w-[170px]">Fecha</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {participants.map((participant) => (
-                        <TableRow key={participant.normalizedUsername}>
+                        <TableRow key={participant.commentId}>
+                          <TableCell className="font-mono text-xs text-muted-foreground">
+                            #{participant.entryNumber}
+                          </TableCell>
                           <TableCell className="truncate font-medium">@{participant.username}</TableCell>
                           <TableCell className="text-muted-foreground">{truncateComment(participant.text)}</TableCell>
-                          <TableCell className="text-right text-muted-foreground">{participant.entries}</TableCell>
                           <TableCell className="whitespace-nowrap text-muted-foreground">
                             {formatDate(participant.timestamp)}
                           </TableCell>
@@ -341,9 +443,9 @@ export default function AdminSorteos() {
                 {result?.winner ? (
                   <div className="space-y-4">
                     <div className="rounded-lg border border-primary/25 bg-primary/5 p-4">
-                      <p className="text-xs uppercase text-muted-foreground">Username</p>
+                      <p className="text-xs uppercase text-muted-foreground">Chance ganadora</p>
                       <p className="mt-1 break-words text-2xl font-display font-bold text-foreground">
-                        @{result.winner.username}
+                        #{result.winner.entryNumber} · @{result.winner.username}
                       </p>
                     </div>
                     <div>

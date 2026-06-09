@@ -12,31 +12,31 @@
     },
     {
       "source": "/sitemap.xml",
-      "destination": "/api/sitemap"
+      "destination": "/api/seo?feed=sitemap"
     },
     {
       "source": "/sitemaps/pages.xml",
-      "destination": "/api/sitemap-pages"
+      "destination": "/api/seo?feed=pages"
     },
     {
       "source": "/sitemaps/articles.xml",
-      "destination": "/api/sitemap-articles"
+      "destination": "/api/seo?feed=articles"
     },
     {
       "source": "/sitemaps/events.xml",
-      "destination": "/api/sitemap-events"
+      "destination": "/api/seo?feed=events"
     },
     {
       "source": "/news-sitemap.xml",
-      "destination": "/api/news-sitemap"
+      "destination": "/api/seo?feed=news"
     },
     {
       "source": "/sitemaps/salas.xml",
-      "destination": "/api/sitemap-salas"
+      "destination": "/api/seo?feed=salas"
     },
     {
       "source": "/rss.xml",
-      "destination": "/api/rss"
+      "destination": "/api/seo?feed=rss"
     },
     {
       "source": "/noticias/:slug",

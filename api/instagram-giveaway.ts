@@ -5,8 +5,8 @@ import { createClient } from "@supabase/supabase-js";
 const DEFAULT_GRAPH_VERSION = "v25.0";
 const GRAPH_VERSION = process.env.META_GRAPH_VERSION || DEFAULT_GRAPH_VERSION;
 const GRAPH_BASE_URL = `https://graph.facebook.com/${GRAPH_VERSION}`;
-const MAX_MEDIA_PAGES = Number(process.env.META_GIVEAWAY_MAX_MEDIA_PAGES || 20);
-const MAX_COMMENT_PAGES = Number(process.env.META_GIVEAWAY_MAX_COMMENT_PAGES || 50);
+const MAX_MEDIA_PAGES = Number(process.env.META_GIVEAWAY_MAX_MEDIA_PAGES || 2000);
+const MAX_COMMENT_PAGES = Number(process.env.META_GIVEAWAY_MAX_COMMENT_PAGES || 5000);
 
 type GiveawayAction = "load" | "draw";
 
@@ -15,6 +15,7 @@ type GiveawayRequestBody = {
   postUrl?: string;
   mediaId?: string;
   excludedUsernames?: string[];
+  streamProgress?: boolean;
 };
 
 type MetaPaging = {
@@ -73,7 +74,17 @@ type GiveawayParticipant = {
   text: string;
   timestamp: string | null;
   likeCount: number | null;
-  entries: number;
+  entryNumber: number;
+  type?: "comment" | "mention";
+  mentionedBy?: string;
+};
+
+type GiveawayProgress = {
+  phase: "resolving_media" | "loading_comments" | "finalizing";
+  commentsFetched: number;
+  pagesRead?: number;
+  totalComments?: number | null;
+  message?: string;
 };
 
 class HttpError extends Error {
@@ -86,7 +97,13 @@ class HttpError extends Error {
 }
 
 function getAccessToken() {
-  return process.env.META_API || process.env.META_ACCESS_TOKEN || "";
+  return (
+    process.env.META_API ||
+    process.env.META_ACCESS_TOKEN ||
+    process.env.META_SYSTEM_USER_TOKEN ||
+    process.env.SYSTEM_USER_TOKEN ||
+    ""
+  );
 }
 
 function getSupabaseUrl() {
@@ -192,7 +209,7 @@ async function readJsonResponse<T>(response: Response) {
 async function metaGet<T>(path: string, params: Record<string, string | number | undefined> = {}) {
   const accessToken = getAccessToken();
   if (!accessToken) {
-    throw new HttpError(500, "Falta configurar META_API en el servidor.");
+    throw new HttpError(503, "Falta configurar META_API en el servidor local o en Vercel.");
   }
 
   const response = await fetch(buildMetaUrl(path, params).toString(), {
@@ -251,6 +268,14 @@ function displayUsername(value?: string | null) {
   return (value || "").trim().replace(/^@+/, "");
 }
 
+function extractUniqueMentions(text: string): string[] {
+  const matches = text.match(/@[\w.]+/g) || [];
+  const uniqueMentions = new Set(
+    matches.map(m => normalizeUsername(m.slice(1)))
+  );
+  return Array.from(uniqueMentions);
+}
+
 function getConfiguredIgUser() {
   const id =
     process.env.META_IG_USER_ID ||
@@ -266,9 +291,33 @@ function getConfiguredIgUser() {
   };
 }
 
+async function resolveIgUserFromPage() {
+  const pageId = process.env.META_PAGE_ID || process.env.FACEBOOK_PAGE_ID || "";
+  if (!pageId) return null;
+
+  const page = await metaGet<{ instagram_business_account?: { id: string; username?: string } }>(pageId, {
+    fields: "instagram_business_account{id,username}",
+  });
+
+  if (!page.instagram_business_account?.id) {
+    throw new HttpError(
+      400,
+      "META_PAGE_ID no tiene una cuenta profesional de Instagram conectada o el token no tiene acceso a esa pagina.",
+    );
+  }
+
+  return {
+    id: page.instagram_business_account.id,
+    username: displayUsername(page.instagram_business_account.username) || undefined,
+  };
+}
+
 async function resolveIgUser() {
   const configured = getConfiguredIgUser();
   if (configured) return configured;
+
+  const fromPage = await resolveIgUserFromPage();
+  if (fromPage) return fromPage;
 
   const expectedUsername = normalizeUsername(process.env.META_IG_USERNAME || process.env.INSTAGRAM_USERNAME);
 
@@ -295,7 +344,7 @@ async function resolveIgUser() {
 
   throw new HttpError(
     400,
-    "No pude detectar la cuenta de Instagram conectada al token. Configura META_IG_USER_ID para resolver posts por URL.",
+    "No pude detectar la cuenta de Instagram conectada al token. Configura META_IG_USER_ID o META_PAGE_ID para resolver posts por URL.",
   );
 }
 
@@ -303,6 +352,26 @@ async function getMediaById(mediaId: string) {
   return metaGet<MetaMedia>(mediaId, {
     fields: "id,permalink,caption,comments_count,media_type,timestamp,username",
   });
+}
+
+async function checkUserFollowsAccount(userId: string, businessAccountId: string): Promise<boolean> {
+  try {
+    const response = await metaGet<MetaCollection<{ id: string; username?: string }>>(
+      `${businessAccountId}/followers`,
+      {
+        fields: "id,username",
+        limit: 100,
+      },
+    );
+
+    return (response.data || []).some(
+      (follower) =>
+        follower.id === userId ||
+        normalizeUsername(follower.username) === normalizeUsername(userId),
+    );
+  } catch {
+    return false;
+  }
 }
 
 async function findMediaByShortcode(shortcode: string) {
@@ -350,7 +419,11 @@ async function resolveMedia(input: GiveawayRequestBody) {
   return findMediaByShortcode(shortcode);
 }
 
-async function loadComments(mediaId: string) {
+async function loadComments(
+  mediaId: string,
+  onProgress?: (progress: GiveawayProgress) => void,
+  totalComments?: number | null,
+) {
   const comments: MetaComment[] = [];
   let nextUrl: string | undefined;
   let pagesRead = 0;
@@ -366,6 +439,13 @@ async function loadComments(mediaId: string) {
     comments.push(...(response.data || []));
     pagesRead += 1;
     nextUrl = response.paging?.next;
+    onProgress?.({
+      phase: "loading_comments",
+      commentsFetched: comments.length,
+      pagesRead,
+      totalComments,
+      message: "Cargando comentarios",
+    });
   } while (nextUrl && pagesRead < MAX_COMMENT_PAGES);
 
   return {
@@ -385,9 +465,10 @@ function buildParticipants(
       .filter(Boolean),
   );
 
-  const participants = new Map<string, GiveawayParticipant>();
   let excludedComments = 0;
-  let duplicateComments = 0;
+  const uniqueCommenters = new Set<string>();
+  const participants: GiveawayParticipant[] = [];
+  let entryNumber = 1;
 
   for (const comment of comments) {
     const username = displayUsername(comment.username);
@@ -398,28 +479,44 @@ function buildParticipants(
       continue;
     }
 
-    const existing = participants.get(normalizedUsername);
-    if (existing) {
-      existing.entries += 1;
-      duplicateComments += 1;
-      continue;
-    }
+    uniqueCommenters.add(normalizedUsername);
 
-    participants.set(normalizedUsername, {
+    // Entrada por el comentario original
+    participants.push({
       username: username || `comment-${comment.id}`,
       normalizedUsername,
       commentId: comment.id,
       text: comment.text || "",
       timestamp: comment.timestamp || null,
       likeCount: typeof comment.like_count === "number" ? comment.like_count : null,
-      entries: 1,
+      entryNumber: entryNumber++,
+      type: "comment",
     });
+
+    // Entradas adicionales por menciones únicas en el comentario
+    const mentions = extractUniqueMentions(comment.text || "");
+    for (const mentionedUsername of mentions) {
+      // No incluir si es el mismo que comentó o si está excluido
+      if (mentionedUsername !== normalizedUsername && !excluded.has(mentionedUsername)) {
+        participants.push({
+          username: mentionedUsername,
+          normalizedUsername: mentionedUsername,
+          commentId: comment.id,
+          text: comment.text || "",
+          timestamp: comment.timestamp || null,
+          likeCount: null,
+          entryNumber: entryNumber++,
+          type: "mention",
+          mentionedBy: username || `comment-${comment.id}`,
+        });
+      }
+    }
   }
 
   return {
-    participants: Array.from(participants.values()).sort((a, b) => a.username.localeCompare(b.username)),
+    participants,
     excludedComments,
-    duplicateComments,
+    uniqueCommenters: uniqueCommenters.size,
   };
 }
 
@@ -429,10 +526,60 @@ function buildPostUrl(media: MetaMedia, fallback?: string) {
   return null;
 }
 
-async function buildGiveawayPayload(body: GiveawayRequestBody) {
+async function drawWinner(
+  participants: GiveawayParticipant[],
+  businessAccountId: string,
+  maxAttempts = 100,
+): Promise<GiveawayParticipant | null> {
+  const tried = new Set<string>();
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const winner = participants[randomInt(participants.length)];
+    const winnerId = `${winner.normalizedUsername}-${winner.commentId}`;
+
+    if (tried.has(winnerId)) continue;
+    tried.add(winnerId);
+
+    const follows = await checkUserFollowsAccount(winner.normalizedUsername, businessAccountId);
+    if (follows) {
+      return winner;
+    }
+  }
+
+  return null;
+}
+
+async function buildGiveawayPayload(
+  body: GiveawayRequestBody,
+  onProgress?: (progress: GiveawayProgress) => void,
+) {
+  onProgress?.({
+    phase: "resolving_media",
+    commentsFetched: 0,
+    message: "Resolviendo post",
+  });
+
   const media = await resolveMedia(body);
-  const { comments, maxPagesReached } = await loadComments(media.id);
+  const totalComments = typeof media.comments_count === "number" ? media.comments_count : null;
+
+  onProgress?.({
+    phase: "loading_comments",
+    commentsFetched: 0,
+    pagesRead: 0,
+    totalComments,
+    message: "Cargando comentarios",
+  });
+
+  const { comments, maxPagesReached } = await loadComments(media.id, onProgress, totalComments);
+  onProgress?.({
+    phase: "finalizing",
+    commentsFetched: comments.length,
+    totalComments,
+    message: "Preparando sorteo",
+  });
+
   const participantData = buildParticipants(comments, media, body.excludedUsernames || []);
+  const igUser = await resolveIgUser();
 
   return {
     media: {
@@ -446,12 +593,13 @@ async function buildGiveawayPayload(body: GiveawayRequestBody) {
     },
     stats: {
       commentsFetched: comments.length,
-      uniqueParticipants: participantData.participants.length,
-      duplicateComments: participantData.duplicateComments,
+      eligibleComments: participantData.participants.length,
+      uniqueCommenters: participantData.uniqueCommenters,
       excludedComments: participantData.excludedComments,
       maxCommentPagesReached: maxPagesReached,
     },
     participants: participantData.participants,
+    igUserId: igUser.id,
   };
 }
 
@@ -465,6 +613,19 @@ function parseBody(req: VercelRequest): GiveawayRequestBody {
   }
 
   return (req.body || {}) as GiveawayRequestBody;
+}
+
+function startProgressStream(res: VercelResponse) {
+  res.status(200);
+  res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Accel-Buffering", "no");
+  (res as VercelResponse & { flushHeaders?: () => void }).flushHeaders?.();
+}
+
+function writeStreamEvent(res: VercelResponse, event: Record<string, unknown>) {
+  res.write(`${JSON.stringify(event)}\n`);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -489,6 +650,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw new HttpError(400, "Accion invalida. Usa load o draw.");
     }
 
+    if (body.streamProgress) {
+      startProgressStream(res);
+
+      try {
+        const payload = await buildGiveawayPayload(body, (progress) => {
+          writeStreamEvent(res, {
+            type: "progress",
+            ...progress,
+          });
+        });
+
+        if (action === "draw" && payload.participants.length === 0) {
+          throw new HttpError(400, "No hay participantes elegibles para sortear.");
+        }
+
+        const winner =
+          action === "draw"
+            ? await drawWinner(payload.participants, payload.igUserId)
+            : undefined;
+
+        if (action === "draw" && !winner) {
+          throw new HttpError(
+            400,
+            "No se pudo encontrar un ganador que siga el perfil de Instagram. Intenta nuevamente.",
+          );
+        }
+
+        const winnerWithTimestamp = winner
+          ? { ...winner, drawnAt: new Date().toISOString() }
+          : undefined;
+
+        writeStreamEvent(res, {
+          type: "result",
+          success: true,
+          action,
+          ...payload,
+          ...(winnerWithTimestamp ? { winner: winnerWithTimestamp } : {}),
+        });
+        return res.end();
+      } catch (streamError) {
+        const status = streamError instanceof HttpError ? streamError.status : 500;
+        const message = streamError instanceof Error ? streamError.message : "Error inesperado.";
+
+        writeStreamEvent(res, {
+          type: "error",
+          success: false,
+          status,
+          error: message,
+        });
+        return res.end();
+      }
+    }
+
     const payload = await buildGiveawayPayload(body);
 
     if (action === "draw") {
@@ -496,7 +710,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         throw new HttpError(400, "No hay participantes elegibles para sortear.");
       }
 
-      const winner = payload.participants[randomInt(payload.participants.length)];
+      const winner = await drawWinner(payload.participants, payload.igUserId);
+      if (!winner) {
+        throw new HttpError(
+          400,
+          "No se pudo encontrar un ganador que siga el perfil de Instagram. Intenta nuevamente.",
+        );
+      }
+
       return res.status(200).json({
         success: true,
         action,
