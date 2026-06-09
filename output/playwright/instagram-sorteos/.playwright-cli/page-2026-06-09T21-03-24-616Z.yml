@@ -1,0 +1,23 @@
+- generic [ref=e12]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T"
+  - generic [ref=e13]:
+    - generic [ref=e15]:
+      - generic [ref=e16]:
+        - img "Fichas Online"
+        - paragraph [ref=e17]: Iniciá sesión para continuar
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - text: Email
+          - textbox "Email" [ref=e20]:
+            - /placeholder: tu@email.com
+        - button "Enviar enlace mágico" [ref=e21] [cursor=pointer]
+      - generic [ref=e26]: O continuar con
+      - button "Google" [ref=e27] [cursor=pointer]:
+        - img
+        - text: Google
+    - contentinfo [ref=e28]:
+      - link "Built by DTE" [ref=e29] [cursor=pointer]:
+        - /url: https://grupodte.com
+        - generic [ref=e30]: Built by DTE

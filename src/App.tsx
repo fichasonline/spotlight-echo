@@ -25,6 +25,7 @@ const AdminNoticias = lazy(() => import("./pages/admin/AdminNoticias"));
 const AdminNoticiasInstagram = lazy(() => import("./pages/admin/AdminNoticiasInstagram"));
 const AdminLiveblogs = lazy(() => import("./pages/admin/AdminLiveblogs"));
 const AdminStoriesQueue = lazy(() => import("./pages/admin/AdminStoriesQueue"));
+const AdminSorteos = lazy(() => import("./pages/admin/AdminSorteos"));
 const AdminModeracion = lazy(() => import("./pages/admin/AdminModeracion"));
 const AdminLeads = lazy(() => import("./pages/admin/AdminLeads"));
 const AdminChatLeads = lazy(() => import("./pages/admin/AdminChatLeads"));
@@ -111,6 +112,14 @@ const App = () => (
                     element={
                       <AdminRoute>
                         <AdminStoriesQueue />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/sorteos"
+                    element={
+                      <AdminRoute>
+                        <AdminSorteos />
                       </AdminRoute>
                     }
                   />

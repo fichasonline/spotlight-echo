@@ -1,10 +1,119 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import type { Plugin } from "vite";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+
+type DevVercelResponse = ServerResponse & {
+  status: (statusCode: number) => DevVercelResponse;
+  json: (payload: unknown) => DevVercelResponse;
+  send: (payload: unknown) => DevVercelResponse;
+};
+
+type DevVercelRequest = IncomingMessage & {
+  query: Record<string, string | string[]>;
+  body: unknown;
+};
+
+type VercelLikeHandler = (req: DevVercelRequest, res: DevVercelResponse) => Promise<unknown> | unknown;
+
+function loadServerEnv(mode: string) {
+  const env = loadEnv(mode, process.cwd(), "");
+  for (const [key, value] of Object.entries(env)) {
+    if (process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
+}
+
+function readDevRequestBody(req: IncomingMessage) {
+  return new Promise<string>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", reject);
+  });
+}
+
+function buildDevQuery(searchParams: URLSearchParams) {
+  const query: Record<string, string | string[]> = {};
+  for (const [key, value] of searchParams.entries()) {
+    const current = query[key];
+    if (current === undefined) {
+      query[key] = value;
+    } else if (Array.isArray(current)) {
+      current.push(value);
+    } else {
+      query[key] = [current, value];
+    }
+  }
+  return query;
+}
+
+function adaptDevResponse(res: ServerResponse) {
+  const devRes = res as DevVercelResponse;
+  devRes.status = (statusCode: number) => {
+    res.statusCode = statusCode;
+    return devRes;
+  };
+  devRes.json = (payload: unknown) => {
+    if (!res.hasHeader("Content-Type")) {
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+    }
+    res.end(JSON.stringify(payload));
+    return devRes;
+  };
+  devRes.send = (payload: unknown) => {
+    if (typeof payload === "string" || Buffer.isBuffer(payload)) {
+      res.end(payload);
+    } else {
+      devRes.json(payload);
+    }
+    return devRes;
+  };
+  return devRes;
+}
+
+function instagramGiveawayDevPlugin(): Plugin {
+  return {
+    name: "instagram-giveaway-api-dev",
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const parsed = new URL(req.url || "/", "http://localhost");
+        if (parsed.pathname !== "/api/instagram-giveaway") return next();
+
+        try {
+          const body = req.method === "GET" || req.method === "HEAD" ? "" : await readDevRequestBody(req);
+          const mod = (await server.ssrLoadModule("/api/instagram-giveaway.ts")) as {
+            default: VercelLikeHandler;
+          };
+          const devReq = Object.assign(req, {
+            query: buildDevQuery(parsed.searchParams),
+            body,
+          }) as DevVercelRequest;
+
+          await mod.default(devReq, adaptDevResponse(res));
+        } catch (error) {
+          if (!res.headersSent) {
+            res.statusCode = 500;
+            res.setHeader("Content-Type", "application/json; charset=utf-8");
+          }
+          if (!res.writableEnded) {
+            res.end(
+              JSON.stringify({
+                success: false,
+                error: error instanceof Error ? error.message : "Error inesperado en API local.",
+              }),
+            );
+          }
+        }
+      });
+    },
+  };
+}
 
 function getSingleQueryValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) return value[0];
@@ -408,45 +517,50 @@ function imageProxyDevPlugin(): Plugin {
 }
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: "::",
-    port: 8080,
-    hmr: {
-      overlay: false,
+export default defineConfig(({ mode }) => {
+  loadServerEnv(mode);
+
+  return {
+    server: {
+      host: "::",
+      port: 8080,
+      hmr: {
+        overlay: false,
+      },
     },
-  },
-  plugins: [
-    react(),
-    mode === "development" && componentTagger(),
-    pdfProxyDevPlugin(),
-    imageProxyDevPlugin(),
-    linkPreviewDevPlugin(),
-  ].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+    plugins: [
+      react(),
+      mode === "development" && componentTagger(),
+      pdfProxyDevPlugin(),
+      imageProxyDevPlugin(),
+      linkPreviewDevPlugin(),
+      instagramGiveawayDevPlugin(),
+    ].filter(Boolean),
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+      },
     },
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return undefined;
-          if (
-            id.includes("node_modules/react/") ||
-            id.includes("node_modules/react-dom/") ||
-            id.includes("node_modules/scheduler/")
-          ) {
-            return "react-vendor";
-          }
-          if (id.includes("node_modules/@supabase")) return "supabase-vendor";
-          if (id.includes("node_modules/framer-motion") || id.includes("node_modules/motion")) return "motion-vendor";
-          if (id.includes("node_modules/recharts") || id.includes("node_modules/d3-")) return "charts-vendor";
-          if (id.includes("node_modules/date-fns")) return "date-vendor";
-          return undefined;
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return undefined;
+            if (
+              id.includes("node_modules/react/") ||
+              id.includes("node_modules/react-dom/") ||
+              id.includes("node_modules/scheduler/")
+            ) {
+              return "react-vendor";
+            }
+            if (id.includes("node_modules/@supabase")) return "supabase-vendor";
+            if (id.includes("node_modules/framer-motion") || id.includes("node_modules/motion")) return "motion-vendor";
+            if (id.includes("node_modules/recharts") || id.includes("node_modules/d3-")) return "charts-vendor";
+            if (id.includes("node_modules/date-fns")) return "date-vendor";
+            return undefined;
+          },
         },
       },
     },
-  },
-}));
+  };
+});

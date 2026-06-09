@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { isChatLead, isLandingLead } from "@/lib/support-leads";
-import { Newspaper, Calendar, Flag, Users, MessageCircle, ContactRound, Image, Instagram, Radio, Sparkles } from "lucide-react";
+import { Newspaper, Calendar, Flag, Users, MessageCircle, ContactRound, Image, Instagram, Radio, Sparkles, Dice5 } from "lucide-react";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -86,6 +86,7 @@ export default function AdminDashboard() {
     { label: "IG noticias", value: stats.instagramPending, icon: Instagram, to: "/admin/noticias/instagram", color: "text-primary" },
     { label: "Liveblogs", value: stats.liveblogs, icon: Radio, to: "/admin/liveblogs", color: "text-accent" },
     { label: "Stories en cola", value: stats.storiesPending, icon: Sparkles, to: "/admin/stories", color: "text-primary" },
+    { label: "Sorteos IG", value: "IG", icon: Dice5, to: "/admin/sorteos", color: "text-accent" },
     { label: "Banners home", value: 4, icon: Image, to: "/admin/banners", color: "text-primary" },
   ];
 
