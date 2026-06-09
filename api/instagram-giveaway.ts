@@ -436,7 +436,7 @@ async function loadComments(
       ? await metaGetAbsolute<MetaCollection<MetaComment>>(nextUrl)
       : await metaGet<MetaCollection<MetaComment>>(`${mediaId}/comments`, {
           fields: "id,text,timestamp,username,like_count",
-          limit: 100,
+          limit: 500,
           order: "chronological",
         });
 
