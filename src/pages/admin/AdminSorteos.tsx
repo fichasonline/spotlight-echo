@@ -331,140 +331,49 @@ export default function AdminSorteos() {
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Button
                     type="button"
-                    variant="outline"
                     onClick={() => requestGiveaway("load")}
                     disabled={loadingAction !== null}
+                    className="flex-1"
                   >
-                    {loadingAction === "load" ? (
+                    {loadingAction ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : result ? (
                       <RefreshCw className="mr-2 h-4 w-4" />
                     ) : (
-                      <Search className="mr-2 h-4 w-4" />
-                    )}
-                    {result ? "Recargar comentarios" : "Cargar comentarios"}
-                  </Button>
-                  <Button type="button" onClick={() => requestGiveaway("draw")} disabled={!canDraw}>
-                    {loadingAction === "draw" ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
                       <Dice5 className="mr-2 h-4 w-4" />
                     )}
-                    Elegir ganador
+                    {result ? "Nuevo sorteo" : "Elegir ganador"}
                   </Button>
                 </div>
 
                 {loadingAction && loadingProgress ? (
-                  <div className="space-y-3">
-                    <div className="rounded-lg border border-border bg-muted/30 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">
-                            {loadingAction === "draw" ? "Preparando sorteo" : "Cargando comentarios"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {loadingProgress.message || "Leyendo Instagram"}
-                            {typeof loadingProgress.pagesRead === "number"
-                              ? ` · pagina ${loadingProgress.pagesRead}`
-                              : ""}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-display text-2xl font-bold text-foreground">
-                            {loadingProgress.commentsFetched}
-                            {typeof loadingProgress.totalComments === "number"
-                              ? `/${loadingProgress.totalComments}`
-                              : ""}
-                          </p>
-                          <p className="text-xs text-muted-foreground">comentarios</p>
-                        </div>
+                  <div className="rounded-lg border border-border bg-muted/30 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Eligiendo ganador al azar...
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {loadingProgress.message || "Leyendo Instagram"}
+                          {typeof loadingProgress.pagesRead === "number"
+                            ? ` · pagina ${loadingProgress.pagesRead}`
+                            : ""}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-display text-2xl font-bold text-foreground">
+                          {loadingProgress.commentsFetched}
+                        </p>
+                        <p className="text-xs text-muted-foreground">comentarios</p>
                       </div>
                     </div>
-
-                    {recentComments.length > 0 && loadingAction === "load" ? (
-                      <div className="max-h-64 overflow-y-auto rounded-lg border border-border bg-card">
-                        <div className="space-y-2 p-3">
-                          {recentComments.map((comment) => (
-                            <div
-                              key={comment.id}
-                              className="flex gap-3 border-b border-border pb-2 last:border-0"
-                            >
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate font-medium text-sm">@{comment.username}</p>
-                                <p className="break-words text-xs text-muted-foreground line-clamp-2">
-                                  {comment.text || "-"}
-                                </p>
-                                {comment.likeCount > 0 && (
-                                  <p className="text-xs text-muted-foreground mt-1">❤️ {comment.likeCount}</p>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
                   </div>
                 ) : null}
               </CardContent>
             </Card>
 
-            {stats ? (
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <StatBox label="Comentarios leidos" value={stats.commentsFetched} />
-                <StatBox label="Chances" value={stats.eligibleComments} />
-                <StatBox label="Usuarios unicos" value={stats.uniqueCommenters} />
-                <StatBox label="Excluidos" value={stats.excludedComments} />
-              </div>
-            ) : null}
 
 
-            <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="font-display text-xl font-semibold">Participantes</h2>
-                  <p className="text-sm text-muted-foreground">
-                    {participants.length > 0 ? `${participants.length} comentarios elegibles` : "Sin comentarios cargados"}
-                  </p>
-                </div>
-                <Badge variant="outline">
-                  <Users className="mr-1 h-3 w-3" />
-                  Follow manual
-                </Badge>
-              </div>
-
-              {participants.length === 0 ? (
-                <div className="py-16 text-center text-sm text-muted-foreground">
-                  Carga un post para ver participantes.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table className="min-w-[760px] table-fixed text-sm">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[90px]">Chance</TableHead>
-                        <TableHead className="w-[180px]">Usuario</TableHead>
-                        <TableHead>Comentario</TableHead>
-                        <TableHead className="w-[170px]">Fecha</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {participants.map((participant) => (
-                        <TableRow key={participant.commentId}>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
-                            #{participant.entryNumber}
-                          </TableCell>
-                          <TableCell className="truncate font-medium">@{participant.username}</TableCell>
-                          <TableCell className="text-muted-foreground">{truncateComment(participant.text)}</TableCell>
-                          <TableCell className="whitespace-nowrap text-muted-foreground">
-                            {formatDate(participant.timestamp)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
           </div>
 
           <div className="space-y-6">
