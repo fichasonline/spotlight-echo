@@ -266,14 +266,6 @@ function displayUsername(value?: string | null) {
   return (value || "").trim().replace(/^@+/, "");
 }
 
-function extractUniqueMentions(text: string): string[] {
-  const matches = text.match(/@[\w.]+/g) || [];
-  const uniqueMentions = new Set(
-    matches.map(m => normalizeUsername(m.slice(1)))
-  );
-  return Array.from(uniqueMentions);
-}
-
 function getConfiguredIgUser() {
   const id =
     process.env.META_IG_USER_ID ||
@@ -350,26 +342,6 @@ async function getMediaById(mediaId: string) {
   return metaGet<MetaMedia>(mediaId, {
     fields: "id,permalink,caption,comments_count,media_type,timestamp,username",
   });
-}
-
-async function checkUserFollowsAccount(userId: string, businessAccountId: string): Promise<boolean> {
-  try {
-    const response = await metaGet<MetaCollection<{ id: string; username?: string }>>(
-      `${businessAccountId}/followers`,
-      {
-        fields: "id,username",
-        limit: 100,
-      },
-    );
-
-    return (response.data || []).some(
-      (follower) =>
-        follower.id === userId ||
-        normalizeUsername(follower.username) === normalizeUsername(userId),
-    );
-  } catch {
-    return false;
-  }
 }
 
 async function findMediaByShortcode(shortcode: string) {
@@ -482,7 +454,6 @@ function buildParticipants(
   let excludedComments = 0;
   const uniqueCommenters = new Set<string>();
   const participants: GiveawayParticipant[] = [];
-  let entryNumber = 1;
 
   for (const comment of comments) {
     const username = displayUsername(comment.username);
@@ -495,7 +466,7 @@ function buildParticipants(
 
     uniqueCommenters.add(normalizedUsername);
 
-    // Entrada por el comentario original
+    // 1 chance por comentario
     participants.push({
       username: username || `comment-${comment.id}`,
       normalizedUsername,
@@ -503,28 +474,8 @@ function buildParticipants(
       text: comment.text || "",
       timestamp: comment.timestamp || null,
       likeCount: typeof comment.like_count === "number" ? comment.like_count : null,
-      entryNumber: entryNumber++,
-      type: "comment",
+      entryNumber: participants.length + 1,
     });
-
-    // Entradas adicionales por menciones únicas en el comentario
-    const mentions = extractUniqueMentions(comment.text || "");
-    for (const mentionedUsername of mentions) {
-      // No incluir si es el mismo que comentó o si está excluido
-      if (mentionedUsername !== normalizedUsername && !excluded.has(mentionedUsername)) {
-        participants.push({
-          username: mentionedUsername,
-          normalizedUsername: mentionedUsername,
-          commentId: comment.id,
-          text: comment.text || "",
-          timestamp: comment.timestamp || null,
-          likeCount: null,
-          entryNumber: entryNumber++,
-          type: "mention",
-          mentionedBy: username || `comment-${comment.id}`,
-        });
-      }
-    }
   }
 
   return {
@@ -540,33 +491,8 @@ function buildPostUrl(media: MetaMedia, fallback?: string) {
   return null;
 }
 
-async function drawWinner(
-  participants: GiveawayParticipant[],
-  businessAccountId?: string,
-  maxAttempts = 100,
-): Promise<GiveawayParticipant | null> {
-  const tried = new Set<string>();
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const winner = participants[randomInt(participants.length)];
-    const winnerId = `${winner.normalizedUsername}-${winner.commentId}`;
-
-    if (tried.has(winnerId)) continue;
-    tried.add(winnerId);
-
-    // Validar followers solo si está disponible el businessAccountId
-    if (businessAccountId) {
-      const follows = await checkUserFollowsAccount(winner.normalizedUsername, businessAccountId);
-      if (follows) {
-        return winner;
-      }
-    } else {
-      // Si no hay validación de followers, devolver el primer ganador
-      return winner;
-    }
-  }
-
-  return null;
+function drawWinner(participants: GiveawayParticipant[]): GiveawayParticipant {
+  return participants[randomInt(participants.length)];
 }
 
 async function buildGiveawayPayload(
@@ -702,29 +628,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           },
         );
 
-        if (action === "draw" && payload.participants.length === 0) {
+        // Auto-draw después de cargar comentarios
+        if (payload.participants.length === 0) {
           throw new HttpError(400, "No hay participantes elegibles para sortear.");
         }
 
-        let winner: GiveawayParticipant | null = null;
-        if (action === "draw") {
-          winner = await drawWinner(payload.participants, payload.igUserId);
-          if (!winner) {
-            throw new HttpError(
-              400,
-              "No se pudo encontrar un ganador que siga el perfil de Instagram. Intenta nuevamente.",
-            );
-          }
-        }
+        const winner = drawWinner(payload.participants);
 
         const result = {
           type: "result" as const,
           success: true,
-          action,
+          action: "draw",
           media: payload.media,
           stats: payload.stats,
           participants: payload.participants,
-          ...(winner ? { winner: { ...winner, drawnAt: new Date().toISOString() } } : {}),
+          winner: { ...winner, drawnAt: new Date().toISOString() },
         };
 
         writeStreamEvent(res, result);
@@ -746,22 +664,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const payload = await buildGiveawayPayload(body);
 
-    if (action === "draw") {
+    // Auto-draw después de cargar comentarios
+    if (action === "load" || action === "draw") {
       if (payload.participants.length === 0) {
         throw new HttpError(400, "No hay participantes elegibles para sortear.");
       }
 
-      const winner = await drawWinner(payload.participants, payload.igUserId);
-      if (!winner) {
-        throw new HttpError(
-          400,
-          "No se pudo encontrar un ganador que siga el perfil de Instagram. Intenta nuevamente.",
-        );
-      }
+      const winner = drawWinner(payload.participants);
 
       return res.status(200).json({
         success: true,
-        action,
+        action: "draw",
         ...payload,
         winner: {
           ...winner,

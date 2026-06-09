@@ -237,12 +237,14 @@ export default function AdminSorteos() {
       }
 
       setResult(payload);
+
+      // Mostrar resultado basado en si es draw automático o manual
+      const isByAutoDraw = action === "load" && payload.winner;
       toast({
-        title: action === "draw" ? "Ganador elegido" : "Comentarios cargados",
-        description:
-          action === "draw"
-            ? `@${payload.winner?.username ?? "ganador"} fue elegido al azar.`
-            : `${payload.stats?.eligibleComments ?? 0} comentarios elegibles encontrados.`,
+        title: isByAutoDraw || action === "draw" ? "¡Ganador elegido!" : "Comentarios cargados",
+        description: isByAutoDraw || action === "draw"
+          ? `@${payload.winner?.username ?? "ganador"} fue elegido al azar.`
+          : `${payload.stats?.eligibleComments ?? 0} comentarios elegibles encontrados.`,
       });
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Error inesperado.";
