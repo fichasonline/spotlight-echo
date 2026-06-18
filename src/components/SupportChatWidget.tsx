@@ -60,7 +60,7 @@ interface AutomatedSupportReplyResponse {
   messageId?: string | null;
   persisted?: boolean;
   error?: string;
-  details?: string;
+  details?: unknown;
   persistenceError?: string;
 }
 
@@ -158,10 +158,33 @@ async function requestAutomatedSupportReply(payload: AutomatedSupportReplyReques
   const data = (await response.json().catch(() => ({}))) as AutomatedSupportReplyResponse;
 
   if (!response.ok) {
-    throw new Error(data.details || data.error || "No pudimos procesar la respuesta automatica.");
+    throw new Error(getAutomatedReplyErrorMessage(data));
   }
 
   return data;
+}
+
+function getAutomatedReplyErrorMessage(data: AutomatedSupportReplyResponse) {
+  if (typeof data.details === "string" && data.details.trim()) {
+    return data.details.trim();
+  }
+
+  if (typeof data.details === "object" && data.details !== null) {
+    const details = data.details as { message?: unknown; causeMessage?: unknown; causeCode?: unknown };
+    const message = typeof details.message === "string" ? details.message.trim() : "";
+    const causeMessage = typeof details.causeMessage === "string" ? details.causeMessage.trim() : "";
+    const causeCode = typeof details.causeCode === "string" ? details.causeCode.trim() : "";
+
+    if (causeMessage) return causeMessage;
+    if (message) return message;
+    if (causeCode) return `Error de conexion (${causeCode}).`;
+  }
+
+  if (typeof data.error === "string" && data.error.trim()) {
+    return data.error.trim();
+  }
+
+  return "Probá de nuevo en unos segundos.";
 }
 
 export function SupportChatWidget({ triggerVariant = "floating", initialOpen = false }: SupportChatWidgetProps) {
