@@ -59,6 +59,37 @@ function getWebhookUrl() {
   return process.env.N8N_SUPPORT_CHAT_WEBHOOK_URL?.trim() || "";
 }
 
+function getWebhookHost(webhookUrl: string) {
+  try {
+    return new URL(webhookUrl).host;
+  } catch {
+    return null;
+  }
+}
+
+function getRequestFailureDetails(error: unknown) {
+  if (!(error instanceof Error)) {
+    return { message: "Unexpected n8n request failure" };
+  }
+
+  const cause = error.cause as
+    | {
+        code?: string;
+        message?: string;
+        syscall?: string;
+        hostname?: string;
+      }
+    | undefined;
+
+  return {
+    message: error.message,
+    causeCode: cause?.code,
+    causeMessage: cause?.message,
+    causeSyscall: cause?.syscall,
+    causeHostname: cause?.hostname,
+  };
+}
+
 function getSupabaseConfig() {
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -123,7 +154,7 @@ function extractReply(payload: unknown): string | null {
     if (reply) return reply;
   }
 
-  for (const key of ["body", "data", "result"]) {
+  for (const key of ["data", "result"]) {
     const reply = extractReply(record[key]);
     if (reply) return reply;
   }
@@ -269,7 +300,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     return res.status(502).json({
       error: "n8n failed to process support chat message",
-      details: error instanceof Error ? error.message : "Unexpected n8n request failure",
+      details: getRequestFailureDetails(error),
+      webhookHost: getWebhookHost(webhookUrl),
     });
   }
 
