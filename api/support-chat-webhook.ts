@@ -1,9 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const RECENT_HISTORY_LIMIT = 12;
 const MAX_MESSAGE_CHARS = 2000;
 const N8N_TIMEOUT_MS = 25_000;
+const ENDPOINT_VERSION = "support-chat-n8n-v2";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 interface SupportChatRequestPayload {
@@ -63,7 +65,7 @@ function getWebhookUrl() {
   return process.env.N8N_SUPPORT_CHAT_WEBHOOK_URL?.trim() || "";
 }
 
-function getSupabaseClient() {
+function getSupabaseConfig() {
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -71,7 +73,19 @@ function getSupabaseClient() {
     throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
   }
 
-  return createClient(url, serviceRoleKey, {
+  return { url, serviceRoleKey };
+}
+
+function getSupabaseRef(url: string) {
+  try {
+    return new URL(url).hostname.split(".")[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+function getSupabaseClient(config: { url: string; serviceRoleKey: string }): SupabaseClient {
+  return createClient(config.url, config.serviceRoleKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -169,6 +183,8 @@ async function callN8n(webhookUrl: string, payload: Record<string, unknown>) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader("X-Support-Chat-Webhook-Version", ENDPOINT_VERSION);
+
   if (req.method === "OPTIONS") {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -206,9 +222,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: "Message is required" });
   }
 
-  let supabase;
+  let supabase: SupabaseClient;
+  let supabaseRef: string | null = null;
   try {
-    supabase = getSupabaseClient();
+    const supabaseConfig = getSupabaseConfig();
+    supabaseRef = getSupabaseRef(supabaseConfig.url);
+    supabase = getSupabaseClient(supabaseConfig);
   } catch (error) {
     return res.status(503).json({
       error: error instanceof Error ? error.message : "Supabase is not configured",
@@ -227,7 +246,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (!thread) {
-    return res.status(404).json({ error: "Chat session not found" });
+    return res.status(404).json({
+      error: "Chat session not found",
+      endpointVersion: ENDPOINT_VERSION,
+      supabaseRef,
+    });
   }
 
   if (thread.status !== "open") {
