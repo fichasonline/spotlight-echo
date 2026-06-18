@@ -22,6 +22,11 @@ interface SupportMessageRow {
   thread_status?: "open" | "closed";
 }
 
+interface AutomationReplyRow {
+  id?: string | null;
+  created_at?: string | null;
+}
+
 function parseJsonBody(body: unknown): SupportChatRequestPayload {
   if (typeof body === "string") {
     if (!body.trim()) return {};
@@ -297,17 +302,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(502).json({ error: "n8n did not return a reply" });
   }
 
-  const { data: insertedMessage, error: insertError } = await supabase
-    .from("support_messages")
-    .insert({
-      thread_id: threadId,
-      sender_type: "staff",
-      sender_user_id: null,
-      sender_name: "Fichas Online",
-      body: reply.slice(0, MAX_MESSAGE_CHARS),
-    })
-    .select("id, created_at")
-    .single();
+  const { data: insertedRows, error: insertError } = await supabase.rpc(
+    "send_support_message_from_automation",
+    {
+      p_thread_id: threadId,
+      p_visitor_token: visitorToken,
+      p_message: reply.slice(0, MAX_MESSAGE_CHARS),
+      p_sender_name: "Fichas Online",
+    },
+  );
 
   if (insertError) {
     return res.status(200).json({
@@ -318,6 +321,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       persistenceError: insertError.message,
     });
   }
+
+  const insertedMessage = (Array.isArray(insertedRows) ? insertedRows[0] : insertedRows) as
+    | AutomationReplyRow
+    | null
+    | undefined;
 
   return res.status(200).json({
     reply,
