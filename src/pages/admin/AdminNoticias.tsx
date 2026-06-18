@@ -360,7 +360,14 @@ export default function AdminNoticias() {
                     <div className="mt-1 flex items-center gap-2">
                       <Badge className={statusColors[article.status]}>{article.status}</Badge>
                       {article.status === "published" && article.instagram_selected && (
-                        <Badge variant="outline" className="border-primary/25 bg-primary/10 text-primary">
+                        <Badge
+                          variant="outline"
+                          className={
+                            article.instagram_published
+                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                              : "border-primary/25 bg-primary/10 text-primary"
+                          }
+                        >
                           {article.instagram_published ? "IG publicada" : "IG pendiente"}
                         </Badge>
                       )}
