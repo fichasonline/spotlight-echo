@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const MAX_MESSAGE_CHARS = 2000;
-const N8N_TIMEOUT_MS = 25_000;
+const N8N_TIMEOUT_MS = 55_000;
 const ENDPOINT_VERSION = "support-chat-n8n-v2";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -81,6 +81,7 @@ function getRequestFailureDetails(error: unknown) {
     | undefined;
 
   return {
+    name: error.name,
     message: error.message,
     causeCode: cause?.code,
     causeMessage: cause?.message,
@@ -282,14 +283,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       timestamp: getOptionalString(body.timestamp) || new Date().toISOString(),
     });
   } catch (error) {
-    return res.status(502).json({
-      error: "n8n failed to process support chat message",
-      details: getRequestFailureDetails(error),
+    const details = getRequestFailureDetails(error);
+    const isTimeout = error instanceof Error && error.name === "AbortError";
+    console.error("[support-chat-webhook] n8n request failed", {
+      details,
+      webhookHost: getWebhookHost(webhookUrl),
+      threadId,
+    });
+
+    return res.status(isTimeout ? 504 : 502).json({
+      error: isTimeout
+        ? "n8n took too long to process support chat message"
+        : "n8n failed to process support chat message",
+      details,
       webhookHost: getWebhookHost(webhookUrl),
     });
   }
 
   if (!n8nResult.ok) {
+    console.error("[support-chat-webhook] n8n returned an error", {
+      status: n8nResult.status,
+      details: n8nResult.error,
+      threadId,
+    });
+
     return res.status(502).json({
       error: "n8n failed to process support chat message",
       status: n8nResult.status,
@@ -299,6 +316,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const reply = n8nResult.reply?.trim();
   if (!reply) {
+    console.error("[support-chat-webhook] n8n returned no reply", { threadId });
     return res.status(502).json({ error: "n8n did not return a reply" });
   }
 
