@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -22,7 +21,6 @@ import {
   Instagram,
   Link2,
   ListOrdered,
-  Plus,
   RotateCcw,
   X,
 } from "lucide-react";
@@ -135,7 +133,6 @@ async function copyToClipboard(text: string) {
 export default function AdminNoticiasInstagram() {
   const { toast } = useToast();
   const [articles, setArticles] = useState<Article[]>([]);
-  const [articleToAddId, setArticleToAddId] = useState("");
   const [storyDrafts, setStoryDrafts] = useState<Record<string, StoryDraft>>({});
   const [generatedStories, setGeneratedStories] = useState<GeneratedStories>({});
   const [generatingStoryIds, setGeneratingStoryIds] = useState<GeneratingStoryIds>({});
@@ -175,18 +172,6 @@ export default function AdminNoticiasInstagram() {
     };
   }, []);
 
-  const availableArticles = useMemo(
-    () =>
-      [...articles]
-        .filter((article) => !article.instagram_selected)
-        .sort((left, right) => {
-          const leftTime = parseDateValue(left.published_at || left.created_at).getTime();
-          const rightTime = parseDateValue(right.published_at || right.created_at).getTime();
-          return rightTime - leftTime;
-        }),
-    [articles],
-  );
-
   const instagramPendingArticles = useMemo(
     () => sortInstagramArticles(articles.filter((article) => article.instagram_selected && !article.instagram_published)),
     [articles],
@@ -196,15 +181,6 @@ export default function AdminNoticiasInstagram() {
     () => sortInstagramArticles(articles.filter((article) => article.instagram_selected && article.instagram_published)),
     [articles],
   );
-
-  useEffect(() => {
-    const nextArticleToAddId = availableArticles.find((article) => article.id === articleToAddId)?.id
-      ?? availableArticles[0]?.id
-      ?? "";
-    if (nextArticleToAddId !== articleToAddId) {
-      setArticleToAddId(nextArticleToAddId);
-    }
-  }, [availableArticles, articleToAddId]);
 
   useEffect(() => {
     const pendingIds = new Set(instagramPendingArticles.map((article) => article.id));
@@ -382,36 +358,6 @@ export default function AdminNoticiasInstagram() {
     return true;
   };
 
-  const handleAddToInstagram = async () => {
-    const article = availableArticles.find((entry) => entry.id === articleToAddId);
-    if (!article) return;
-
-    const nextOrder = instagramPendingArticles.length + 1;
-    const { error } = await supabase
-      .from("articles")
-      .update({
-        instagram_selected: true,
-        instagram_published: false,
-        instagram_order: nextOrder,
-      })
-      .eq("id", article.id);
-
-    if (error) {
-      toast({
-        title: "No se pudo agregar a Instagram",
-        description: error.message,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    toast({
-      title: "Agregada a Instagram",
-      description: "La noticia quedó lista para descargar como story.",
-    });
-    void fetchArticles();
-  };
-
   const handleToggleInstagramSelection = async (article: Article) => {
     const sourceQueue = sortInstagramArticles(
       (article.instagram_published ? instagramPublishedArticles : instagramPendingArticles).filter(
@@ -563,100 +509,36 @@ export default function AdminNoticiasInstagram() {
             </Link>
             <h1 className="text-3xl font-display font-bold">Instagram de noticias</h1>
             <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-              Elegí noticias, descargá la story y marcala como publicada desde un solo lugar.
+              Descargá las stories pendientes y marcalas como publicadas desde un solo lugar.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="outline" className="border-primary/25 bg-primary/10 text-primary">
-              Listas: {instagramPendingArticles.length}
-            </Badge>
-            <Badge variant="outline" className="border-muted-foreground/20 bg-muted/50 text-muted-foreground">
-              Publicadas: {instagramPublishedArticles.length}
-            </Badge>
-          </div>
+          <Badge variant="outline" className="border-primary/25 bg-primary/10 text-primary">
+            Listas: {instagramPendingArticles.length}
+          </Badge>
         </div>
 
-        <div className="space-y-5">
-          <section className="rounded-lg border border-border bg-card/90 p-5 shadow-[var(--shadow-card)]">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-              <div>
-                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-                  <Plus className="h-3.5 w-3.5" />
-                  Agregar
-                </div>
-                <Label>Noticia publicada</Label>
-                {availableArticles.length > 0 ? (
-                  <Select value={articleToAddId} onValueChange={setArticleToAddId}>
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Selecciona una noticia" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableArticles.map((article) => (
-                        <SelectItem key={article.id} value={article.id}>
-                          {article.headline}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="mt-2 rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-                    No hay más noticias publicadas disponibles para agregar a Instagram.
-                  </div>
-                )}
-              </div>
-              <Button onClick={() => void handleAddToInstagram()} disabled={!articleToAddId || availableArticles.length === 0}>
-                <Instagram className="mr-2 h-4 w-4" />
-                Agregar a stories
-              </Button>
+        <section>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+              <ListOrdered className="h-3.5 w-3.5" />
+              Stories
             </div>
-          </section>
+            <Badge variant="outline">{instagramPendingArticles.length}</Badge>
+          </div>
 
-          <section className="rounded-lg border border-border bg-card/90 p-5 shadow-[var(--shadow-card)]">
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-                  <ListOrdered className="h-3.5 w-3.5" />
-                  Stories
-                </div>
-                <h2 className="mt-3 text-xl font-display font-bold">Listas para descargar</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Las pendientes ya aparecen con preview, texto editable y descarga directa.
-                </p>
-              </div>
-              <Badge variant="outline">{instagramPendingArticles.length}</Badge>
-            </div>
+          <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+            {instagramPendingArticles.map((article, index) => {
+              const draft = storyDrafts[article.id] ?? getDefaultStoryDraft(article);
+              const story = generatedStories[article.id];
+              const isGenerating = Boolean(generatingStoryIds[article.id]);
+              const storyLink = getArticleStoryUrl(article.slug);
 
-            <div className="grid gap-4">
-              {instagramPendingArticles.map((article, index) => {
-                const draft = storyDrafts[article.id] ?? getDefaultStoryDraft(article);
-                const story = generatedStories[article.id];
-                const isGenerating = Boolean(generatingStoryIds[article.id]);
-                const storyLink = getArticleStoryUrl(article.slug);
-
-                return (
-                  <article key={article.id} className="rounded-lg border border-border bg-background/50 p-4">
-                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              return (
+                <article key={article.id} className="rounded-lg border border-border bg-card/90 p-3 shadow-[var(--shadow-card)]">
+                    <div className="mb-3 flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <Badge variant="outline">Orden {index + 1}</Badge>
-                          <Badge
-                            variant="outline"
-                            className={
-                              story
-                                ? story.usedArticleImage
-                                  ? "border-primary/25 bg-primary/10 text-primary"
-                                  : "border-muted-foreground/20 bg-muted/50"
-                                : "border-muted-foreground/20 bg-muted/50"
-                            }
-                          >
-                            {story ? (story.usedArticleImage ? "Imagen original" : "Fondo editorial") : "Generando"}
-                          </Badge>
-                          <span>1080 x 1920</span>
-                          {article.published_at && (
-                            <span>{format(parseDateValue(article.published_at), "d MMM yyyy", { locale: es })}</span>
-                          )}
-                        </div>
-                        <h3 className="mt-2 line-clamp-2 text-lg font-display font-bold">{article.headline}</h3>
+                        <Badge variant="outline">Orden {index + 1}</Badge>
+                        <h3 className="mt-2 line-clamp-2 text-sm font-semibold leading-snug text-foreground">{article.headline}</h3>
                       </div>
 
                       <div className="flex shrink-0 items-center gap-1">
@@ -689,9 +571,9 @@ export default function AdminNoticiasInstagram() {
                       </div>
                     </div>
 
-                    <div className="grid gap-5 xl:grid-cols-[220px_minmax(0,1fr)] 2xl:grid-cols-[260px_minmax(0,1fr)]">
-                      <div className="mx-auto w-full max-w-[220px] 2xl:max-w-[260px]">
-                        <div className="relative aspect-[9/16] overflow-hidden rounded-lg border border-white/10 bg-[#09070d] shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
+                    <div className="grid grid-cols-[118px_minmax(0,1fr)] gap-3 sm:grid-cols-[136px_minmax(0,1fr)]">
+                      <div className="min-w-0">
+                        <div className="relative aspect-[9/16] overflow-hidden rounded-md border border-white/10 bg-[#09070d] shadow-[0_12px_28px_rgba(0,0,0,0.28)]">
                           {story ? (
                             <img
                               src={story.url}
@@ -704,164 +586,126 @@ export default function AdminNoticiasInstagram() {
                             </div>
                           )}
                         </div>
-                        <p className="mt-2 truncate text-center text-xs text-muted-foreground">
-                          {story ? story.fileName : "Se genera sola al cargar."}
-                        </p>
-                      </div>
 
-                      <div className="min-w-0 space-y-3">
-                        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                          <div>
-                            <Label>Titular</Label>
-                            <Textarea
-                              className="mt-2 min-h-[88px]"
-                              rows={3}
-                              value={draft.headline}
-                              onChange={(event) => handleStoryDraftChange(article, "headline", event.target.value)}
-                              placeholder="Titular para la story"
-                            />
-                          </div>
-
-                          <div>
-                            <Label>Resumen</Label>
-                            <Textarea
-                              className="mt-2 min-h-[88px]"
-                              rows={3}
-                              value={draft.summary}
-                              onChange={(event) => handleStoryDraftChange(article, "summary", event.target.value)}
-                              placeholder="Resumen breve"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <Label>Conceptos</Label>
-                          <Input
-                            className="mt-2"
-                            value={draft.conceptsText}
-                            onChange={(event) => handleStoryDraftChange(article, "conceptsText", event.target.value)}
-                            placeholder="Ej: WSOP, Montevideo, Main Event"
-                          />
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          <Button onClick={() => handleDownloadStory(story)} disabled={!story || isGenerating}>
+                        <div className="mt-2 grid gap-2">
+                          <Button size="sm" onClick={() => handleDownloadStory(story)} disabled={!story || isGenerating}>
                             <Download className="mr-2 h-4 w-4" />
-                            Descargar PNG
+                            Descargar
                           </Button>
                           <Button
+                            size="sm"
                             variant="outline"
                             onClick={() => void generateStoryImage(article, draft)}
                             disabled={isGenerating}
                           >
                             <Instagram className="mr-2 h-4 w-4" />
-                            {isGenerating ? "Actualizando..." : "Actualizar"}
+                            {isGenerating ? "Actualizando" : "Actualizar"}
                           </Button>
-                          <Button variant="outline" onClick={() => void handleCopyStoryCaption(article, draft)}>
-                            <Copy className="mr-2 h-4 w-4" />
-                            Caption
-                          </Button>
-                          <Button variant="outline" onClick={() => void handleCopyStoryLink(article)}>
-                            <Link2 className="mr-2 h-4 w-4" />
-                            Link
-                          </Button>
-                          <Button variant="outline" onClick={() => void handleSetInstagramPublished(article, true)}>
+                          <Button size="sm" variant="outline" onClick={() => void handleSetInstagramPublished(article, true)}>
                             <CheckCircle2 className="mr-2 h-4 w-4" />
                             Publicada
                           </Button>
-                          <Button variant="ghost" onClick={() => resetStoryDraft(article)}>
-                            <RotateCcw className="mr-2 h-4 w-4" />
-                            Restaurar
+                        </div>
+
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8"
+                            onClick={() => void handleCopyStoryCaption(article, draft)}
+                            title="Copiar caption"
+                          >
+                            <Copy className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" asChild>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8"
+                            onClick={() => void handleCopyStoryLink(article)}
+                            title="Copiar link"
+                          >
+                            <Link2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            onClick={() => resetStoryDraft(article)}
+                            title="Restaurar"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" asChild title="Ver noticia">
                             <a href={storyLink} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="mr-2 h-4 w-4" />
-                              Ver noticia
+                              <ExternalLink className="h-4 w-4" />
                             </a>
                           </Button>
                         </div>
                       </div>
-                    </div>
-                  </article>
-                );
-              })}
 
-              {instagramPendingArticles.length === 0 && (
-                <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-                  No hay noticias pendientes para Instagram.
-                </div>
-              )}
-            </div>
-          </section>
+                      <div className="min-w-0 space-y-2">
+                        <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+                          <Badge
+                            variant="outline"
+                            className={
+                              story
+                                ? story.usedArticleImage
+                                  ? "border-primary/25 bg-primary/10 text-primary"
+                                  : "border-muted-foreground/20 bg-muted/50"
+                                : "border-muted-foreground/20 bg-muted/50"
+                            }
+                          >
+                            {story ? (story.usedArticleImage ? "Original" : "Editorial") : "Generando"}
+                          </Badge>
+                          {article.published_at && (
+                            <span>{format(parseDateValue(article.published_at), "d MMM yyyy", { locale: es })}</span>
+                          )}
+                        </div>
 
-          <section className="rounded-lg border border-border bg-card/90 p-5 shadow-[var(--shadow-card)]">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-muted-foreground/20 bg-muted/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Historial
-                </div>
-                <h2 className="mt-3 text-xl font-display font-bold">Ya publicadas</h2>
-              </div>
-              <Badge variant="outline">{instagramPublishedArticles.length}</Badge>
-            </div>
+                        <div>
+                          <Label className="text-xs">Titular</Label>
+                          <Textarea
+                            className="mt-1 min-h-[58px] resize-none text-sm"
+                            rows={2}
+                            value={draft.headline}
+                            onChange={(event) => handleStoryDraftChange(article, "headline", event.target.value)}
+                            placeholder="Titular"
+                          />
+                        </div>
 
-            <div className="grid gap-3 xl:grid-cols-2">
-              {instagramPublishedArticles.map((article, index) => (
-                <div key={article.id} className="rounded-lg border border-border bg-background/50 px-3 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium text-foreground line-clamp-2">{article.headline}</p>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="outline">Orden {index + 1}</Badge>
-                        {article.published_at && (
-                          <span>{format(parseDateValue(article.published_at), "d MMM yyyy", { locale: es })}</span>
-                        )}
+                        <div>
+                          <Label className="text-xs">Resumen</Label>
+                          <Textarea
+                            className="mt-1 min-h-[58px] resize-none text-sm"
+                            rows={2}
+                            value={draft.summary}
+                            onChange={(event) => handleStoryDraftChange(article, "summary", event.target.value)}
+                            placeholder="Resumen"
+                          />
+                        </div>
+
+                        <div>
+                          <Label className="text-xs">Conceptos</Label>
+                          <Input
+                            className="mt-1 h-8 text-sm"
+                            value={draft.conceptsText}
+                            onChange={(event) => handleStoryDraftChange(article, "conceptsText", event.target.value)}
+                            placeholder="WSOP, Montevideo"
+                          />
+                        </div>
                       </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => void handleMoveInstagramArticle(article, -1)}
-                        disabled={index === 0}
-                        title="Subir"
-                      >
-                        <ArrowUp className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => void handleMoveInstagramArticle(article, 1)}
-                        disabled={index === instagramPublishedArticles.length - 1}
-                        title="Bajar"
-                      >
-                        <ArrowDown className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                </article>
+              );
+            })}
 
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => void handleSetInstagramPublished(article, false)}>
-                      <RotateCcw className="mr-2 h-4 w-4" />
-                      Volver a pendientes
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => void handleToggleInstagramSelection(article)}>
-                      <X className="mr-2 h-4 w-4" />
-                      Quitar
-                    </Button>
-                  </div>
-                </div>
-              ))}
-
-              {instagramPublishedArticles.length === 0 && (
-                <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground xl:col-span-2">
-                  Todavía no marcaste noticias como publicadas en Instagram.
-                </div>
-              )}
-            </div>
-          </section>
-        </div>
+            {instagramPendingArticles.length === 0 && (
+              <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground lg:col-span-2 2xl:col-span-3">
+                No hay noticias pendientes para Instagram.
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
