@@ -24,6 +24,20 @@ interface SupportMessage {
   thread_status: ThreadStatus;
 }
 
+interface SupportChatRpcError {
+  message: string;
+  code?: string;
+}
+
+interface SupportChatRpcResult<T> {
+  data: T | null;
+  error: SupportChatRpcError | null;
+}
+
+interface SupportChatRpcClient {
+  rpc<T>(functionName: string, args?: Record<string, unknown>): Promise<SupportChatRpcResult<T>>;
+}
+
 interface PersistedSupportSession {
   threadId: string;
   visitorToken: string;
@@ -32,7 +46,24 @@ interface PersistedSupportSession {
   phone: string;
 }
 
+interface AutomatedSupportReplyRequest {
+  threadId: string;
+  visitorToken: string;
+  name: string;
+  email: string;
+  phone: string;
+  message: string;
+}
+
+interface AutomatedSupportReplyResponse {
+  reply?: string;
+  messageId?: string | null;
+  error?: string;
+  details?: string;
+}
+
 const SUPPORT_SESSION_KEY = "support_chat_session_v3";
+const supportChatRpcClient = supabase as unknown as SupportChatRpcClient;
 
 interface SupportChatWidgetProps {
   triggerVariant?: "floating" | "header" | "hero";
@@ -109,6 +140,28 @@ function renderMessageBody(raw: string) {
   return parts;
 }
 
+async function requestAutomatedSupportReply(payload: AutomatedSupportReplyRequest) {
+  const response = await fetch("/api/support-chat-webhook", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      ...payload,
+      pageUrl: typeof window !== "undefined" ? window.location.href : null,
+      timestamp: new Date().toISOString(),
+    }),
+  });
+
+  const data = (await response.json().catch(() => ({}))) as AutomatedSupportReplyResponse;
+
+  if (!response.ok) {
+    throw new Error(data.details || data.error || "No pudimos procesar la respuesta automatica.");
+  }
+
+  return data;
+}
+
 export function SupportChatWidget({ triggerVariant = "floating", initialOpen = false }: SupportChatWidgetProps) {
   const isMobile = useIsMobile();
   const { toast } = useToast();
@@ -117,6 +170,7 @@ export function SupportChatWidget({ triggerVariant = "floating", initialOpen = f
   const [initializing, setInitializing] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
+  const [automatedReplyPending, setAutomatedReplyPending] = useState(false);
 
   useEffect(() => {
     if (initialOpen) {
@@ -155,13 +209,16 @@ export function SupportChatWidget({ triggerVariant = "floating", initialOpen = f
     setThreadStatus("open");
   }, []);
 
-  const fetchMessages = useCallback(async () => {
-    if (!threadId || !visitorToken) return;
+  const fetchMessages = useCallback(async (targetThreadId?: string | null, targetVisitorToken?: string | null) => {
+    const activeThreadId = targetThreadId ?? threadId;
+    const activeVisitorToken = targetVisitorToken ?? visitorToken;
+
+    if (!activeThreadId || !activeVisitorToken) return;
 
     setLoadingMessages(true);
-    const { data, error } = await (supabase as any).rpc("get_support_thread_messages", {
-      p_thread_id: threadId,
-      p_visitor_token: visitorToken,
+    const { data, error } = await supportChatRpcClient.rpc<SupportMessage[]>("get_support_thread_messages", {
+      p_thread_id: activeThreadId,
+      p_visitor_token: activeVisitorToken,
     });
     setLoadingMessages(false);
 
@@ -226,7 +283,7 @@ export function SupportChatWidget({ triggerVariant = "floating", initialOpen = f
     if (!open) return;
     const container = messagesContainerRef.current;
     if (container) container.scrollTop = container.scrollHeight;
-  }, [messages, open]);
+  }, [automatedReplyPending, messages, open]);
 
   useEffect(() => {
     for (const msg of messages) {
@@ -248,12 +305,16 @@ export function SupportChatWidget({ triggerVariant = "floating", initialOpen = f
     event.preventDefault();
     if (!canCreateThread) return;
 
+    const trimmedFirstMessage = firstMessage.trim();
+
     setSending(true);
-    const { data, error } = await (supabase as any).rpc("create_support_thread_and_message", {
+    const { data, error } = await supportChatRpcClient.rpc<
+      { thread_id: string; visitor_token: string } | { thread_id: string; visitor_token: string }[]
+    >("create_support_thread_and_message", {
       p_name: name.trim(),
       p_email: email.trim(),
       p_phone: phone.trim(),
-      p_message: firstMessage.trim(),
+      p_message: trimmedFirstMessage,
       p_visitor_token: visitorToken,
     });
     setSending(false);
@@ -291,21 +352,44 @@ export function SupportChatWidget({ triggerVariant = "floating", initialOpen = f
 
     toast({
       title: "Chat iniciado",
-      description: "Tu contacto se guardo como lead y un moderador/admin te respondera en breve.",
+      description: "Estamos procesando tu consulta para responderte aca mismo.",
     });
 
-    await fetchMessages();
+    await fetchMessages(row.thread_id, row.visitor_token);
+
+    setAutomatedReplyPending(true);
+    try {
+      await requestAutomatedSupportReply({
+        threadId: row.thread_id,
+        visitorToken: row.visitor_token,
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        message: trimmedFirstMessage,
+      });
+    } catch (replyError) {
+      toast({
+        title: "No pudimos generar la respuesta",
+        description: replyError instanceof Error ? replyError.message : "El equipo va a poder responder desde moderacion.",
+        variant: "destructive",
+      });
+    } finally {
+      setAutomatedReplyPending(false);
+      await fetchMessages(row.thread_id, row.visitor_token);
+    }
   };
 
   const handleSendMessage = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!threadId || !visitorToken || !messageText.trim() || threadStatus === "closed") return;
 
+    const trimmedMessage = messageText.trim();
+
     setSending(true);
-    const { error } = await (supabase as any).rpc("send_support_message_from_visitor", {
+    const { error } = await supportChatRpcClient.rpc<string>("send_support_message_from_visitor", {
       p_thread_id: threadId,
       p_visitor_token: visitorToken,
-      p_message: messageText.trim(),
+      p_message: trimmedMessage,
       p_sender_name: name.trim(),
     });
     setSending(false);
@@ -317,6 +401,27 @@ export function SupportChatWidget({ triggerVariant = "floating", initialOpen = f
 
     setMessageText("");
     await fetchMessages();
+
+    setAutomatedReplyPending(true);
+    try {
+      await requestAutomatedSupportReply({
+        threadId,
+        visitorToken,
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        message: trimmedMessage,
+      });
+    } catch (replyError) {
+      toast({
+        title: "No pudimos generar la respuesta",
+        description: replyError instanceof Error ? replyError.message : "El equipo va a poder responder desde moderacion.",
+        variant: "destructive",
+      });
+    } finally {
+      setAutomatedReplyPending(false);
+      await fetchMessages();
+    }
   };
 
   const renderBody = () => {
@@ -429,6 +534,14 @@ export function SupportChatWidget({ triggerVariant = "floating", initialOpen = f
               </div>
             );
           })}
+          {automatedReplyPending && (
+            <div className="mr-auto max-w-[86%] rounded-2xl border border-border bg-card px-3 py-2 text-sm text-foreground">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Fichas Online
+              </p>
+              <p className="text-muted-foreground">Soporte esta escribiendo...</p>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
 
@@ -440,12 +553,22 @@ export function SupportChatWidget({ triggerVariant = "floating", initialOpen = f
             <Textarea
               value={messageText}
               onChange={(event) => setMessageText(event.target.value.slice(0, 800))}
-              placeholder={threadStatus === "open" ? "Escribe un mensaje" : "Chat cerrado"}
+              placeholder={
+                threadStatus === "open"
+                  ? automatedReplyPending
+                    ? "Esperando respuesta"
+                    : "Escribe un mensaje"
+                  : "Chat cerrado"
+              }
               rows={2}
-              disabled={threadStatus === "closed" || sending}
+              disabled={threadStatus === "closed" || sending || automatedReplyPending}
               className="min-h-[44px] resize-none"
             />
-            <Button type="submit" size="icon" disabled={threadStatus === "closed" || sending || !messageText.trim()}>
+            <Button
+              type="submit"
+              size="icon"
+              disabled={threadStatus === "closed" || sending || automatedReplyPending || !messageText.trim()}
+            >
               <Send className="h-4 w-4" />
             </Button>
           </div>

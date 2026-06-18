@@ -115,6 +115,43 @@ function instagramGiveawayDevPlugin(): Plugin {
   };
 }
 
+function supportChatWebhookDevPlugin(): Plugin {
+  return {
+    name: "support-chat-webhook-api-dev",
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const parsed = new URL(req.url || "/", "http://localhost");
+        if (parsed.pathname !== "/api/support-chat-webhook") return next();
+
+        try {
+          const body = req.method === "GET" || req.method === "HEAD" ? "" : await readDevRequestBody(req);
+          const mod = (await server.ssrLoadModule("/api/support-chat-webhook.ts")) as {
+            default: VercelLikeHandler;
+          };
+          const devReq = Object.assign(req, {
+            query: buildDevQuery(parsed.searchParams),
+            body,
+          }) as DevVercelRequest;
+
+          await mod.default(devReq, adaptDevResponse(res));
+        } catch (error) {
+          if (!res.headersSent) {
+            res.statusCode = 500;
+            res.setHeader("Content-Type", "application/json; charset=utf-8");
+          }
+          if (!res.writableEnded) {
+            res.end(
+              JSON.stringify({
+                error: error instanceof Error ? error.message : "Error inesperado en API local.",
+              }),
+            );
+          }
+        }
+      });
+    },
+  };
+}
+
 function getSingleQueryValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) return value[0];
   return value;
@@ -534,6 +571,7 @@ export default defineConfig(({ mode }) => {
       pdfProxyDevPlugin(),
       imageProxyDevPlugin(),
       linkPreviewDevPlugin(),
+      supportChatWebhookDevPlugin(),
       instagramGiveawayDevPlugin(),
     ].filter(Boolean),
     resolve: {
