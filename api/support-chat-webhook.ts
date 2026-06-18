@@ -2,7 +2,6 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const RECENT_HISTORY_LIMIT = 12;
 const MAX_MESSAGE_CHARS = 2000;
 const N8N_TIMEOUT_MS = 25_000;
 const ENDPOINT_VERSION = "support-chat-n8n-v2";
@@ -20,11 +19,6 @@ interface SupportChatRequestPayload {
 }
 
 interface SupportMessageRow {
-  id?: string;
-  sender_type: "visitor" | "staff";
-  sender_name: string | null;
-  body: string;
-  created_at: string;
   thread_status?: "open" | "closed";
 }
 
@@ -116,18 +110,6 @@ function getSupabaseClient(config: { url: string; serviceRoleKey: string }): Sup
       autoRefreshToken: false,
     },
   });
-}
-
-function normalizeHistory(rows: SupportMessageRow[] | null) {
-  return (rows ?? [])
-    .slice()
-    .reverse()
-    .map((message) => ({
-      role: message.sender_type === "visitor" ? "customer" : "support",
-      name: message.sender_name,
-      message: message.body,
-      createdAt: message.created_at,
-    }));
 }
 
 function extractReply(payload: unknown): string | null {
@@ -280,8 +262,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(409).json({ error: "Chat session is closed" });
   }
 
-  const recentMessages = recentRows.slice(-RECENT_HISTORY_LIMIT);
-
   let n8nResult: Awaited<ReturnType<typeof callN8n>>;
   try {
     n8nResult = await callN8n(webhookUrl, {
@@ -295,7 +275,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       message,
       pageUrl: getOptionalString(body.pageUrl),
       timestamp: getOptionalString(body.timestamp) || new Date().toISOString(),
-      history: normalizeHistory(recentMessages),
     });
   } catch (error) {
     return res.status(502).json({
