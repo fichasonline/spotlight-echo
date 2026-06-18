@@ -19,19 +19,13 @@ interface SupportChatRequestPayload {
   timestamp?: unknown;
 }
 
-interface SupportThreadRow {
-  id: string;
-  visitor_name: string | null;
-  visitor_email: string | null;
-  visitor_phone: string | null;
-  status: "open" | "closed";
-}
-
 interface SupportMessageRow {
+  id?: string;
   sender_type: "visitor" | "staff";
   sender_name: string | null;
   body: string;
   created_at: string;
+  thread_status?: "open" | "closed";
 }
 
 function parseJsonBody(body: unknown): SupportChatRequestPayload {
@@ -234,36 +228,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  const { data: thread, error: threadError } = await supabase
-    .from("support_threads")
-    .select("id, visitor_name, visitor_email, visitor_phone, status")
-    .eq("id", threadId)
-    .eq("visitor_token", visitorToken)
-    .maybeSingle<SupportThreadRow>();
+  const { data: threadMessages, error: threadError } = await supabase.rpc("get_support_thread_messages", {
+    p_thread_id: threadId,
+    p_visitor_token: visitorToken,
+  });
 
   if (threadError) {
-    return res.status(500).json({ error: "Failed to verify chat session", details: threadError.message });
-  }
-
-  if (!thread) {
-    return res.status(404).json({
-      error: "Chat session not found",
+    return res.status(409).json({
+      error: "Chat session could not be verified",
+      details: threadError.message,
       endpointVersion: ENDPOINT_VERSION,
       supabaseRef,
     });
   }
 
-  if (thread.status !== "open") {
+  const recentRows = (Array.isArray(threadMessages) ? threadMessages : []) as SupportMessageRow[];
+  const threadStatus = recentRows.at(-1)?.thread_status ?? "open";
+
+  if (threadStatus !== "open") {
     return res.status(409).json({ error: "Chat session is closed" });
   }
 
-  const { data: recentMessages } = await supabase
-    .from("support_messages")
-    .select("sender_type, sender_name, body, created_at")
-    .eq("thread_id", threadId)
-    .order("created_at", { ascending: false })
-    .limit(RECENT_HISTORY_LIMIT)
-    .returns<SupportMessageRow[]>();
+  const recentMessages = recentRows.slice(-RECENT_HISTORY_LIMIT);
 
   let n8nResult: Awaited<ReturnType<typeof callN8n>>;
   try {
@@ -271,14 +257,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       source: "fichasonline_home_chat",
       threadId,
       contact: {
-        name: getOptionalString(body.name) || thread.visitor_name,
-        email: getOptionalString(body.email) || thread.visitor_email,
-        phone: getOptionalString(body.phone) || thread.visitor_phone,
+        name: getOptionalString(body.name),
+        email: getOptionalString(body.email),
+        phone: getOptionalString(body.phone),
       },
       message,
       pageUrl: getOptionalString(body.pageUrl),
       timestamp: getOptionalString(body.timestamp) || new Date().toISOString(),
-      history: normalizeHistory(recentMessages ?? null),
+      history: normalizeHistory(recentMessages),
     });
   } catch (error) {
     return res.status(502).json({
@@ -313,9 +299,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .single();
 
   if (insertError) {
-    return res.status(500).json({
-      error: "n8n replied, but we could not save the support message",
-      details: insertError.message,
+    return res.status(200).json({
+      reply,
+      messageId: null,
+      createdAt: null,
+      persisted: false,
+      persistenceError: insertError.message,
     });
   }
 
@@ -323,5 +312,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     reply,
     messageId: insertedMessage?.id ?? null,
     createdAt: insertedMessage?.created_at ?? null,
+    persisted: true,
   });
 }

@@ -58,8 +58,10 @@ interface AutomatedSupportReplyRequest {
 interface AutomatedSupportReplyResponse {
   reply?: string;
   messageId?: string | null;
+  persisted?: boolean;
   error?: string;
   details?: string;
+  persistenceError?: string;
 }
 
 const SUPPORT_SESSION_KEY = "support_chat_session_v3";
@@ -207,6 +209,23 @@ export function SupportChatWidget({ triggerVariant = "floating", initialOpen = f
     setVisitorToken(null);
     setMessages([]);
     setThreadStatus("open");
+  }, []);
+
+  const appendLocalAutomatedReply = useCallback((reply: string) => {
+    const cleanReply = reply.trim();
+    if (!cleanReply) return;
+
+    setMessages((currentMessages) => [
+      ...currentMessages,
+      {
+        id: `automated-${Date.now()}`,
+        sender_type: "staff",
+        sender_name: "Fichas Online",
+        body: cleanReply,
+        created_at: new Date().toISOString(),
+        thread_status: "open",
+      },
+    ]);
   }, []);
 
   const fetchMessages = useCallback(async (targetThreadId?: string | null, targetVisitorToken?: string | null) => {
@@ -358,8 +377,9 @@ export function SupportChatWidget({ triggerVariant = "floating", initialOpen = f
     await fetchMessages(row.thread_id, row.visitor_token);
 
     setAutomatedReplyPending(true);
+    let shouldFetchAfterReply = true;
     try {
-      await requestAutomatedSupportReply({
+      const automatedReply = await requestAutomatedSupportReply({
         threadId: row.thread_id,
         visitorToken: row.visitor_token,
         name: name.trim(),
@@ -367,6 +387,11 @@ export function SupportChatWidget({ triggerVariant = "floating", initialOpen = f
         phone: phone.trim(),
         message: trimmedFirstMessage,
       });
+
+      if (automatedReply.reply && !automatedReply.messageId) {
+        appendLocalAutomatedReply(automatedReply.reply);
+        shouldFetchAfterReply = false;
+      }
     } catch (replyError) {
       toast({
         title: "No pudimos generar la respuesta",
@@ -375,7 +400,9 @@ export function SupportChatWidget({ triggerVariant = "floating", initialOpen = f
       });
     } finally {
       setAutomatedReplyPending(false);
-      await fetchMessages(row.thread_id, row.visitor_token);
+      if (shouldFetchAfterReply) {
+        await fetchMessages(row.thread_id, row.visitor_token);
+      }
     }
   };
 
@@ -403,8 +430,9 @@ export function SupportChatWidget({ triggerVariant = "floating", initialOpen = f
     await fetchMessages();
 
     setAutomatedReplyPending(true);
+    let shouldFetchAfterReply = true;
     try {
-      await requestAutomatedSupportReply({
+      const automatedReply = await requestAutomatedSupportReply({
         threadId,
         visitorToken,
         name: name.trim(),
@@ -412,6 +440,11 @@ export function SupportChatWidget({ triggerVariant = "floating", initialOpen = f
         phone: phone.trim(),
         message: trimmedMessage,
       });
+
+      if (automatedReply.reply && !automatedReply.messageId) {
+        appendLocalAutomatedReply(automatedReply.reply);
+        shouldFetchAfterReply = false;
+      }
     } catch (replyError) {
       toast({
         title: "No pudimos generar la respuesta",
@@ -420,7 +453,9 @@ export function SupportChatWidget({ triggerVariant = "floating", initialOpen = f
       });
     } finally {
       setAutomatedReplyPending(false);
-      await fetchMessages();
+      if (shouldFetchAfterReply) {
+        await fetchMessages();
+      }
     }
   };
 
