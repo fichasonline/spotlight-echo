@@ -347,26 +347,63 @@ export default function AdminSorteos() {
                 </div>
 
                 {loadingAction && loadingProgress ? (
-                  <div className="rounded-lg border border-border bg-muted/30 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          Eligiendo ganador al azar...
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {loadingProgress.message || "Leyendo Instagram"}
-                          {typeof loadingProgress.pagesRead === "number"
-                            ? ` · pagina ${loadingProgress.pagesRead}`
-                            : ""}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-display text-2xl font-bold text-foreground">
-                          {loadingProgress.commentsFetched}
-                        </p>
-                        <p className="text-xs text-muted-foreground">comentarios</p>
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-border bg-muted/30 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            Cargando comentarios...
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {loadingProgress.message || "Leyendo Instagram"}
+                            {typeof loadingProgress.pagesRead === "number"
+                              ? ` · pagina ${loadingProgress.pagesRead}`
+                              : ""}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-display text-2xl font-bold text-foreground">
+                            {loadingProgress.commentsFetched}
+                          </p>
+                          <p className="text-xs text-muted-foreground">comentarios</p>
+                        </div>
                       </div>
                     </div>
+
+                    {recentComments.length > 0 ? (
+                      <div className="max-h-96 overflow-y-auto rounded-lg border border-border bg-card">
+                        <div className="space-y-0 divide-y divide-border">
+                          {[...recentComments].reverse().map((comment) => (
+                            <div
+                              key={comment.id}
+                              className="flex gap-3 p-3 hover:bg-muted/30"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="truncate font-medium text-sm">@{comment.username}</p>
+                                  <p className="text-xs text-muted-foreground whitespace-nowrap">
+                                    {comment.timestamp
+                                      ? new Date(comment.timestamp).toLocaleString("es-UY", {
+                                          month: "short",
+                                          day: "2-digit",
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })
+                                      : "-"}
+                                  </p>
+                                </div>
+                                <p className="break-words text-xs text-muted-foreground line-clamp-2 mt-1">
+                                  {comment.text || "-"}
+                                </p>
+                                {comment.likeCount > 0 && (
+                                  <p className="text-xs text-muted-foreground mt-1">❤️ {comment.likeCount}</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </CardContent>
