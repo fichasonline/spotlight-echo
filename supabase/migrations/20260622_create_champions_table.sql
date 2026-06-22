@@ -15,23 +15,27 @@ CREATE TABLE IF NOT EXISTS public.champions (
 ALTER TABLE public.champions ENABLE ROW LEVEL SECURITY;
 
 -- RLS: Anyone can view champions
-CREATE POLICY IF NOT EXISTS "champions_select" ON public.champions
+DROP POLICY IF EXISTS "champions_select" ON public.champions;
+CREATE POLICY "champions_select" ON public.champions
   FOR SELECT USING (true);
 
 -- RLS: Only admin can insert
-CREATE POLICY IF NOT EXISTS "champions_insert" ON public.champions
+DROP POLICY IF EXISTS "champions_insert" ON public.champions;
+CREATE POLICY "champions_insert" ON public.champions
   FOR INSERT WITH CHECK (
     auth.uid() IS NOT NULL AND
     public.has_role(auth.uid(), 'admin'::app_role)
   );
 
 -- RLS: Only admin can update/delete
-CREATE POLICY IF NOT EXISTS "champions_update" ON public.champions
+DROP POLICY IF EXISTS "champions_update" ON public.champions;
+CREATE POLICY "champions_update" ON public.champions
   FOR UPDATE USING (
     public.has_role(auth.uid(), 'admin'::app_role)
   );
 
-CREATE POLICY IF NOT EXISTS "champions_delete" ON public.champions
+DROP POLICY IF EXISTS "champions_delete" ON public.champions;
+CREATE POLICY "champions_delete" ON public.champions
   FOR DELETE USING (
     public.has_role(auth.uid(), 'admin'::app_role)
   );
@@ -40,15 +44,15 @@ CREATE POLICY IF NOT EXISTS "champions_delete" ON public.champions
 INSERT INTO storage.buckets (id, name, public) VALUES ('champions', 'champions', true) ON CONFLICT DO NOTHING;
 
 -- Allow public read access to champion images
+DROP POLICY IF EXISTS "Public champion images" ON storage.objects;
 CREATE POLICY "Public champion images" ON storage.objects
   FOR SELECT USING (bucket_id = 'champions');
 
--- Allow authenticated users with moderator/admin role to upload champion images
+-- Allow authenticated users with admin role to upload champion images
+DROP POLICY IF EXISTS "Moderator champion image uploads" ON storage.objects;
 CREATE POLICY "Moderator champion image uploads" ON storage.objects
   FOR INSERT WITH CHECK (
     bucket_id = 'champions' AND
-    auth.uid() IS NOT NULL AND (
-      public.has_role(auth.uid(), 'admin'::app_role) OR
-      public.has_role(auth.uid(), 'moderator'::app_role)
-    )
+    auth.uid() IS NOT NULL AND
+    public.has_role(auth.uid(), 'admin'::app_role)
   );
