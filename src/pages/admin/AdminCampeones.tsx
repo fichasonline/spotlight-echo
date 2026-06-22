@@ -237,7 +237,7 @@ export default function AdminCampeones() {
   const handleDialogOpenChange = (newOpen: boolean) => {
     setOpen(newOpen);
     if (!newOpen) {
-      setForms([emptyForm]);
+      setForms([JSON.parse(JSON.stringify(emptyForm))]);
       setEditId(null);
     }
   };
