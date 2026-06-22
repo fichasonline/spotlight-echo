@@ -15,31 +15,25 @@ CREATE TABLE IF NOT EXISTS public.champions (
 ALTER TABLE public.champions ENABLE ROW LEVEL SECURITY;
 
 -- RLS: Anyone can view champions
-CREATE POLICY "champions_select" ON public.champions
+CREATE POLICY IF NOT EXISTS "champions_select" ON public.champions
   FOR SELECT USING (true);
 
--- RLS: Only admin/moderator can insert
-CREATE POLICY "champions_insert" ON public.champions
+-- RLS: Only admin can insert
+CREATE POLICY IF NOT EXISTS "champions_insert" ON public.champions
   FOR INSERT WITH CHECK (
-    auth.uid() IS NOT NULL AND (
-      public.has_role(auth.uid(), 'admin'::app_role) OR
-      public.has_role(auth.uid(), 'moderator'::app_role)
-    )
+    auth.uid() IS NOT NULL AND
+    public.has_role(auth.uid(), 'admin'::app_role)
   );
 
--- RLS: Only creator or admin/moderator can update/delete
-CREATE POLICY "champions_update" ON public.champions
+-- RLS: Only admin can update/delete
+CREATE POLICY IF NOT EXISTS "champions_update" ON public.champions
   FOR UPDATE USING (
-    auth.uid() = created_by OR
-    public.has_role(auth.uid(), 'admin'::app_role) OR
-    public.has_role(auth.uid(), 'moderator'::app_role)
+    public.has_role(auth.uid(), 'admin'::app_role)
   );
 
-CREATE POLICY "champions_delete" ON public.champions
+CREATE POLICY IF NOT EXISTS "champions_delete" ON public.champions
   FOR DELETE USING (
-    auth.uid() = created_by OR
-    public.has_role(auth.uid(), 'admin'::app_role) OR
-    public.has_role(auth.uid(), 'moderator'::app_role)
+    public.has_role(auth.uid(), 'admin'::app_role)
   );
 
 -- Storage bucket for champion images (if it doesn't exist)
