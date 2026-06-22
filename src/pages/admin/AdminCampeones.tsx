@@ -19,7 +19,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Plus, Trash2, Pencil, Upload, X } from "lucide-react";
+import { Plus, Trash2, Pencil, X, ExternalLink } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -35,6 +35,7 @@ interface Champion {
   amount: number;
   currency: "UYU" | "USD";
   image_url: string | null;
+  post_url: string | null;
   week_number: number;
   year_week: string;
   created_at: string;
@@ -47,6 +48,7 @@ interface ChampionForm {
   amount: string;
   currency: "UYU" | "USD";
   image_url: string;
+  post_url: string;
 }
 
 function createEmptyForm(): ChampionForm {
@@ -56,6 +58,7 @@ function createEmptyForm(): ChampionForm {
     amount: "",
     currency: "UYU",
     image_url: "",
+    post_url: "",
   };
 }
 
@@ -82,7 +85,7 @@ export default function AdminCampeones() {
     setLoading(true);
     const { data } = await (supabase as any)
       .from("champions")
-      .select("id, name, tournament, amount, currency, image_url, week_number, year_week, created_at, created_by")
+      .select("id, name, tournament, amount, currency, image_url, post_url, week_number, year_week, created_at, created_by")
       .order("year_week", { ascending: false })
       .order("created_at", { ascending: false });
     if (data) setChampions(data);
@@ -156,6 +159,7 @@ export default function AdminCampeones() {
           amount: parseFloat(form.amount),
           currency: form.currency,
           image_url: form.image_url || null,
+          post_url: form.post_url || null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", editId);
@@ -172,6 +176,7 @@ export default function AdminCampeones() {
         amount: parseFloat(f.amount),
         currency: f.currency,
         image_url: f.image_url || null,
+        post_url: f.post_url || null,
         created_by: user?.id,
       }));
 
@@ -198,6 +203,7 @@ export default function AdminCampeones() {
         amount: champion.amount.toString(),
         currency: champion.currency,
         image_url: champion.image_url || "",
+        post_url: champion.post_url || "",
       },
     ]);
     setEditId(champion.id);
@@ -360,6 +366,17 @@ export default function AdminCampeones() {
                         </div>
                       )}
                     </div>
+
+                    <div>
+                      <Label htmlFor={`post-url-${index}`}>Link de la publicación</Label>
+                      <Input
+                        id={`post-url-${index}`}
+                        type="url"
+                        placeholder="https://..."
+                        value={form.post_url}
+                        onChange={(e) => handleFormChange(index, "post_url", e.target.value)}
+                      />
+                    </div>
                   </div>
                 ))}
 
@@ -414,6 +431,17 @@ export default function AdminCampeones() {
                           <div>
                             <div className="font-medium">{champion.name}</div>
                             <div className="text-sm text-gray-500">{champion.tournament}</div>
+                            {champion.post_url && (
+                              <a
+                                href={champion.post_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline mt-0.5"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                Ver publicación
+                              </a>
+                            )}
                           </div>
                         </div>
                       </td>

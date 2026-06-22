@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS public.champions (
   amount DECIMAL(12, 2) NOT NULL,
   currency TEXT NOT NULL CHECK (currency IN ('UYU', 'USD')),
   image_url TEXT,
+  post_url TEXT,
   week_number INT NOT NULL DEFAULT (EXTRACT(WEEK FROM now())::INT),
   year_week TEXT NOT NULL DEFAULT (to_char(now(), 'YYYY-WW')),
   created_by UUID REFERENCES public.profiles(id),
