@@ -35,6 +35,8 @@ interface Champion {
   amount: number;
   currency: "UYU" | "USD";
   image_url: string | null;
+  week_number: number;
+  year_week: string;
   created_at: string;
   created_by: string | null;
 }
@@ -55,6 +57,13 @@ const emptyForm: ChampionForm = {
   image_url: "",
 };
 
+function getWeekInfo() {
+  const now = new Date();
+  const weekNumber = Math.ceil((now.getDate() - now.getDay() + 1) / 7);
+  const year = now.getFullYear();
+  return { weekNumber, year, yearWeek: `${year}-W${weekNumber.toString().padStart(2, '0')}` };
+}
+
 export default function AdminCampeones() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -69,9 +78,10 @@ export default function AdminCampeones() {
 
   const fetchChampions = async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from("champions")
-      .select("*")
+      .select("id, name, tournament, amount, currency, image_url, week_number, year_week, created_at, created_by")
+      .order("year_week", { ascending: false })
       .order("created_at", { ascending: false });
     if (data) setChampions(data);
     setLoading(false);
@@ -154,16 +164,19 @@ export default function AdminCampeones() {
       }
     } else {
       // Insert mode
+      const { yearWeek, weekNumber } = getWeekInfo();
       const toInsert = validForms.map((f) => ({
         name: f.name,
         tournament: f.tournament,
         amount: parseFloat(f.amount),
         currency: f.currency,
         image_url: f.image_url || null,
+        year_week: yearWeek,
+        week_number: weekNumber,
         created_by: user?.id,
       }));
 
-      const { error } = await supabase.from("champions").insert(toInsert);
+      const { error } = await (supabase as any).from("champions").insert(toInsert);
 
       if (error) {
         toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -257,6 +270,11 @@ export default function AdminCampeones() {
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editId ? "Editar Campeón" : "Agregar Campeones"}</DialogTitle>
+                {!editId && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    Semana actual: <span className="font-semibold">{getWeekInfo().yearWeek}</span>
+                  </p>
+                )}
               </DialogHeader>
 
               <div className="space-y-6" onPaste={(e) => handlePaste(e, forms.length > 1 ? 0 : 0)}>
@@ -371,61 +389,64 @@ export default function AdminCampeones() {
           </Dialog>
         </div>
 
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold">Campeón</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold">Torneo</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold">Monto</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold">Fecha</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {champions.map((champion) => (
-                <tr key={champion.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      {champion.image_url && (
-                        <img src={champion.image_url} alt={champion.name} className="w-10 h-10 rounded object-cover" />
-                      )}
-                      <div>
-                        <div className="font-medium">{champion.name}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm">{champion.tournament}</td>
-                  <td className="px-6 py-4 text-sm">
-                    {champion.currency === "USD" ? "$" : "$"} {champion.amount.toLocaleString("es-UY")}
-                    <span className="ml-1 text-gray-500 text-xs">{champion.currency}</span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {format(new Date(champion.created_at), "d 'de' MMMM", { locale: es })}
-                  </td>
-                  <td className="px-6 py-4 text-right space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEdit(champion)}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDeleteTarget(champion)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-6">
+          {Object.entries(
+            champions.reduce((acc, champ) => {
+              const week = champ.year_week || "Sin semana";
+              if (!acc[week]) acc[week] = [];
+              acc[week].push(champ);
+              return acc;
+            }, {} as Record<string, Champion[]>)
+          ).map(([week, weekChampions]) => (
+            <div key={week} className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b">
+                <h3 className="text-lg font-semibold">Semana {week}</h3>
+                <p className="text-sm text-gray-600">{weekChampions.length} campeón{weekChampions.length !== 1 ? "es" : ""}</p>
+              </div>
+              <table className="w-full">
+                <tbody className="divide-y">
+                  {weekChampions.map((champion) => (
+                    <tr key={champion.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          {champion.image_url && (
+                            <img src={champion.image_url} alt={champion.name} className="w-10 h-10 rounded object-cover" />
+                          )}
+                          <div>
+                            <div className="font-medium">{champion.name}</div>
+                            <div className="text-sm text-gray-500">{champion.tournament}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-right font-semibold">
+                        {champion.currency === "USD" ? "$" : "$"} {champion.amount.toLocaleString("es-UY")}
+                        <span className="ml-2 text-gray-500 text-xs">{champion.currency}</span>
+                      </td>
+                      <td className="px-6 py-4 text-right space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(champion)}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeleteTarget(champion)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
           {champions.length === 0 && (
-            <div className="px-6 py-8 text-center text-gray-500">
+            <div className="bg-white rounded-lg shadow px-6 py-8 text-center text-gray-500">
               No hay campeones registrados aún
             </div>
           )}
