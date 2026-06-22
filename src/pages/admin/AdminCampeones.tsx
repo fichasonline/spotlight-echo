@@ -207,6 +207,20 @@ export default function AdminCampeones() {
     setDeletingId(null);
   };
 
+  const handlePaste = async (e: React.ClipboardEvent, formIndex: number) => {
+    const items = e.clipboardData.items;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          await handleImageUpload(file, formIndex);
+        }
+        break;
+      }
+    }
+  };
+
   const handleDialogOpenChange = (newOpen: boolean) => {
     setOpen(newOpen);
     if (!newOpen) {
@@ -245,9 +259,9 @@ export default function AdminCampeones() {
                 <DialogTitle>{editId ? "Editar Campeón" : "Agregar Campeones"}</DialogTitle>
               </DialogHeader>
 
-              <div className="space-y-6">
+              <div className="space-y-6" onPaste={(e) => handlePaste(e, forms.length > 1 ? 0 : 0)}>
                 {forms.map((form, index) => (
-                  <div key={index} className="border rounded-lg p-4 space-y-4 relative">
+                  <div key={index} className="border rounded-lg p-4 space-y-4 relative" onPaste={(e) => handlePaste(e, index)}>
                     {forms.length > 1 && (
                       <button
                         onClick={() => handleRemoveForm(index)}
