@@ -68,7 +68,7 @@ export default function AdminCampeones() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [champions, setChampions] = useState<Champion[]>([]);
-  const [forms, setForms] = useState<ChampionForm[]>([emptyForm]);
+  const [forms, setForms] = useState<ChampionForm[]>([JSON.parse(JSON.stringify(emptyForm))]);
   const [editId, setEditId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Champion | null>(null);
