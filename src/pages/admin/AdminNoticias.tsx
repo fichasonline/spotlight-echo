@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -6,7 +6,6 @@ import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -19,12 +18,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Check, Instagram, Pencil, Plus, Trash2, X } from "lucide-react";
+import {
+  CalendarDays,
+  Check,
+  FileText,
+  Image as ImageIcon,
+  Instagram,
+  Link as LinkIcon,
+  Pencil,
+  Plus,
+  Save,
+  Trash2,
+  X,
+} from "lucide-react";
 import { parseDateValue } from "@/lib/date";
+import { ArticleMarkdown } from "@/components/ArticleMarkdown";
 
 interface Article {
   id: string;
@@ -41,7 +53,9 @@ interface Article {
   instagram_order: number | null;
 }
 
-const emptyForm = { slug: "", headline: "", summary: "", body_markdown: "", image_url: "" };
+const createEmptyForm = () => ({ slug: "", headline: "", summary: "", body_markdown: "", image_url: "" });
+
+type ArticleForm = ReturnType<typeof createEmptyForm>;
 
 function sortInstagramArticles(articles: Article[]) {
   return [...articles].sort((left, right) => {
@@ -56,12 +70,48 @@ function sortInstagramArticles(articles: Article[]) {
   });
 }
 
+type ArticleTextareaProps = {
+  ariaLabel: string;
+  className?: string;
+  minRows?: number;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  value: string;
+};
+
+function ArticleTextarea({ ariaLabel, className, minRows = 1, onChange, placeholder, value }: ArticleTextareaProps) {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    element.style.height = "auto";
+    element.style.height = `${element.scrollHeight}px`;
+  }, [value]);
+
+  return (
+    <textarea
+      ref={ref}
+      aria-label={ariaLabel}
+      rows={minRows}
+      value={value}
+      placeholder={placeholder}
+      onChange={(event) => onChange(event.target.value)}
+      className={[
+        "w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-foreground outline-none",
+        "placeholder:text-muted-foreground/45 focus-visible:ring-0",
+        className,
+      ].join(" ")}
+    />
+  );
+}
+
 export default function AdminNoticias() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [articles, setArticles] = useState<Article[]>([]);
   const [tab, setTab] = useState("needs_review");
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<ArticleForm>(() => createEmptyForm());
   const [editId, setEditId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Article | null>(null);
@@ -88,6 +138,13 @@ export default function AdminNoticias() {
     publishedArticles.filter((article) => article.instagram_selected && article.instagram_published),
   );
   const buildSlug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const editingArticle = editId ? articles.find((article) => article.id === editId) ?? null : null;
+  const previewSlug = form.slug.trim() || buildSlug(form.headline) || "slug-de-la-noticia";
+  const previewDate = editingArticle?.published_at || editingArticle?.created_at || new Date().toISOString();
+  const previewStatus = editingArticle?.status || "needs_review";
+  const updateForm = (field: keyof ArticleForm, value: string) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
 
   const handleSaveArticle = async () => {
     if (!form.headline.trim()) {
@@ -95,15 +152,15 @@ export default function AdminNoticias() {
       return;
     }
 
-    const slug = form.slug || buildSlug(form.headline);
+    const slug = form.slug.trim() || buildSlug(form.headline);
     const payload = {
       slug,
-      summary: form.summary || null,
-      body_markdown: form.body_markdown || null,
+      summary: form.summary.trim() || null,
+      body_markdown: form.body_markdown.trim() || null,
       source_name: null,
       source_url: null,
-      image_url: form.image_url || null,
-      headline: form.headline,
+      image_url: form.image_url.trim() || null,
+      headline: form.headline.trim(),
     };
 
     const { error } = editId
@@ -116,7 +173,7 @@ export default function AdminNoticias() {
     }
 
     setOpen(false);
-    setForm(emptyForm);
+    setForm(createEmptyForm());
     setEditId(null);
     void fetchArticles();
   };
@@ -262,6 +319,11 @@ export default function AdminNoticias() {
     published: "bg-primary/20 text-primary",
     rejected: "bg-destructive/20 text-destructive",
   };
+  const statusLabels: Record<string, string> = {
+    needs_review: "Por revisar",
+    published: "Publicado",
+    rejected: "Rechazado",
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -282,65 +344,201 @@ export default function AdminNoticias() {
               </Link>
             </Button>
 
-            <Dialog
+            <Sheet
               open={open}
               onOpenChange={(nextOpen) => {
                 setOpen(nextOpen);
                 if (!nextOpen) {
-                  setForm(emptyForm);
+                  setForm(createEmptyForm());
                   setEditId(null);
                 }
               }}
             >
-              <DialogTrigger asChild>
-                <Button>
+              <SheetTrigger asChild>
+                <Button
+                  onClick={() => {
+                    setForm(createEmptyForm());
+                    setEditId(null);
+                  }}
+                >
                   <Plus className="mr-1 h-4 w-4" />
                   Nuevo artículo
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>{editId ? "Editar artículo" : "Nuevo artículo"}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-3">
-                  <div>
-                    <Label>Titular</Label>
-                    <Input value={form.headline} onChange={(e) => setForm({ ...form, headline: e.target.value })} />
+              </SheetTrigger>
+              <SheetContent
+                side="bottom"
+                className="inset-x-auto left-1/2 right-auto top-auto h-[calc(100vh-1.5rem)] max-h-[920px] w-[min(1180px,calc(100vw-1rem))] max-w-none -translate-x-1/2 overflow-hidden rounded-t-2xl border border-border bg-background p-0 shadow-2xl sm:max-w-none"
+              >
+                <div className="flex h-full flex-col overflow-hidden">
+                  <SheetHeader className="border-b border-border bg-background/95 px-5 py-4 pr-14 text-left backdrop-blur">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <SheetTitle className="font-display text-2xl">
+                          {editId ? "Editar noticia" : "Nueva noticia"}
+                        </SheetTitle>
+                        <SheetDescription>
+                          Editá sobre una hoja editorial: portada, titular, bajada y cuerpo con vista publicada.
+                        </SheetDescription>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button variant="outline" onClick={() => setOpen(false)}>
+                          Cerrar
+                        </Button>
+                        <Button onClick={handleSaveArticle}>
+                          <Save className="h-4 w-4" />
+                          {editId ? "Guardar cambios" : "Crear artículo"}
+                        </Button>
+                      </div>
+                    </div>
+                  </SheetHeader>
+
+                  <div className="flex-1 overflow-y-auto bg-gradient-to-b from-background via-background to-muted/20">
+                    <div className="grid gap-6 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+                      <article className="mx-auto w-full max-w-3xl pb-10">
+                        <div className="aspect-[21/9] w-full overflow-hidden rounded-lg border border-border bg-card md:aspect-[21/8]">
+                          {form.image_url.trim() ? (
+                            <img
+                              src={form.image_url}
+                              alt={form.headline || "Portada de la noticia"}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full flex-col items-center justify-center gap-2 bg-muted/50 px-6 text-center text-muted-foreground">
+                              <ImageIcon className="h-8 w-8" />
+                              <span className="text-sm">Agregá una URL de portada en el panel derecho.</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-6">
+                          <ArticleTextarea
+                            ariaLabel="Titular"
+                            value={form.headline}
+                            onChange={(value) => updateForm("headline", value)}
+                            placeholder="Titular de la noticia"
+                            className="font-display text-3xl font-bold leading-tight tracking-[0.01em] md:text-4xl"
+                          />
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                          <span className="inline-flex items-center gap-1.5">
+                            <CalendarDays className="h-4 w-4" />
+                            {format(parseDateValue(previewDate), "d MMMM yyyy", { locale: es })}
+                          </span>
+                          <Badge className={statusColors[previewStatus]}>{statusLabels[previewStatus] ?? previewStatus}</Badge>
+                        </div>
+
+                        <div className="mt-8 border-l-2 border-primary pl-4">
+                          <ArticleTextarea
+                            ariaLabel="Resumen"
+                            value={form.summary}
+                            onChange={(value) => updateForm("summary", value)}
+                            placeholder="Bajada o resumen de la noticia"
+                            minRows={2}
+                            className="text-lg italic leading-8 text-foreground/80"
+                          />
+                        </div>
+
+                        <section className="mt-8">
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <span className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                              <FileText className="h-4 w-4" />
+                              Cuerpo del artículo
+                            </span>
+                            <Badge variant="outline">Markdown</Badge>
+                          </div>
+                          <div className="rounded-lg border border-border/70 bg-card/35 p-4">
+                            <ArticleTextarea
+                              ariaLabel="Cuerpo en Markdown"
+                              value={form.body_markdown}
+                              onChange={(value) => updateForm("body_markdown", value)}
+                              placeholder="Escribí el cuerpo de la noticia..."
+                              minRows={10}
+                              className="min-h-[280px] text-base leading-7 text-foreground/90"
+                            />
+                          </div>
+                        </section>
+
+                        {form.body_markdown.trim() && (
+                          <section className="mt-8 border-t border-border pt-8">
+                            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                              Vista publicada
+                            </p>
+                            <ArticleMarkdown imageUrlToOmit={form.image_url}>{form.body_markdown}</ArticleMarkdown>
+                          </section>
+                        )}
+                      </article>
+
+                      <aside className="h-fit rounded-xl border border-border bg-card/70 p-4 shadow-sm lg:sticky lg:top-5">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-primary" />
+                          <h3 className="font-display text-lg font-bold">Ajustes</h3>
+                        </div>
+
+                        <div className="mt-4 space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="article-slug">Slug</Label>
+                            <div className="relative">
+                              <LinkIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                              <Input
+                                id="article-slug"
+                                value={form.slug}
+                                onChange={(event) => updateForm("slug", event.target.value)}
+                                placeholder={buildSlug(form.headline) || "auto-generado"}
+                                className="pl-9"
+                              />
+                            </div>
+                            <p className="break-all text-xs text-muted-foreground">/noticias/{previewSlug}</p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="article-image">URL imagen de portada</Label>
+                            <div className="relative">
+                              <ImageIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                              <Input
+                                id="article-image"
+                                value={form.image_url}
+                                onChange={(event) => updateForm("image_url", event.target.value)}
+                                placeholder="https://..."
+                                className="pl-9"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="rounded-lg border border-border bg-background/60 p-3">
+                            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Fecha visible</p>
+                            <p className="mt-1 font-medium">
+                              {format(parseDateValue(previewDate), "d MMM yyyy", { locale: es })}
+                            </p>
+                          </div>
+
+                          <div className="rounded-lg border border-border bg-background/60 p-3">
+                            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Estado</p>
+                            <Badge className={`mt-2 ${statusColors[previewStatus]}`}>
+                              {statusLabels[previewStatus] ?? previewStatus}
+                            </Badge>
+                          </div>
+
+                          {editingArticle?.status === "published" && (
+                            <Button variant="outline" className="w-full" asChild>
+                              <Link to={`/noticias/${editingArticle.slug}`}>
+                                <LinkIcon className="h-4 w-4" />
+                                Ver publicada
+                              </Link>
+                            </Button>
+                          )}
+
+                          <Button onClick={handleSaveArticle} className="w-full">
+                            <Save className="h-4 w-4" />
+                            {editId ? "Guardar cambios" : "Crear artículo"}
+                          </Button>
+                        </div>
+                      </aside>
+                    </div>
                   </div>
-                  <div>
-                    <Label>Slug (opcional)</Label>
-                    <Input
-                      value={form.slug}
-                      onChange={(e) => setForm({ ...form, slug: e.target.value })}
-                      placeholder="auto-generado"
-                    />
-                  </div>
-                  <div>
-                    <Label>Resumen</Label>
-                    <Textarea value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} rows={2} />
-                  </div>
-                  <div>
-                    <Label>Cuerpo (Markdown)</Label>
-                    <Textarea
-                      value={form.body_markdown}
-                      onChange={(e) => setForm({ ...form, body_markdown: e.target.value })}
-                      rows={6}
-                    />
-                  </div>
-                  <div>
-                    <Label>URL imagen (portada)</Label>
-                    <Input
-                      value={form.image_url}
-                      onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-                      placeholder="https://..."
-                    />
-                  </div>
-                  <Button onClick={handleSaveArticle} className="w-full">
-                    {editId ? "Guardar cambios" : "Crear artículo"}
-                  </Button>
                 </div>
-              </DialogContent>
-            </Dialog>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
 
