@@ -36,7 +36,6 @@ import {
   X,
 } from "lucide-react";
 import { parseDateValue } from "@/lib/date";
-import { ArticleMarkdown } from "@/components/ArticleMarkdown";
 
 interface Article {
   id: string;
@@ -377,7 +376,7 @@ export default function AdminNoticias() {
                           {editId ? "Editar noticia" : "Nueva noticia"}
                         </SheetTitle>
                         <SheetDescription>
-                          Editá sobre una hoja editorial: portada, titular, bajada y cuerpo con vista publicada.
+                          Editá sobre una hoja editorial: portada, titular, bajada y cuerpo en un solo documento.
                         </SheetDescription>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
@@ -440,33 +439,15 @@ export default function AdminNoticias() {
                         </div>
 
                         <section className="mt-8">
-                          <div className="mb-3 flex items-center justify-between gap-3">
-                            <span className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                              <FileText className="h-4 w-4" />
-                              Cuerpo del artículo
-                            </span>
-                            <Badge variant="outline">Markdown</Badge>
-                          </div>
-                          <div className="rounded-lg border border-border/70 bg-card/35 p-4">
-                            <ArticleTextarea
-                              ariaLabel="Cuerpo en Markdown"
-                              value={form.body_markdown}
-                              onChange={(value) => updateForm("body_markdown", value)}
-                              placeholder="Escribí el cuerpo de la noticia..."
-                              minRows={10}
-                              className="min-h-[280px] text-base leading-7 text-foreground/90"
-                            />
-                          </div>
+                          <ArticleTextarea
+                            ariaLabel="Cuerpo del artículo"
+                            value={form.body_markdown}
+                            onChange={(value) => updateForm("body_markdown", value)}
+                            placeholder="Escribí el cuerpo de la noticia..."
+                            minRows={14}
+                            className="min-h-[420px] text-[1.05rem] leading-8 text-foreground/90"
+                          />
                         </section>
-
-                        {form.body_markdown.trim() && (
-                          <section className="mt-8 border-t border-border pt-8">
-                            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                              Vista publicada
-                            </p>
-                            <ArticleMarkdown imageUrlToOmit={form.image_url}>{form.body_markdown}</ArticleMarkdown>
-                          </section>
-                        )}
                       </article>
 
                       <aside className="h-fit rounded-xl border border-border bg-card/70 p-4 shadow-sm lg:sticky lg:top-5">
