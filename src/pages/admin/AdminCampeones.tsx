@@ -49,13 +49,15 @@ interface ChampionForm {
   image_url: string;
 }
 
-const emptyForm: ChampionForm = {
-  name: "",
-  tournament: "",
-  amount: "",
-  currency: "UYU",
-  image_url: "",
-};
+function createEmptyForm(): ChampionForm {
+  return {
+    name: "",
+    tournament: "",
+    amount: "",
+    currency: "UYU",
+    image_url: "",
+  };
+}
 
 function getWeekInfo() {
   const now = new Date();
@@ -68,7 +70,7 @@ export default function AdminCampeones() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [champions, setChampions] = useState<Champion[]>([]);
-  const [forms, setForms] = useState<ChampionForm[]>([JSON.parse(JSON.stringify(emptyForm))]);
+  const [forms, setForms] = useState<ChampionForm[]>([createEmptyForm()]);
   const [editId, setEditId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Champion | null>(null);
@@ -112,27 +114,27 @@ export default function AdminCampeones() {
 
     const { data: publicUrlData } = supabase.storage.from("champions").getPublicUrl(filePath);
 
-    const newForms = [...forms];
-    newForms[formIndex].image_url = publicUrlData.publicUrl;
-    setForms(newForms);
+    setForms((prev) =>
+      prev.map((form, i) => (i === formIndex ? { ...form, image_url: publicUrlData.publicUrl } : form)),
+    );
     setUploadingImage(null);
 
     toast({ title: "Éxito", description: "Imagen subida correctamente" });
   };
 
   const handleAddForm = () => {
-    setForms([...forms, JSON.parse(JSON.stringify(emptyForm))]);
+    setForms((prev) => [...prev, createEmptyForm()]);
   };
 
   const handleRemoveForm = (index: number) => {
-    const newForms = forms.filter((_, i) => i !== index);
-    setForms(newForms.length > 0 ? newForms : [emptyForm]);
+    setForms((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      return next.length > 0 ? next : [createEmptyForm()];
+    });
   };
 
   const handleFormChange = (index: number, field: keyof ChampionForm, value: string) => {
-    const newForms = [...forms];
-    newForms[index][field] = value;
-    setForms(newForms);
+    setForms((prev) => prev.map((form, i) => (i === index ? { ...form, [field]: value } : form)));
   };
 
   const handleSaveChampions = async () => {
@@ -146,7 +148,7 @@ export default function AdminCampeones() {
     if (editId) {
       // Edit mode
       const form = forms[0];
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("champions")
         .update({
           name: form.name,
@@ -182,7 +184,7 @@ export default function AdminCampeones() {
     }
 
     setOpen(false);
-    setForms([emptyForm]);
+    setForms([createEmptyForm()]);
     setEditId(null);
     void fetchChampions();
     toast({ title: "Éxito", description: editId ? "Campeón actualizado" : "Campeones agregados" });
@@ -205,7 +207,7 @@ export default function AdminCampeones() {
   const handleDelete = async (champion: Champion) => {
     setDeletingId(champion.id);
 
-    const { error } = await supabase.from("champions").delete().eq("id", champion.id);
+    const { error } = await (supabase as any).from("champions").delete().eq("id", champion.id);
 
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -234,7 +236,7 @@ export default function AdminCampeones() {
   const handleDialogOpenChange = (newOpen: boolean) => {
     setOpen(newOpen);
     if (!newOpen) {
-      setForms([JSON.parse(JSON.stringify(emptyForm))]);
+      setForms([createEmptyForm()]);
       setEditId(null);
     }
   };
@@ -257,7 +259,7 @@ export default function AdminCampeones() {
           <Dialog open={open} onOpenChange={handleDialogOpenChange}>
             <DialogTrigger asChild>
               <Button onClick={() => {
-                setForms([emptyForm]);
+                setForms([createEmptyForm()]);
                 setEditId(null);
               }}>
                 <Plus className="w-4 h-4 mr-2" />
