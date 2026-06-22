@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { isChatLead, isLandingLead } from "@/lib/support-leads";
-import { Newspaper, Calendar, Flag, Users, MessageCircle, ContactRound, Image, Instagram, Radio, Sparkles, Dice5 } from "lucide-react";
+import { Newspaper, Calendar, Flag, Users, MessageCircle, ContactRound, Image, Instagram, Radio, Sparkles, Dice5, Trophy } from "lucide-react";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -17,11 +17,12 @@ export default function AdminDashboard() {
     instagramPending: 0,
     liveblogs: 0,
     storiesPending: 0,
+    champions: 0,
   });
 
   useEffect(() => {
     const fetch = async () => {
-      const [a, e, r, u, openThreads, allLeads, instagramPending, liveblogs, storiesPending] = await Promise.all([
+      const [a, e, r, u, openThreads, allLeads, instagramPending, liveblogs, storiesPending, champions] = await Promise.all([
         supabase.from("articles").select("id", { count: "exact", head: true }),
         supabase.from("events").select("id", { count: "exact", head: true }),
         supabase.from("reports").select("id", { count: "exact", head: true }).eq("status", "pending"),
@@ -47,6 +48,7 @@ export default function AdminDashboard() {
           .select("id", { count: "exact", head: true })
           .eq("format", "story")
           .in("status", ["needs_approval", "draft"]),
+        (supabase as any).from("champions" as any).select("id", { count: "exact", head: true }),
       ]);
 
       const openLeadIds = new Set(
@@ -70,6 +72,7 @@ export default function AdminDashboard() {
         instagramPending: instagramPending.count ?? 0,
         liveblogs: liveblogs.count ?? 0,
         storiesPending: storiesPending.count ?? 0,
+        champions: champions.count ?? 0,
       });
     };
     fetch();
@@ -88,6 +91,7 @@ export default function AdminDashboard() {
     { label: "Stories en cola", value: stats.storiesPending, icon: Sparkles, to: "/admin/stories", color: "text-primary" },
     { label: "Sorteos IG", value: "IG", icon: Dice5, to: "/admin/sorteos", color: "text-accent" },
     { label: "Banners home", value: 4, icon: Image, to: "/admin/banners", color: "text-primary" },
+    { label: "Campeones", value: stats.champions, icon: Trophy, to: "/admin/campeones", color: "text-accent" },
   ];
 
   return (

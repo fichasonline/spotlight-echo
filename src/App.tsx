@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -10,6 +10,7 @@ import { AgeGate } from "@/components/AgeGate";
 import { ProtectedRoute, AdminRoute, StaffRoute } from "@/components/ProtectedRoute";
 import { RouteSeo } from "@/components/RouteSeo";
 import Footer from "@/components/Footer";
+import { SHOW_FEED } from "@/lib/feature-flags";
 
 const Index = lazy(() => import("./pages/Index"));
 const AuthPage = lazy(() => import("./pages/Auth"));
@@ -17,7 +18,7 @@ const CalendarioPage = lazy(() => import("./pages/Calendario"));
 const EventoDetailPage = lazy(() => import("./pages/EventoDetail"));
 const NoticiasPage = lazy(() => import("./pages/Noticias"));
 const ArticleDetailPage = lazy(() => import("./pages/ArticleDetail"));
-const FeedPage = lazy(() => import("./pages/Feed"));
+const FeedPage = SHOW_FEED ? lazy(() => import("./pages/Feed")) : null;
 const SorteoTvPage = lazy(() => import("./pages/SorteoTv"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminEventos = lazy(() => import("./pages/admin/AdminEventos"));
@@ -31,6 +32,7 @@ const AdminLeads = lazy(() => import("./pages/admin/AdminLeads"));
 const AdminChatLeads = lazy(() => import("./pages/admin/AdminChatLeads"));
 const AdminBanners = lazy(() => import("./pages/admin/AdminBanners"));
 const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
+const AdminCampeones = lazy(() => import("./pages/admin/AdminCampeones"));
 const SalasPage = lazy(() => import("./pages/Salas"));
 const SalaDetailPage = lazy(() => import("./pages/SalaDetail"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -62,9 +64,13 @@ const App = () => (
                   <Route
                     path="/feed"
                     element={
-                      <ProtectedRoute>
-                        <FeedPage />
-                      </ProtectedRoute>
+                      SHOW_FEED && FeedPage ? (
+                        <ProtectedRoute>
+                          <FeedPage />
+                        </ProtectedRoute>
+                      ) : (
+                        <Navigate to="/" replace />
+                      )
                     }
                   />
                   <Route
@@ -160,6 +166,14 @@ const App = () => (
                     element={
                       <AdminRoute>
                         <AdminUsers />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/campeones"
+                    element={
+                      <AdminRoute>
+                        <AdminCampeones />
                       </AdminRoute>
                     }
                   />
