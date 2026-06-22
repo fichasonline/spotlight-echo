@@ -19,11 +19,9 @@ CREATE POLICY "champions_select" ON public.champions
 -- RLS: Only admin/moderator can insert
 CREATE POLICY "champions_insert" ON public.champions
   FOR INSERT WITH CHECK (
-    auth.uid() IS NOT NULL AND
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid()
-      AND role IN ('admin', 'moderator')
+    auth.uid() IS NOT NULL AND (
+      public.has_role(auth.uid(), 'admin'::app_role) OR
+      public.has_role(auth.uid(), 'moderator'::app_role)
     )
   );
 
@@ -31,21 +29,15 @@ CREATE POLICY "champions_insert" ON public.champions
 CREATE POLICY "champions_update" ON public.champions
   FOR UPDATE USING (
     auth.uid() = created_by OR
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid()
-      AND role IN ('admin', 'moderator')
-    )
+    public.has_role(auth.uid(), 'admin'::app_role) OR
+    public.has_role(auth.uid(), 'moderator'::app_role)
   );
 
 CREATE POLICY "champions_delete" ON public.champions
   FOR DELETE USING (
     auth.uid() = created_by OR
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid()
-      AND role IN ('admin', 'moderator')
-    )
+    public.has_role(auth.uid(), 'admin'::app_role) OR
+    public.has_role(auth.uid(), 'moderator'::app_role)
   );
 
 -- Storage bucket for champion images (if it doesn't exist)
@@ -59,10 +51,8 @@ CREATE POLICY "Public champion images" ON storage.objects
 CREATE POLICY "Moderator champion image uploads" ON storage.objects
   FOR INSERT WITH CHECK (
     bucket_id = 'champions' AND
-    auth.uid() IS NOT NULL AND
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid()
-      AND role IN ('admin', 'moderator')
+    auth.uid() IS NOT NULL AND (
+      public.has_role(auth.uid(), 'admin'::app_role) OR
+      public.has_role(auth.uid(), 'moderator'::app_role)
     )
   );
