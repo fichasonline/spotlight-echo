@@ -121,7 +121,7 @@ export default function AdminCampeones() {
   };
 
   const handleAddForm = () => {
-    setForms([...forms, emptyForm]);
+    setForms([...forms, { ...emptyForm }]);
   };
 
   const handleRemoveForm = (index: number) => {
