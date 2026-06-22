@@ -164,15 +164,12 @@ export default function AdminCampeones() {
       }
     } else {
       // Insert mode
-      const { yearWeek, weekNumber } = getWeekInfo();
       const toInsert = validForms.map((f) => ({
         name: f.name,
         tournament: f.tournament,
         amount: parseFloat(f.amount),
         currency: f.currency,
         image_url: f.image_url || null,
-        year_week: yearWeek,
-        week_number: weekNumber,
         created_by: user?.id,
       }));
 
