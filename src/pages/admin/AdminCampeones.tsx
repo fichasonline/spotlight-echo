@@ -141,10 +141,18 @@ export default function AdminCampeones() {
   };
 
   const handleSaveChampions = async () => {
-    const validForms = forms.filter((f) => f.name.trim() && f.tournament.trim() && f.amount.trim());
+    const validForms = forms.filter((f) => {
+      const amount = parseFloat(f.amount);
+      return f.name.trim() && f.tournament.trim() && f.amount.trim() && !isNaN(amount) && amount > 0;
+    });
 
     if (validForms.length === 0) {
-      toast({ title: "Falta información", description: "Completa al menos un campeón con nombre, torneo y monto.", variant: "destructive" });
+      toast({ title: "Falta información", description: "Completa al menos un campeón con nombre, torneo y monto válido (número positivo).", variant: "destructive" });
+      return;
+    }
+
+    if (!user?.id) {
+      toast({ title: "Error", description: "Usuario no autenticado", variant: "destructive" });
       return;
     }
 
@@ -183,7 +191,8 @@ export default function AdminCampeones() {
       const { error } = await (supabase as any).from("champions").insert(toInsert);
 
       if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
+        console.error("Insert error:", error);
+        toast({ title: "Error al guardar", description: error.message || "Error desconocido", variant: "destructive" });
         return;
       }
     }
