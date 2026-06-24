@@ -103,7 +103,7 @@ export default function AdminCampeones() {
     const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
     const filePath = `${fileName}`;
 
-    setUploadingImage(filePath);
+    setUploadingImage(String(formIndex));
 
     const { error: uploadError } = await supabase.storage
       .from("champions")
@@ -353,9 +353,9 @@ export default function AdminCampeones() {
                               void handleImageUpload(file, index);
                             }
                           }}
-                          disabled={uploadingImage === `image-${index}`}
+                          disabled={uploadingImage === String(index)}
                         />
-                        {uploadingImage === `image-${index}` && (
+                        {uploadingImage === String(index) && (
                           <div className="flex items-center text-sm text-gray-500">Subiendo...</div>
                         )}
                       </div>
