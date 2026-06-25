@@ -293,6 +293,23 @@ export default function AdminNoticias() {
     if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
+  const handleImagePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          void handleCoverImageUpload(file);
+        }
+        return;
+      }
+    }
+  };
+
   const handleToggleInstagramSelection = async (article: Article) => {
     if (!article.instagram_selected) {
       const nextOrder = instagramPendingArticles.length + 1;
@@ -523,6 +540,7 @@ export default function AdminNoticias() {
                                 placeholder="https://ejemplo.com/imagen.jpg"
                                 value={form.image_url}
                                 onChange={(event) => updateForm("image_url", event.target.value)}
+                                onPaste={handleImagePaste}
                                 className="text-xs"
                               />
                               {form.image_url.trim() && (
