@@ -36,7 +36,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
     extensions: [
       StarterKit,
       Image.configure({
-        allowBase64: true,
+        allowBase64: false,
         HTMLAttributes: {
           class: "max-w-full h-auto rounded-lg border border-border",
         },
@@ -56,6 +56,22 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
       attributes: {
         class:
           "prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[420px] px-4 py-3 text-base leading-8",
+      },
+      handlePaste(view, event) {
+        const items = event.clipboardData?.items;
+        if (!items) return false;
+
+        for (const item of items) {
+          if (item.type.startsWith("image/")) {
+            event.preventDefault();
+            const file = item.getAsFile();
+            if (file) {
+              void handleImageUpload(file);
+            }
+            return true;
+          }
+        }
+        return false;
       },
     },
   });
