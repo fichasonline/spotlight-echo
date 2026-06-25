@@ -16,7 +16,7 @@ import {
   Undo2,
   Redo2,
 } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -119,6 +119,12 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
       if (linkInputRef.current) linkInputRef.current.value = "";
     }
   };
+
+  useEffect(() => {
+    if (editor && value && editor.getHTML() !== value) {
+      editor.commands.setContent(value, false);
+    }
+  }, [value, editor]);
 
   if (!editor) return null;
 
