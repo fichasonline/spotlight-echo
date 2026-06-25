@@ -512,51 +512,58 @@ export default function AdminNoticias() {
 
                           <div className="space-y-2">
                             <Label htmlFor="article-image">Imagen de portada</Label>
-                            {form.image_url.trim() ? (
-                              <div className="space-y-2">
+                            <div className="space-y-2">
+                              <Input
+                                id="article-image"
+                                type="url"
+                                placeholder="https://ejemplo.com/imagen.jpg"
+                                value={form.image_url}
+                                onChange={(event) => updateForm("image_url", event.target.value)}
+                                className="text-xs"
+                              />
+                              {form.image_url.trim() && (
                                 <div className="rounded-lg overflow-hidden border border-border h-24 bg-muted/50">
                                   <img
                                     src={form.image_url}
                                     alt="Portada"
                                     className="w-full h-full object-cover"
+                                    onError={() => {
+                                      toast({
+                                        title: "Error al cargar imagen",
+                                        description: "La URL de la imagen no es válida.",
+                                        variant: "destructive",
+                                      });
+                                    }}
                                   />
                                 </div>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => imageInputRef.current?.click()}
-                                  disabled={uploading}
-                                  className="w-full"
-                                >
-                                  <Upload className="h-4 w-4 mr-2" />
-                                  {uploading ? "Subiendo..." : "Cambiar imagen"}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => updateForm("image_url", "")}
-                                  className="w-full text-destructive hover:text-destructive"
-                                >
-                                  Eliminar
-                                </Button>
-                              </div>
-                            ) : (
+                              )}
+                            </div>
+                            <div className="flex gap-2">
                               <Button
                                 type="button"
                                 size="sm"
                                 variant="outline"
                                 onClick={() => imageInputRef.current?.click()}
                                 disabled={uploading}
-                                className="w-full"
+                                className="flex-1"
                               >
                                 <Upload className="h-4 w-4 mr-2" />
-                                {uploading ? "Subiendo..." : "Seleccionar imagen"}
+                                {uploading ? "Subiendo..." : "Subir"}
                               </Button>
-                            )}
+                              {form.image_url.trim() && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => updateForm("image_url", "")}
+                                  className="flex-1 text-destructive hover:text-destructive"
+                                >
+                                  Eliminar
+                                </Button>
+                              )}
+                            </div>
                             <p className="text-xs text-muted-foreground">
-                              JPG, PNG o WebP. Máximo 50MB.
+                              Pega una URL directa o sube un archivo (JPG, PNG, WebP. Máximo 50MB).
                             </p>
                           </div>
 
