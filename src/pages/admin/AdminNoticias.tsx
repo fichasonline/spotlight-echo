@@ -37,6 +37,7 @@ import {
   Upload,
 } from "lucide-react";
 import { parseDateValue } from "@/lib/date";
+import { markdownToHtml, isMarkdown } from "@/lib/markdown";
 import { RichTextEditor } from "@/components/RichTextEditor";
 
 interface Article {
@@ -182,11 +183,14 @@ export default function AdminNoticias() {
   };
 
   const handleEdit = (article: Article) => {
+    const bodyContent = article.body_markdown ?? "";
+    const processedBody = isMarkdown(bodyContent) ? markdownToHtml(bodyContent) : bodyContent;
+
     setForm({
       slug: article.slug,
       headline: article.headline,
       summary: article.summary ?? "",
-      body_markdown: article.body_markdown ?? "",
+      body_markdown: processedBody,
       image_url: article.image_url ?? "",
     });
     setEditId(article.id);
