@@ -83,12 +83,21 @@ export default function AdminCampeones() {
 
   const fetchChampions = async () => {
     setLoading(true);
-    const { data } = await (supabase as any)
-      .from("champions")
-      .select("id, name, tournament, amount, currency, image_url, post_url, week_number, year_week, created_at, created_by")
-      .order("year_week", { ascending: false })
-      .order("created_at", { ascending: false });
-    if (data) setChampions(data);
+    try {
+      const { data, error } = await (supabase as any)
+        .from("champions")
+        .select("*")
+        .order("year_week", { ascending: false })
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Fetch error:", error);
+        toast({ title: "Error al cargar", description: error.message, variant: "destructive" });
+      }
+      if (data) setChampions(data);
+    } catch (err) {
+      console.error("Unexpected error:", err);
+    }
     setLoading(false);
   };
 

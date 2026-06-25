@@ -8,6 +8,7 @@ import { ArrowLeft } from "lucide-react";
 import { parseDateValue } from "@/lib/date";
 import { ArticleComments } from "@/components/ArticleComments";
 import { ArticleMarkdown } from "@/components/ArticleMarkdown";
+import { ArticleHTML } from "@/components/ArticleHTML";
 import {
   SITE_NAME,
   SITE_URL,
@@ -191,7 +192,11 @@ export default function ArticleDetailPage() {
         )}
 
         {article.body_markdown && (
-          <ArticleMarkdown imageUrlToOmit={article.image_url}>{article.body_markdown}</ArticleMarkdown>
+          article.body_markdown.includes("<") && article.body_markdown.includes(">") ? (
+            <ArticleHTML>{article.body_markdown}</ArticleHTML>
+          ) : (
+            <ArticleMarkdown imageUrlToOmit={article.image_url}>{article.body_markdown}</ArticleMarkdown>
+          )
         )}
 
         <ArticleComments articleId={article.id} />

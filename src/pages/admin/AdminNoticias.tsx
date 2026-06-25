@@ -34,8 +34,10 @@ import {
   Save,
   Trash2,
   X,
+  Upload,
 } from "lucide-react";
 import { parseDateValue } from "@/lib/date";
+import { RichTextEditor } from "@/components/RichTextEditor";
 
 interface Article {
   id: string;
@@ -115,6 +117,8 @@ export default function AdminNoticias() {
   const [open, setOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Article | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const fetchArticles = async () => {
     const { data } = await supabase
@@ -246,6 +250,43 @@ export default function AdminNoticias() {
     }
 
     return true;
+  };
+
+  const handleCoverImageUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Tipo de archivo inválido",
+        description: "Por favor selecciona una imagen.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploading(true);
+    const fileName = `cover-${Date.now()}-${file.name}`;
+    const { data, error } = await supabase.storage.from("articles").upload(fileName, file);
+
+    if (error) {
+      toast({
+        title: "Error al subir imagen",
+        description: error.message,
+        variant: "destructive",
+      });
+      setUploading(false);
+      return;
+    }
+
+    const { data: publicUrl } = supabase.storage.from("articles").getPublicUrl(data.path);
+    updateForm("image_url", publicUrl.publicUrl);
+    setUploading(false);
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      void handleCoverImageUpload(file);
+    }
+    if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
   const handleToggleInstagramSelection = async (article: Article) => {
@@ -439,13 +480,10 @@ export default function AdminNoticias() {
                         </div>
 
                         <section className="mt-8">
-                          <ArticleTextarea
-                            ariaLabel="Cuerpo del artículo"
+                          <RichTextEditor
                             value={form.body_markdown}
                             onChange={(value) => updateForm("body_markdown", value)}
                             placeholder="Escribí el cuerpo de la noticia..."
-                            minRows={14}
-                            className="min-h-[420px] text-[1.05rem] leading-8 text-foreground/90"
                           />
                         </section>
                       </article>
@@ -473,17 +511,53 @@ export default function AdminNoticias() {
                           </div>
 
                           <div className="space-y-2">
-                            <Label htmlFor="article-image">URL imagen de portada</Label>
-                            <div className="relative">
-                              <ImageIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                              <Input
-                                id="article-image"
-                                value={form.image_url}
-                                onChange={(event) => updateForm("image_url", event.target.value)}
-                                placeholder="https://..."
-                                className="pl-9"
-                              />
-                            </div>
+                            <Label htmlFor="article-image">Imagen de portada</Label>
+                            {form.image_url.trim() ? (
+                              <div className="space-y-2">
+                                <div className="rounded-lg overflow-hidden border border-border h-24 bg-muted/50">
+                                  <img
+                                    src={form.image_url}
+                                    alt="Portada"
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => imageInputRef.current?.click()}
+                                  disabled={uploading}
+                                  className="w-full"
+                                >
+                                  <Upload className="h-4 w-4 mr-2" />
+                                  {uploading ? "Subiendo..." : "Cambiar imagen"}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => updateForm("image_url", "")}
+                                  className="w-full text-destructive hover:text-destructive"
+                                >
+                                  Eliminar
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => imageInputRef.current?.click()}
+                                disabled={uploading}
+                                className="w-full"
+                              >
+                                <Upload className="h-4 w-4 mr-2" />
+                                {uploading ? "Subiendo..." : "Seleccionar imagen"}
+                              </Button>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              JPG, PNG o WebP. Máximo 50MB.
+                            </p>
                           </div>
 
                           <div className="rounded-lg border border-border bg-background/60 p-3">
@@ -634,6 +708,14 @@ export default function AdminNoticias() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageSelect}
+          style={{ display: "none" }}
+        />
       </div>
     </div>
   );
