@@ -15,6 +15,9 @@ import { LazySupportChatWidget } from "@/components/LazySupportChatWidget";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/contexts/ThemeContext";
 
+const DEFAULT_LOGO_URL = "/logo_fichas.png";
+const HOME_LOGO_URL = "/Group%20789.svg";
+
 function getInitial(name: string | null | undefined) {
   const cleanName = name?.trim();
   if (!cleanName) return "U";
@@ -27,6 +30,7 @@ export function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const logoSrc = location.pathname === "/" ? HOME_LOGO_URL : DEFAULT_LOGO_URL;
   const staffLink = isAdmin
     ? { to: "/admin", label: "Admin" }
     : isStaff
@@ -54,7 +58,7 @@ export function Navbar() {
             theme === "light" && "rounded-lg bg-[#1a0f2e] px-2 py-1"
           )}>
             <img
-              src="/logo_fichas.png"
+              src={logoSrc}
               alt="Fichas Online"
               className="h-8 w-auto object-contain drop-shadow-[0_0_14px_hsl(273_66%_66%_/_0.35)] transition-transform duration-300 group-hover:scale-[1.02] md:h-9"
             />
