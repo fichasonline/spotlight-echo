@@ -5,7 +5,7 @@ import { buildAbsoluteUrl, SITE_URL, stripMarkdown, truncateText } from "@/lib/s
 
 const STORY_WIDTH = 1080;
 const STORY_HEIGHT = 1920;
-const STORY_BRAND_LOGO_URL = "/logo_fichas.png";
+const STORY_BRAND_LOGO_URL = "/Group%20789.svg";
 const STORY_VECTOR_URL = "/Vector.png";
 const STORY_STOP_WORDS = new Set([
   "actualidad",
