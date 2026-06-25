@@ -31,7 +31,6 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
   const fileInputRef = useRef<HTMLInputElement>(null);
   const linkInputRef = useRef<HTMLInputElement>(null);
   const linkUrlRef = useRef<string>("");
-  const lastValueRef = useRef<string>("");
 
   const editor = useEditor({
     extensions: [
@@ -128,16 +127,16 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
   };
 
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || !value) return;
 
-    if (value && value !== lastValueRef.current) {
-      lastValueRef.current = value;
+    const currentContent = editor.getHTML().trim();
+    const newContent = value.trim();
+
+    // Solo actualizar si el contenido es significativamente diferente
+    if (currentContent !== newContent && currentContent !== "") {
       editor.commands.setContent(value);
-    } else if (!value && lastValueRef.current) {
-      lastValueRef.current = "";
-      editor.commands.clearContent();
     }
-  }, [value, editor]);
+  }, []);
 
   if (!editor) return null;
 
