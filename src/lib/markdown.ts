@@ -14,12 +14,16 @@ export function markdownToHtml(markdown: string): string {
 export function isMarkdown(content: string): boolean {
   if (!content) return false;
   const trimmed = content.trim();
+  // Si contiene tags HTML, es HTML, no markdown
+  if (trimmed.includes("<")) return false;
+  // Si contiene elementos markdown, es markdown
   return (
     trimmed.includes("**") ||
-    trimmed.includes("_") ||
+    trimmed.includes("__") ||
     trimmed.includes("# ") ||
+    trimmed.includes("## ") ||
     trimmed.includes("- ") ||
-    trimmed.includes("1. ") ||
-    !trimmed.includes("<")
+    trimmed.includes("* ") ||
+    trimmed.includes("1. ")
   );
 }

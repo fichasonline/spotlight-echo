@@ -31,14 +31,21 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
   const fileInputRef = useRef<HTMLInputElement>(null);
   const linkInputRef = useRef<HTMLInputElement>(null);
   const linkUrlRef = useRef<string>("");
+  const lastValueRef = useRef<string>("");
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        paragraph: {
+          HTMLAttributes: {
+            class: "mb-4",
+          },
+        },
+      }),
       Image.configure({
         allowBase64: false,
         HTMLAttributes: {
-          class: "max-w-full h-auto rounded-lg border border-border",
+          class: "max-w-full h-auto rounded-lg border border-border my-4",
         },
       }),
       Link.configure({
@@ -121,8 +128,14 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
   };
 
   useEffect(() => {
-    if (editor && value && editor.getHTML() !== value) {
-      editor.commands.setContent(value, false);
+    if (!editor) return;
+
+    if (value && value !== lastValueRef.current) {
+      lastValueRef.current = value;
+      editor.commands.setContent(value);
+    } else if (!value && lastValueRef.current) {
+      lastValueRef.current = "";
+      editor.commands.clearContent();
     }
   }, [value, editor]);
 
