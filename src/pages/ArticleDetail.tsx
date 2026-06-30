@@ -9,6 +9,7 @@ import { parseDateValue } from "@/lib/date";
 import { ArticleComments } from "@/components/ArticleComments";
 import { ArticleMarkdown } from "@/components/ArticleMarkdown";
 import { ArticleHTML } from "@/components/ArticleHTML";
+import { getArticleImageStyle } from "@/lib/article-image";
 import {
   SITE_NAME,
   SITE_URL,
@@ -27,6 +28,8 @@ interface Article {
   body_markdown: string | null;
   published_at: string | null;
   image_url: string | null;
+  image_position_x: number | null;
+  image_position_y: number | null;
 }
 
 export default function ArticleDetailPage() {
@@ -39,7 +42,7 @@ export default function ArticleDetailPage() {
     setIsLoaded(false);
     supabase
       .from("articles")
-      .select("id, created_at, headline, summary, body_markdown, published_at, image_url")
+      .select("id, created_at, headline, summary, body_markdown, published_at, image_url, image_position_x, image_position_y")
       .eq("slug", slug)
       .eq("status", "published")
       .maybeSingle()
@@ -174,6 +177,7 @@ export default function ArticleDetailPage() {
             <img
               src={article.image_url}
               alt={article.headline}
+              style={getArticleImageStyle(article)}
               className="w-full h-full object-cover"
             />
           </div>

@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { parseDateValue } from "@/lib/date";
+import { getArticleImageStyle } from "@/lib/article-image";
 
 interface Article {
   id: string;
@@ -15,6 +16,8 @@ interface Article {
   created_at: string;
   published_at: string | null;
   image_url: string | null;
+  image_position_x: number | null;
+  image_position_y: number | null;
 }
 
 const PAGE_SIZE = 12;
@@ -27,7 +30,7 @@ export default function NoticiasPage() {
   const fetchArticles = async (p: number) => {
     const { data } = await supabase
       .from("articles")
-      .select("id, slug, headline, summary, created_at, published_at, image_url")
+      .select("id, slug, headline, summary, created_at, published_at, image_url, image_position_x, image_position_y")
       .eq("status", "published")
       .order("published_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
@@ -66,6 +69,7 @@ export default function NoticiasPage() {
                   <img
                     src={a.image_url}
                     alt={a.headline}
+                    style={getArticleImageStyle(a)}
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 group-active:scale-105"
                   />
                 </div>

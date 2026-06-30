@@ -21,6 +21,8 @@ export type Database = {
           created_by: string | null
           headline: string
           id: string
+          image_position_x: number
+          image_position_y: number
           image_url: string | null
           instagram_order: number | null
           instagram_published: boolean
@@ -38,6 +40,8 @@ export type Database = {
           created_by?: string | null
           headline: string
           id?: string
+          image_position_x?: number
+          image_position_y?: number
           image_url?: string | null
           instagram_order?: number | null
           instagram_published?: boolean
@@ -55,6 +59,8 @@ export type Database = {
           created_by?: string | null
           headline?: string
           id?: string
+          image_position_x?: number
+          image_position_y?: number
           image_url?: string | null
           instagram_order?: number | null
           instagram_published?: boolean

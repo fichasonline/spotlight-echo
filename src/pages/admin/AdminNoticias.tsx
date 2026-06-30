@@ -6,6 +6,7 @@ import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -39,6 +40,11 @@ import {
 import { getLocalDateISO, parseDateValue } from "@/lib/date";
 import { markdownToHtml, isMarkdown } from "@/lib/markdown";
 import { RichTextEditor } from "@/components/RichTextEditor";
+import {
+  DEFAULT_ARTICLE_IMAGE_POSITION,
+  clampArticleImagePosition,
+  getArticleImageStyle,
+} from "@/lib/article-image";
 
 interface Article {
   id: string;
@@ -50,6 +56,8 @@ interface Article {
   created_at: string;
   published_at: string | null;
   image_url: string | null;
+  image_position_x: number | null;
+  image_position_y: number | null;
   instagram_selected: boolean;
   instagram_published: boolean;
   instagram_order: number | null;
@@ -61,6 +69,8 @@ const createEmptyForm = () => ({
   summary: "",
   body_markdown: "",
   image_url: "",
+  image_position_x: DEFAULT_ARTICLE_IMAGE_POSITION,
+  image_position_y: DEFAULT_ARTICLE_IMAGE_POSITION,
   published_at: "",
 });
 
@@ -140,7 +150,7 @@ export default function AdminNoticias() {
   const fetchArticles = async () => {
     const { data } = await supabase
       .from("articles")
-      .select("id, slug, headline, summary, body_markdown, status, created_at, published_at, image_url, instagram_selected, instagram_published, instagram_order")
+      .select("id, slug, headline, summary, body_markdown, status, created_at, published_at, image_url, image_position_x, image_position_y, instagram_selected, instagram_published, instagram_order")
       .order("created_at", { ascending: false });
     if (data) setArticles(data);
   };
@@ -166,7 +176,7 @@ export default function AdminNoticias() {
     editingArticle?.created_at ||
     new Date().toISOString();
   const previewStatus = editingArticle?.status || "needs_review";
-  const updateForm = (field: keyof ArticleForm, value: string) => {
+  const updateForm = <Field extends keyof ArticleForm>(field: Field, value: ArticleForm[Field]) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
@@ -184,6 +194,8 @@ export default function AdminNoticias() {
       source_name: null,
       source_url: null,
       image_url: form.image_url.trim() || null,
+      image_position_x: clampArticleImagePosition(form.image_position_x),
+      image_position_y: clampArticleImagePosition(form.image_position_y),
       headline: form.headline.trim(),
       published_at: toPublishedAtTimestamp(form.published_at),
     };
@@ -213,6 +225,8 @@ export default function AdminNoticias() {
       summary: article.summary ?? "",
       body_markdown: processedBody,
       image_url: article.image_url ?? "",
+      image_position_x: clampArticleImagePosition(article.image_position_x),
+      image_position_y: clampArticleImagePosition(article.image_position_y),
       published_at: toDateInputValue(article.published_at || (article.status === "published" ? article.created_at : null)),
     });
     setEditId(article.id);
@@ -453,6 +467,8 @@ export default function AdminNoticias() {
               </SheetTrigger>
               <SheetContent
                 side="bottom"
+                onPointerDownOutside={(event) => event.preventDefault()}
+                onInteractOutside={(event) => event.preventDefault()}
                 className="inset-x-auto left-1/2 right-auto top-auto h-[calc(100vh-1.5rem)] max-h-[920px] w-[min(1180px,calc(100vw-1rem))] max-w-none -translate-x-1/2 overflow-hidden rounded-t-2xl border border-border bg-background p-0 shadow-2xl sm:max-w-none"
               >
                 <div className="flex h-full flex-col overflow-hidden">
@@ -486,6 +502,7 @@ export default function AdminNoticias() {
                             <img
                               src={form.image_url}
                               alt={form.headline || "Portada de la noticia"}
+                              style={getArticleImageStyle(form)}
                               className="h-full w-full object-cover"
                             />
                           ) : (
@@ -573,6 +590,7 @@ export default function AdminNoticias() {
                                   <img
                                     src={form.image_url}
                                     alt="Portada"
+                                    style={getArticleImageStyle(form)}
                                     className="w-full h-full object-cover"
                                     onError={() => {
                                       toast({
@@ -613,6 +631,66 @@ export default function AdminNoticias() {
                               Pega una URL directa o sube un archivo (JPG, PNG, WebP. Máximo 50MB).
                             </p>
                           </div>
+
+                          {form.image_url.trim() && (
+                            <div className="space-y-4 rounded-lg border border-border bg-background/60 p-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-medium">Encuadre de portada</p>
+                                  <p className="text-xs text-muted-foreground">Mové la imagen hasta que el corte quede bien.</p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    updateForm("image_position_x", DEFAULT_ARTICLE_IMAGE_POSITION);
+                                    updateForm("image_position_y", DEFAULT_ARTICLE_IMAGE_POSITION);
+                                  }}
+                                >
+                                  Centrar
+                                </Button>
+                              </div>
+
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                  <span>Horizontal</span>
+                                  <span>{clampArticleImagePosition(form.image_position_x)}%</span>
+                                </div>
+                                <Slider
+                                  value={[clampArticleImagePosition(form.image_position_x)]}
+                                  min={0}
+                                  max={100}
+                                  step={1}
+                                  onValueChange={([value]) => updateForm("image_position_x", value)}
+                                  aria-label="Encuadre horizontal de portada"
+                                />
+                                <div className="flex justify-between text-[11px] text-muted-foreground">
+                                  <span>Izquierda</span>
+                                  <span>Derecha</span>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                  <span>Vertical</span>
+                                  <span>{clampArticleImagePosition(form.image_position_y)}%</span>
+                                </div>
+                                <Slider
+                                  value={[clampArticleImagePosition(form.image_position_y)]}
+                                  min={0}
+                                  max={100}
+                                  step={1}
+                                  onValueChange={([value]) => updateForm("image_position_y", value)}
+                                  aria-label="Encuadre vertical de portada"
+                                />
+                                <div className="flex justify-between text-[11px] text-muted-foreground">
+                                  <span>Arriba</span>
+                                  <span>Abajo</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
                           <div className="rounded-lg border border-border bg-background/60 p-3">
                             <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Fecha visible</p>

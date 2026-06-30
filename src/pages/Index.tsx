@@ -15,6 +15,7 @@ import { Calendar, Newspaper, MessageSquare, ArrowRight, Send, Instagram, Copy, 
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getLocalDateISO, parseDateValue } from "@/lib/date";
+import { getArticleImageStyle } from "@/lib/article-image";
 
 const NEWS_CAROUSEL_LIMIT = 10;
 
@@ -25,6 +26,8 @@ interface Article {
   headline: string;
   summary: string | null;
   image_url: string | null;
+  image_position_x: number | null;
+  image_position_y: number | null;
   created_at: string;
   published_at: string | null;
 }
@@ -454,7 +457,7 @@ export default function HomePage() {
       const today = getLocalDateISO();
       const artResPromise = supabase
         .from("articles")
-        .select("id, slug, headline, summary, image_url, created_at, published_at")
+        .select("id, slug, headline, summary, image_url, image_position_x, image_position_y, created_at, published_at")
         .eq("status", "published")
         .order("published_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
@@ -698,6 +701,7 @@ export default function HomePage() {
                       <BannerMedia
                         src={a.image_url}
                         alt={a.headline}
+                        style={getArticleImageStyle(a)}
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
                         loading="lazy"
                       />
