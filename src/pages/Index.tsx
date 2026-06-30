@@ -25,6 +25,7 @@ interface Article {
   headline: string;
   summary: string | null;
   image_url: string | null;
+  created_at: string;
   published_at: string | null;
 }
 
@@ -453,9 +454,10 @@ export default function HomePage() {
       const today = getLocalDateISO();
       const artResPromise = supabase
         .from("articles")
-        .select("id, slug, headline, summary, image_url, published_at")
+        .select("id, slug, headline, summary, image_url, created_at, published_at")
         .eq("status", "published")
-        .order("published_at", { ascending: false })
+        .order("published_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
         .limit(NEWS_CAROUSEL_LIMIT);
 
       // News carousel should render as soon as this single query resolves.
@@ -708,11 +710,9 @@ export default function HomePage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
 
                   {/* Date badge top-right */}
-                  {a.published_at && (
-                    <span className="absolute right-4 top-4 z-10 rounded-full bg-black/50 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-white/80 backdrop-blur-sm">
-                      {format(parseDateValue(a.published_at), "d MMM yyyy", { locale: es })}
-                    </span>
-                  )}
+                  <span className="absolute right-4 top-4 z-10 rounded-full bg-black/50 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-white/80 backdrop-blur-sm">
+                    {format(parseDateValue(a.published_at || a.created_at), "d MMM yyyy", { locale: es })}
+                  </span>
 
                   {/* Text at bottom */}
                   <div className="relative z-10 mt-auto p-5">

@@ -12,6 +12,7 @@ interface Article {
   slug: string;
   headline: string;
   summary: string | null;
+  created_at: string;
   published_at: string | null;
   image_url: string | null;
 }
@@ -26,9 +27,10 @@ export default function NoticiasPage() {
   const fetchArticles = async (p: number) => {
     const { data } = await supabase
       .from("articles")
-      .select("id, slug, headline, summary, published_at, image_url")
+      .select("id, slug, headline, summary, created_at, published_at, image_url")
       .eq("status", "published")
-      .order("published_at", { ascending: false })
+      .order("published_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
       .range(p * PAGE_SIZE, (p + 1) * PAGE_SIZE - 1);
     if (data) {
       if (p === 0) setArticles(data);
@@ -74,7 +76,7 @@ export default function NoticiasPage() {
                 </h3>
                 {a.summary && <p className="text-sm text-muted-foreground line-clamp-3 mb-3">{a.summary}</p>}
                 <div className="flex items-center gap-2 text-xs text-muted-foreground mt-auto">
-                  {a.published_at && <span>{format(parseDateValue(a.published_at), "d MMM yyyy", { locale: es })}</span>}
+                  <span>{format(parseDateValue(a.published_at || a.created_at), "d MMM yyyy", { locale: es })}</span>
                 </div>
               </div>
             </Link>

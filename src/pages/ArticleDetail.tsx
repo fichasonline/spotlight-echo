@@ -182,9 +182,7 @@ export default function ArticleDetailPage() {
         <h1 className="text-3xl md:text-4xl font-display font-bold mb-4">{article.headline}</h1>
 
         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-8">
-          {article.published_at && (
-            <span>{format(parseDateValue(article.published_at), "d MMMM yyyy", { locale: es })}</span>
-          )}
+          <span>{format(parseDateValue(article.published_at || article.created_at), "d MMMM yyyy", { locale: es })}</span>
         </div>
 
         {article.summary && (

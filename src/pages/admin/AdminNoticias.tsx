@@ -36,7 +36,7 @@ import {
   X,
   Upload,
 } from "lucide-react";
-import { parseDateValue } from "@/lib/date";
+import { getLocalDateISO, parseDateValue } from "@/lib/date";
 import { markdownToHtml, isMarkdown } from "@/lib/markdown";
 import { RichTextEditor } from "@/components/RichTextEditor";
 
@@ -55,7 +55,14 @@ interface Article {
   instagram_order: number | null;
 }
 
-const createEmptyForm = () => ({ slug: "", headline: "", summary: "", body_markdown: "", image_url: "" });
+const createEmptyForm = () => ({
+  slug: "",
+  headline: "",
+  summary: "",
+  body_markdown: "",
+  image_url: "",
+  published_at: "",
+});
 
 type ArticleForm = ReturnType<typeof createEmptyForm>;
 
@@ -70,6 +77,15 @@ function sortInstagramArticles(articles: Article[]) {
     const rightTime = parseDateValue(right.published_at || right.created_at).getTime();
     return rightTime - leftTime;
   });
+}
+
+function toDateInputValue(value: string | null | undefined) {
+  if (!value) return "";
+  return getLocalDateISO(parseDateValue(value));
+}
+
+function toPublishedAtTimestamp(value: string) {
+  return value ? `${value}T12:00:00.000Z` : null;
 }
 
 type ArticleTextareaProps = {
@@ -144,7 +160,11 @@ export default function AdminNoticias() {
   const buildSlug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   const editingArticle = editId ? articles.find((article) => article.id === editId) ?? null : null;
   const previewSlug = form.slug.trim() || buildSlug(form.headline) || "slug-de-la-noticia";
-  const previewDate = editingArticle?.published_at || editingArticle?.created_at || new Date().toISOString();
+  const previewDate =
+    toPublishedAtTimestamp(form.published_at) ||
+    editingArticle?.published_at ||
+    editingArticle?.created_at ||
+    new Date().toISOString();
   const previewStatus = editingArticle?.status || "needs_review";
   const updateForm = (field: keyof ArticleForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -165,6 +185,7 @@ export default function AdminNoticias() {
       source_url: null,
       image_url: form.image_url.trim() || null,
       headline: form.headline.trim(),
+      published_at: toPublishedAtTimestamp(form.published_at),
     };
 
     const { error } = editId
@@ -192,13 +213,17 @@ export default function AdminNoticias() {
       summary: article.summary ?? "",
       body_markdown: processedBody,
       image_url: article.image_url ?? "",
+      published_at: toDateInputValue(article.published_at || (article.status === "published" ? article.created_at : null)),
     });
     setEditId(article.id);
     setOpen(true);
   };
 
-  const handleApprove = async (id: string) => {
-    await supabase.from("articles").update({ status: "published", published_at: new Date().toISOString() }).eq("id", id);
+  const handleApprove = async (article: Article) => {
+    await supabase
+      .from("articles")
+      .update({ status: "published", published_at: article.published_at || new Date().toISOString() })
+      .eq("id", article.id);
     void fetchArticles();
   };
 
@@ -596,6 +621,19 @@ export default function AdminNoticias() {
                             </p>
                           </div>
 
+                          <div className="space-y-2">
+                            <Label htmlFor="article-published-at">Fecha de publicación</Label>
+                            <Input
+                              id="article-published-at"
+                              type="date"
+                              value={form.published_at}
+                              onChange={(event) => updateForm("published_at", event.target.value)}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Esta fecha se muestra en las tarjetas, la noticia y los feeds SEO.
+                            </p>
+                          </div>
+
                           <div className="rounded-lg border border-border bg-background/60 p-3">
                             <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Estado</p>
                             <Badge className={`mt-2 ${statusColors[previewStatus]}`}>
@@ -656,9 +694,9 @@ export default function AdminNoticias() {
                       {article.status === "published" && article.instagram_selected && article.instagram_order !== null && (
                         <Badge variant="outline">IG #{article.instagram_order}</Badge>
                       )}
-                      {article.published_at && (
+                      {(article.published_at || article.created_at) && (
                         <span className="text-xs text-muted-foreground">
-                          {format(parseDateValue(article.published_at), "d MMM yyyy", { locale: es })}
+                          {format(parseDateValue(article.published_at || article.created_at), "d MMM yyyy", { locale: es })}
                         </span>
                       )}
                     </div>
@@ -678,7 +716,7 @@ export default function AdminNoticias() {
                       <Pencil className="h-4 w-4" />
                     </Button>
                     {article.status === "needs_review" && (
-                      <Button size="sm" variant="ghost" onClick={() => handleApprove(article.id)} title="Aprobar">
+                      <Button size="sm" variant="ghost" onClick={() => handleApprove(article)} title="Aprobar">
                         <Check className="h-4 w-4 text-primary" />
                       </Button>
                     )}
