@@ -24,6 +24,9 @@ export type Database = {
           image_position_x: number
           image_position_y: number
           image_url: string | null
+          instagram_image_position_x: number | null
+          instagram_image_position_y: number | null
+          instagram_image_zoom: number | null
           instagram_order: number | null
           instagram_published: boolean
           instagram_selected: boolean
@@ -43,6 +46,9 @@ export type Database = {
           image_position_x?: number
           image_position_y?: number
           image_url?: string | null
+          instagram_image_position_x?: number | null
+          instagram_image_position_y?: number | null
+          instagram_image_zoom?: number | null
           instagram_order?: number | null
           instagram_published?: boolean
           instagram_selected?: boolean
@@ -62,6 +68,9 @@ export type Database = {
           image_position_x?: number
           image_position_y?: number
           image_url?: string | null
+          instagram_image_position_x?: number | null
+          instagram_image_position_y?: number | null
+          instagram_image_zoom?: number | null
           instagram_order?: number | null
           instagram_published?: boolean
           instagram_selected?: boolean

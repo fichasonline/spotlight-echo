@@ -96,6 +96,13 @@ export type ArticleStoryDownloadInput = {
   dateLabel: string;
   url: string;
   imageUrl?: string | null;
+  imagePosition?: ArticleStoryImagePosition;
+};
+
+export type ArticleStoryImagePosition = {
+  x?: number | null;
+  y?: number | null;
+  zoom?: number | null;
 };
 
 export function getArticleStoryExportImageUrl(imageUrl: string | null | undefined, currentOrigin?: string) {
@@ -232,6 +239,16 @@ function roundedRectPath(
   ctx.closePath();
 }
 
+export function clampStoryImagePosition(value: number | null | undefined) {
+  if (typeof value !== "number" || Number.isNaN(value)) return 50;
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+export function clampStoryImageZoom(value: number | null | undefined) {
+  if (typeof value !== "number" || Number.isNaN(value)) return 100;
+  return Math.min(180, Math.max(100, Math.round(value)));
+}
+
 function drawCoverImage(
   ctx: CanvasRenderingContext2D,
   image: HTMLImageElement,
@@ -239,12 +256,16 @@ function drawCoverImage(
   y: number,
   width: number,
   height: number,
+  position: ArticleStoryImagePosition = {},
 ) {
-  const scale = Math.max(width / image.width, height / image.height);
+  const positionX = clampStoryImagePosition(position.x);
+  const positionY = clampStoryImagePosition(position.y);
+  const zoom = clampStoryImageZoom(position.zoom) / 100;
+  const scale = Math.max(width / image.width, height / image.height) * zoom;
   const drawWidth = image.width * scale;
   const drawHeight = image.height * scale;
-  const drawX = x + (width - drawWidth) / 2;
-  const drawY = y + (height - drawHeight) / 2;
+  const drawX = x + ((width - drawWidth) * positionX) / 100;
+  const drawY = y + ((height - drawHeight) * positionY) / 100;
   ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
 }
 
@@ -488,7 +509,7 @@ export async function createArticleStoryPngBlob(input: ArticleStoryDownloadInput
     ctx.save();
     roundedRectPath(ctx, heroX, heroY, heroWidth, heroHeight, cardRadius);
     ctx.clip();
-    drawCoverImage(ctx, articleImage, heroX, heroY, heroWidth, heroHeight);
+    drawCoverImage(ctx, articleImage, heroX, heroY, heroWidth, heroHeight, input.imagePosition);
     ctx.restore();
     usedArticleImage = true;
   } else {

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  clampStoryImagePosition,
+  clampStoryImageZoom,
   extractArticleConcepts,
   getArticleStoryExportImageUrl,
   getArticleStoryCaption,
@@ -62,5 +64,14 @@ describe("article-story helpers", () => {
     expect(getArticleStoryExportImageUrl("https://www.fichasonline.uy/portada.jpg", "https://www.fichasonline.uy")).toBe(
       "https://www.fichasonline.uy/portada.jpg",
     );
+  });
+
+  it("clamps story image adjustment values", () => {
+    expect(clampStoryImagePosition(-10)).toBe(0);
+    expect(clampStoryImagePosition(44.6)).toBe(45);
+    expect(clampStoryImagePosition(120)).toBe(100);
+    expect(clampStoryImageZoom(80)).toBe(100);
+    expect(clampStoryImageZoom(147.4)).toBe(147);
+    expect(clampStoryImageZoom(220)).toBe(180);
   });
 });
