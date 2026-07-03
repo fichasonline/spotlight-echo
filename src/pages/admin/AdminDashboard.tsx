@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { isChatLead, isLandingLead } from "@/lib/support-leads";
-import { Newspaper, Calendar, Flag, Users, MessageCircle, ContactRound, Image, Instagram, Radio, Sparkles, Dice5, Trophy } from "lucide-react";
+import { Newspaper, Calendar, Flag, Users, MessageCircle, ContactRound, Image, Instagram, Radio, Sparkles, Dice5, Trophy, BarChart3 } from "lucide-react";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -81,6 +81,7 @@ export default function AdminDashboard() {
   const cards = [
     { label: "Artículos", value: stats.articles, icon: Newspaper, to: "/admin/noticias", color: "text-primary" },
     { label: "Eventos", value: stats.events, icon: Calendar, to: "/admin/eventos", color: "text-accent" },
+    { label: "Insights", value: "12m", icon: BarChart3, to: "/admin/insights", color: "text-primary" },
     { label: "Reportes pendientes", value: stats.reports, icon: Flag, to: "/admin/moderacion", color: "text-destructive" },
     { label: "Chats abiertos", value: stats.chats, icon: MessageCircle, to: "/admin/moderacion", color: "text-primary" },
     { label: "Usuarios", value: stats.users, icon: Users, to: "/admin/usuarios", color: "text-muted-foreground" },

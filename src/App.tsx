@@ -21,6 +21,7 @@ const ArticleDetailPage = lazy(() => import("./pages/ArticleDetail"));
 const FeedPage = SHOW_FEED ? lazy(() => import("./pages/Feed")) : null;
 const SorteoTvPage = lazy(() => import("./pages/SorteoTv"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminInsights = lazy(() => import("./pages/admin/AdminInsights"));
 const AdminEventos = lazy(() => import("./pages/admin/AdminEventos"));
 const AdminNoticias = lazy(() => import("./pages/admin/AdminNoticias"));
 const AdminNoticiasInstagram = lazy(() => import("./pages/admin/AdminNoticiasInstagram"));
@@ -86,6 +87,14 @@ const App = () => (
                     element={
                       <AdminRoute>
                         <AdminEventos />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/insights"
+                    element={
+                      <AdminRoute>
+                        <AdminInsights />
                       </AdminRoute>
                     }
                   />
