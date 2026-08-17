@@ -265,6 +265,16 @@ export default function AdminCampeones() {
     }
   };
 
+  const handleCopyText = async (text: string, label: string = "Texto") => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: "Éxito", description: `${label} copiado al portapapeles` });
+    } catch (err) {
+      console.error("Error copying text:", err);
+      toast({ title: "Error", description: "No se pudo copiar el texto", variant: "destructive" });
+    }
+  };
+
   const handleCopyImage = async (imageUrl: string) => {
     if (!imageUrl) return;
 
@@ -491,25 +501,55 @@ export default function AdminCampeones() {
                           {champion.image_url && (
                             <img src={champion.image_url} alt={champion.name} className="w-10 h-10 rounded object-cover" />
                           )}
-                          <div>
-                            <div className="font-medium dark:text-white">{champion.name}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{champion.tournament}</div>
-                            {champion.post_url && (
-                              <a
-                                href={champion.post_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline mt-0.5"
+                          <div className="flex-1">
+                            <div className="font-medium dark:text-white flex items-center gap-2 group">
+                              {champion.name}
+                              <button
+                                onClick={() => handleCopyText(champion.name, "Nombre")}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Copiar nombre"
                               >
-                                <ExternalLink className="w-3 h-3" />
-                                Ver publicación
-                              </a>
+                                <Copy className="w-3 h-3 text-gray-500 hover:text-blue-600" />
+                              </button>
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2 group">
+                              {champion.tournament}
+                              <button
+                                onClick={() => handleCopyText(champion.tournament, "Torneo")}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Copiar torneo"
+                              >
+                                <Copy className="w-3 h-3 text-gray-500 hover:text-blue-600" />
+                              </button>
+                            </div>
+                            {champion.post_url && (
+                              <div className="inline-flex items-center gap-2 mt-0.5 group">
+                                <a
+                                  href={champion.post_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  Ver publicación
+                                </a>
+                                <button
+                                  onClick={() => handleCopyText(champion.post_url!, "URL")}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Copiar URL"
+                                >
+                                  <Copy className="w-3 h-3 text-gray-500 hover:text-blue-600" />
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-right font-semibold dark:text-white">
-                        {champion.currency === "USD" ? "USD " : ""} ${champion.amount.toLocaleString("es-UY")}
+                      <td className="px-6 py-4 text-sm text-right font-semibold dark:text-white group cursor-pointer" onClick={() => handleCopyText(`${champion.currency === "USD" ? "USD " : ""}$${champion.amount.toLocaleString("es-UY")}`, "Monto")}>
+                        <div className="flex items-center justify-end gap-2">
+                          <span>{champion.currency === "USD" ? "USD " : ""} ${champion.amount.toLocaleString("es-UY")}</span>
+                          <Copy className="w-3 h-3 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-right space-x-2">
                         {champion.image_url && (
