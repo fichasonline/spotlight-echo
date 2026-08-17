@@ -19,7 +19,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Plus, Trash2, Pencil, X, ExternalLink } from "lucide-react";
+import { Plus, Trash2, Pencil, X, ExternalLink, Copy } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -265,9 +265,24 @@ export default function AdminCampeones() {
     }
   };
 
+  const handleCopyImage = async (imageUrl: string) => {
+    if (!imageUrl) return;
+
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const item = new ClipboardItem({ [blob.type]: blob });
+      await navigator.clipboard.write([item]);
+      toast({ title: "Éxito", description: "Imagen copiada al portapapeles" });
+    } catch (err) {
+      console.error("Error copying image:", err);
+      toast({ title: "Error", description: "No se pudo copiar la imagen", variant: "destructive" });
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-white dark:bg-slate-950">
         <Navbar />
         <div className="max-w-7xl mx-auto px-4 py-8 text-center">Cargando...</div>
       </div>
@@ -275,7 +290,7 @@ export default function AdminCampeones() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white dark:bg-slate-950">
       <Navbar />
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
@@ -432,23 +447,23 @@ export default function AdminCampeones() {
               return acc;
             }, {} as Record<string, Champion[]>)
           ).map(([week, weekChampions]) => (
-            <div key={week} className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b">
-                <h3 className="text-lg font-semibold">Semana {week}</h3>
-                <p className="text-sm text-gray-600">{weekChampions.length} campeón{weekChampions.length !== 1 ? "es" : ""}</p>
+            <div key={week} className="bg-white dark:bg-slate-900 rounded-lg shadow overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-700 px-6 py-4 border-b dark:border-slate-700">
+                <h3 className="text-lg font-semibold dark:text-white">Semana {week}</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{weekChampions.length} campeón{weekChampions.length !== 1 ? "es" : ""}</p>
               </div>
               <table className="w-full">
-                <tbody className="divide-y">
+                <tbody className="divide-y dark:divide-slate-800">
                   {weekChampions.map((champion) => (
-                    <tr key={champion.id} className="hover:bg-gray-50">
+                    <tr key={champion.id} className="hover:bg-gray-50 dark:hover:bg-slate-800">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           {champion.image_url && (
                             <img src={champion.image_url} alt={champion.name} className="w-10 h-10 rounded object-cover" />
                           )}
                           <div>
-                            <div className="font-medium">{champion.name}</div>
-                            <div className="text-sm text-gray-500">{champion.tournament}</div>
+                            <div className="font-medium dark:text-white">{champion.name}</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">{champion.tournament}</div>
                             {champion.post_url && (
                               <a
                                 href={champion.post_url}
@@ -463,11 +478,20 @@ export default function AdminCampeones() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-right font-semibold">
-                        {champion.currency === "USD" ? "$" : "$"} {champion.amount.toLocaleString("es-UY")}
-                        <span className="ml-2 text-gray-500 text-xs">{champion.currency}</span>
+                      <td className="px-6 py-4 text-sm text-right font-semibold dark:text-white">
+                        {champion.currency === "USD" ? "USD " : ""} ${champion.amount.toLocaleString("es-UY")}
                       </td>
                       <td className="px-6 py-4 text-right space-x-2">
+                        {champion.image_url && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCopyImage(champion.image_url!)}
+                            title="Copiar imagen"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -491,7 +515,7 @@ export default function AdminCampeones() {
             </div>
           ))}
           {champions.length === 0 && (
-            <div className="bg-white rounded-lg shadow px-6 py-8 text-center text-gray-500">
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow px-6 py-8 text-center text-gray-500 dark:text-gray-400">
               No hay campeones registrados aún
             </div>
           )}
