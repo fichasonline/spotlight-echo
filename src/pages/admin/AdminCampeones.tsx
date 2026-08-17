@@ -271,9 +271,39 @@ export default function AdminCampeones() {
     try {
       const response = await fetch(imageUrl);
       const blob = await response.blob();
-      const item = new ClipboardItem({ [blob.type]: blob });
-      await navigator.clipboard.write([item]);
-      toast({ title: "Éxito", description: "Imagen copiada al portapapeles" });
+
+      // Convert image to PNG blob for better compatibility
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          toast({ title: "Error", description: "No se pudo procesar la imagen", variant: "destructive" });
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+
+        canvas.toBlob(async (pngBlob) => {
+          if (!pngBlob) {
+            toast({ title: "Error", description: "No se pudo copiar la imagen", variant: "destructive" });
+            return;
+          }
+          try {
+            const item = new ClipboardItem({ "image/png": pngBlob });
+            await navigator.clipboard.write([item]);
+            toast({ title: "Éxito", description: "Imagen copiada al portapapeles" });
+          } catch (err) {
+            console.error("Error copying to clipboard:", err);
+            toast({ title: "Error", description: "No se pudo copiar la imagen al portapapeles", variant: "destructive" });
+          }
+        }, "image/png");
+      };
+      img.onerror = () => {
+        toast({ title: "Error", description: "No se pudo cargar la imagen", variant: "destructive" });
+      };
+      img.src = URL.createObjectURL(blob);
     } catch (err) {
       console.error("Error copying image:", err);
       toast({ title: "Error", description: "No se pudo copiar la imagen", variant: "destructive" });
