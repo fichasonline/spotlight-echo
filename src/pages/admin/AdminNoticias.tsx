@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,7 +36,9 @@ import {
   X,
   Upload,
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getLocalDateISO, parseDateValue } from "@/lib/date";
+import { ARTICLE_CATEGORIES, TAG_TYPES, categoryLabel, type ArticleCategory, type Tag } from "@/lib/taxonomy";
 import { markdownToHtml, isMarkdown } from "@/lib/markdown";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import {
@@ -46,12 +47,16 @@ import {
   getArticleImageStyle,
 } from "@/lib/article-image";
 
+/**
+ * Fila del listado. NO incluye `body_markdown` a propósito: traer el cuerpo
+ * completo de cientos de notas en cada carga es el grueso del payload y no se
+ * usa para nada en la lista. El cuerpo se pide de a uno al abrir el editor.
+ */
 interface Article {
   id: string;
   slug: string;
   headline: string;
   summary: string | null;
-  body_markdown: string | null;
   status: string;
   created_at: string;
   published_at: string | null;
@@ -61,6 +66,9 @@ interface Article {
   instagram_selected: boolean;
   instagram_published: boolean;
   instagram_order: number | null;
+  category: ArticleCategory | null;
+  source_name: string | null;
+  source_url: string | null;
 }
 
 const createEmptyForm = () => ({
@@ -72,9 +80,15 @@ const createEmptyForm = () => ({
   image_position_x: DEFAULT_ARTICLE_IMAGE_POSITION,
   image_position_y: DEFAULT_ARTICLE_IMAGE_POSITION,
   published_at: "",
+  category: "" as ArticleCategory | "",
+  source_name: "",
+  source_url: "",
 });
 
 type ArticleForm = ReturnType<typeof createEmptyForm>;
+
+/** Cuántas notas se renderizan por tanda antes de pedir "cargar más". */
+const PAGE_SIZE = 25;
 
 function sortInstagramArticles(articles: Article[]) {
   return [...articles].sort((left, right) => {
@@ -139,6 +153,9 @@ export default function AdminNoticias() {
   const { toast } = useToast();
   const [articles, setArticles] = useState<Article[]>([]);
   const [tab, setTab] = useState("needs_review");
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [form, setForm] = useState<ArticleForm>(() => createEmptyForm());
   const [editId, setEditId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -147,19 +164,52 @@ export default function AdminNoticias() {
   const [uploading, setUploading] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  /** Vocabulario completo de etiquetas y las aplicadas a la nota en edición. */
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
+  /** Snapshot de las etiquetas al abrir el editor, para calcular el diff. */
+  const [initialTagIds, setInitialTagIds] = useState<Set<string>>(new Set());
+
   const fetchArticles = async () => {
     const { data } = await supabase
       .from("articles")
-      .select("id, slug, headline, summary, body_markdown, status, created_at, published_at, image_url, image_position_x, image_position_y, instagram_selected, instagram_published, instagram_order")
-      .order("created_at", { ascending: false });
+      .select("id, slug, headline, summary, status, created_at, published_at, image_url, image_position_x, image_position_y, instagram_selected, instagram_published, instagram_order, category, source_name, source_url")
+      .order("created_at", { ascending: false })
+      // `category`, `source_name` y `source_url` existen en la base pero todavía
+      // no en types.ts (generado, desactualizado: declara 9 tablas de 20).
+      // Quitar este cast en cuanto se regeneren los tipos.
+      .returns<Article[]>();
     if (data) setArticles(data);
   };
 
   useEffect(() => {
     void fetchArticles();
+    void (async () => {
+      const { data } = await (supabase as any).from("tags").select("id, slug, name, type").order("name");
+      if (data) setAllTags(data as Tag[]);
+    })();
   }, []);
 
-  const filtered = articles.filter((article) => article.status === tab);
+  // Volver al principio del listado cada vez que cambia el recorte.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [tab, search, categoryFilter]);
+
+  const normalizedSearch = search.trim().toLowerCase();
+  const filtered = articles.filter((article) => {
+    if (article.status !== tab) return false;
+    if (categoryFilter === "__none__" && article.category) return false;
+    if (categoryFilter !== "all" && categoryFilter !== "__none__" && article.category !== categoryFilter) return false;
+    if (!normalizedSearch) return true;
+    return (
+      article.headline.toLowerCase().includes(normalizedSearch) ||
+      article.slug.toLowerCase().includes(normalizedSearch)
+    );
+  });
+  const visible = filtered.slice(0, visibleCount);
+  const uncategorizedCount = articles.filter(
+    (article) => article.status === tab && !article.category,
+  ).length;
   const publishedArticles = articles.filter((article) => article.status === "published");
   const instagramPendingArticles = sortInstagramArticles(
     publishedArticles.filter((article) => article.instagram_selected && !article.instagram_published),
@@ -180,6 +230,32 @@ export default function AdminNoticias() {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
+  /** Deja el editor en blanco: formulario, etiquetas y nota en edición. */
+  const resetForm = () => {
+    setForm(createEmptyForm());
+    setEditId(null);
+    setSelectedTagIds(new Set());
+    setInitialTagIds(new Set());
+  };
+
+  /**
+   * Aplica sólo el diff contra las etiquetas que tenía la nota al abrirse.
+   * Evita borrar y reinsertar todo, que dejaría la nota sin etiquetas si el
+   * insert falla a mitad.
+   */
+  const syncArticleTags = async (articleId: string) => {
+    const toAdd = [...selectedTagIds].filter((id) => !initialTagIds.has(id));
+    const toRemove = [...initialTagIds].filter((id) => !selectedTagIds.has(id));
+    const db = supabase as any;
+
+    if (toAdd.length > 0) {
+      await db.from("article_tags").insert(toAdd.map((tagId) => ({ article_id: articleId, tag_id: tagId })));
+    }
+    if (toRemove.length > 0) {
+      await db.from("article_tags").delete().eq("article_id", articleId).in("tag_id", toRemove);
+    }
+  };
+
   const handleSaveArticle = async () => {
     if (!form.headline.trim()) {
       toast({ title: "Falta el titular", description: "Debes completar el titular.", variant: "destructive" });
@@ -191,8 +267,11 @@ export default function AdminNoticias() {
       slug,
       summary: form.summary.trim() || null,
       body_markdown: form.body_markdown.trim() || null,
-      source_name: null,
-      source_url: null,
+      // Estos dos estaban hardcodeados en null: cada edición desde el panel
+      // borraba la atribución de fuente que había cargado el bot.
+      source_name: form.source_name.trim() || null,
+      source_url: form.source_url.trim() || null,
+      category: form.category || null,
       image_url: form.image_url.trim() || null,
       image_position_x: clampArticleImagePosition(form.image_position_x),
       image_position_y: clampArticleImagePosition(form.image_position_y),
@@ -200,23 +279,46 @@ export default function AdminNoticias() {
       published_at: toPublishedAtTimestamp(form.published_at),
     };
 
-    const { error } = editId
-      ? await supabase.from("articles").update(payload).eq("id", editId)
-      : await supabase.from("articles").insert({ ...payload, created_by: user?.id });
+    const { data: saved, error } = editId
+      ? await supabase.from("articles").update(payload).eq("id", editId).select("id").maybeSingle()
+      : await supabase
+          .from("articles")
+          .insert({ ...payload, created_by: user?.id })
+          .select("id")
+          .maybeSingle();
 
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       return;
     }
 
+    const articleId = editId ?? saved?.id;
+    if (articleId) {
+      await syncArticleTags(articleId);
+    }
+
     setOpen(false);
-    setForm(createEmptyForm());
-    setEditId(null);
+    resetForm();
     void fetchArticles();
   };
 
-  const handleEdit = (article: Article) => {
-    const bodyContent = article.body_markdown ?? "";
+  const handleEdit = async (article: Article) => {
+    // El cuerpo no viaja en el listado: se pide sólo al abrir esta nota.
+    const { data: full } = await supabase
+      .from("articles")
+      .select("body_markdown")
+      .eq("id", article.id)
+      .maybeSingle();
+
+    const { data: links } = await (supabase as any)
+      .from("article_tags")
+      .select("tag_id")
+      .eq("article_id", article.id);
+    const tagIds = new Set(((links ?? []) as { tag_id: string }[]).map((row) => row.tag_id));
+    setSelectedTagIds(tagIds);
+    setInitialTagIds(tagIds);
+
+    const bodyContent = full?.body_markdown ?? "";
     const processedBody = isMarkdown(bodyContent) ? markdownToHtml(bodyContent) : bodyContent;
 
     setForm({
@@ -228,6 +330,9 @@ export default function AdminNoticias() {
       image_position_x: clampArticleImagePosition(article.image_position_x),
       image_position_y: clampArticleImagePosition(article.image_position_y),
       published_at: toDateInputValue(article.published_at || (article.status === "published" ? article.created_at : null)),
+      category: article.category ?? "",
+      source_name: article.source_name ?? "",
+      source_url: article.source_url ?? "",
     });
     setEditId(article.id);
     setOpen(true);
@@ -427,7 +532,6 @@ export default function AdminNoticias() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -449,17 +553,13 @@ export default function AdminNoticias() {
               onOpenChange={(nextOpen) => {
                 setOpen(nextOpen);
                 if (!nextOpen) {
-                  setForm(createEmptyForm());
-                  setEditId(null);
+                  resetForm();
                 }
               }}
             >
               <SheetTrigger asChild>
                 <Button
-                  onClick={() => {
-                    setForm(createEmptyForm());
-                    setEditId(null);
-                  }}
+                  onClick={resetForm}
                 >
                   <Plus className="mr-1 h-4 w-4" />
                   Nuevo artículo
@@ -571,6 +671,102 @@ export default function AdminNoticias() {
                               />
                             </div>
                             <p className="break-all text-xs text-muted-foreground">/noticias/{previewSlug}</p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="article-category">Categoría</Label>
+                            <Select
+                              value={form.category || "__none__"}
+                              onValueChange={(value) =>
+                                updateForm("category", value === "__none__" ? "" : (value as ArticleCategory))
+                              }
+                            >
+                              <SelectTrigger id="article-category">
+                                <SelectValue placeholder="Sin categoría" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__">Sin categoría</SelectItem>
+                                {ARTICLE_CATEGORIES.map((category) => (
+                                  <SelectItem key={category.value} value={category.value}>
+                                    {category.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                              Una sola por nota. El resto (circuito, país, sala) va como etiqueta.
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Etiquetas</Label>
+                            {allTags.length === 0 ? (
+                              <p className="text-xs text-muted-foreground">
+                                No hay etiquetas cargadas todavía.
+                              </p>
+                            ) : (
+                              <div className="space-y-3 rounded-lg border border-border bg-background/60 p-3">
+                                {TAG_TYPES.map((type) => {
+                                  const group = allTags.filter((tag) => tag.type === type.value);
+                                  if (group.length === 0) return null;
+                                  return (
+                                    <div key={type.value}>
+                                      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+                                        {type.label}
+                                      </p>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {group.map((tag) => {
+                                          const active = selectedTagIds.has(tag.id);
+                                          return (
+                                            <button
+                                              key={tag.id}
+                                              type="button"
+                                              aria-pressed={active}
+                                              onClick={() =>
+                                                setSelectedTagIds((current) => {
+                                                  const next = new Set(current);
+                                                  if (next.has(tag.id)) next.delete(tag.id);
+                                                  else next.add(tag.id);
+                                                  return next;
+                                                })
+                                              }
+                                              className={
+                                                active
+                                                  ? "rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
+                                                  : "rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                                              }
+                                            >
+                                              {tag.name}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            <Link to="/admin/taxonomia" className="text-xs text-primary hover:underline">
+                              Administrar etiquetas →
+                            </Link>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="article-source-name">Fuente</Label>
+                            <Input
+                              id="article-source-name"
+                              value={form.source_name}
+                              onChange={(event) => updateForm("source_name", event.target.value)}
+                              placeholder="PokerNews, CodigoPoker…"
+                            />
+                            <Input
+                              id="article-source-url"
+                              type="url"
+                              value={form.source_url}
+                              onChange={(event) => updateForm("source_url", event.target.value)}
+                              placeholder="https://…"
+                              className="text-xs"
+                            />
                           </div>
 
                           <div className="space-y-2">
@@ -750,13 +946,45 @@ export default function AdminNoticias() {
           </TabsList>
 
           <TabsContent value={tab} className="mt-4">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar por titular o slug…"
+                className="sm:max-w-xs"
+              />
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="sm:w-56">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las categorías</SelectItem>
+                  <SelectItem value="__none__">Sin categoría ({uncategorizedCount})</SelectItem>
+                  {ARTICLE_CATEGORIES.map((category) => (
+                    <SelectItem key={category.value} value={category.value}>
+                      {category.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground sm:ml-auto">
+                {filtered.length} {filtered.length === 1 ? "nota" : "notas"}
+              </span>
+            </div>
+
             <div className="space-y-3">
-              {filtered.map((article) => (
+              {visible.map((article) => (
                 <div key={article.id} className="flex items-center justify-between rounded-lg border border-border bg-card p-4">
                   <div className="min-w-0 flex-1">
                     <h3 className="truncate font-semibold text-foreground">{article.headline}</h3>
                     <div className="mt-1 flex items-center gap-2">
                       <Badge className={statusColors[article.status]}>{article.status}</Badge>
+                      <Badge
+                        variant="outline"
+                        className={article.category ? undefined : "border-dashed text-muted-foreground"}
+                      >
+                        {categoryLabel(article.category)}
+                      </Badge>
                       {article.status === "published" && article.instagram_selected && (
                         <Badge
                           variant="outline"
@@ -817,8 +1045,21 @@ export default function AdminNoticias() {
                   </div>
                 </div>
               ))}
+              {visible.length < filtered.length && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setVisibleCount((current) => current + PAGE_SIZE)}
+                >
+                  Cargar más ({filtered.length - visible.length} restantes)
+                </Button>
+              )}
               {filtered.length === 0 && (
-                <p className="py-8 text-center text-muted-foreground">No hay artículos en esta categoría.</p>
+                <p className="py-8 text-center text-muted-foreground">
+                  {search.trim() || categoryFilter !== "all"
+                    ? "Ninguna nota coincide con el filtro."
+                    : "No hay artículos en este estado."}
+                </p>
               )}
             </div>
           </TabsContent>

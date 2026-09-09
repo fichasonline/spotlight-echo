@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -153,7 +152,7 @@ function BannerCard({ banner, onSave }: { banner: Banner; onSave: (updated: Bann
             <button
               type="button"
               onClick={clearMedia}
-              className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1 transition-colors"
+              className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-brand-light rounded-full p-1 transition-colors"
               title="Quitar media"
             >
               <X className="h-4 w-4" />
@@ -163,7 +162,7 @@ function BannerCard({ banner, onSave }: { banner: Banner; onSave: (updated: Bann
                 href={form.link_url}
                 target="_blank"
                 rel="noreferrer"
-                className="absolute bottom-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1 transition-colors"
+                className="absolute bottom-2 right-2 bg-black/60 hover:bg-black/80 text-brand-light rounded-full p-1 transition-colors"
                 title="Abrir enlace"
               >
                 <ExternalLink className="h-4 w-4" />
@@ -297,7 +296,6 @@ export default function AdminBanners() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-display font-bold mb-1">Banners de la home</h1>

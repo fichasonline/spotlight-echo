@@ -1,54 +1,105 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Navbar } from "@/components/Navbar";
 import { isChatLead, isLandingLead } from "@/lib/support-leads";
-import { Newspaper, Calendar, Flag, Users, MessageCircle, ContactRound, Image, Instagram, Radio, Sparkles, Dice5, Trophy, BarChart3 } from "lucide-react";
+import {
+  Calendar,
+  ContactRound,
+  Flag,
+  Image,
+  Inbox,
+  Instagram,
+  MessageCircle,
+  Newspaper,
+  Radio,
+  Sparkles,
+  Tags,
+  Trophy,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+
+interface Stats {
+  needsReview: number;
+  uncategorized: number;
+  reports: number;
+  openChats: number;
+  publishedToday: number;
+  upcomingEvents: number;
+  instagramPending: number;
+  storiesPending: number;
+  liveblogs: number;
+  activeBanners: number;
+  champions: number;
+  users: number;
+  leads: number;
+  chatLeads: number;
+}
+
+const EMPTY_STATS: Stats = {
+  needsReview: 0,
+  uncategorized: 0,
+  reports: 0,
+  openChats: 0,
+  publishedToday: 0,
+  upcomingEvents: 0,
+  instagramPending: 0,
+  storiesPending: 0,
+  liveblogs: 0,
+  activeBanners: 0,
+  champions: 0,
+  users: 0,
+  leads: 0,
+  chatLeads: 0,
+};
+
+/** Inicio del día de hoy en ISO, para contar lo publicado en la jornada. */
+function startOfToday() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+}
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({
-    articles: 0,
-    events: 0,
-    reports: 0,
-    users: 0,
-    chats: 0,
-    leads: 0,
-    chatLeads: 0,
-    instagramPending: 0,
-    liveblogs: 0,
-    storiesPending: 0,
-    champions: 0,
-  });
+  const [stats, setStats] = useState<Stats>(EMPTY_STATS);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetch = async () => {
-      const [a, e, r, u, openThreads, allLeads, instagramPending, liveblogs, storiesPending, champions] = await Promise.all([
-        supabase.from("articles").select("id", { count: "exact", head: true }),
-        supabase.from("events").select("id", { count: "exact", head: true }),
-        supabase.from("reports").select("id", { count: "exact", head: true }).eq("status", "pending"),
-        supabase.from("profiles").select("id", { count: "exact", head: true }),
-        (supabase as any)
-          .from("support_threads")
-          .select("id, lead_id")
-          .eq("status", "open"),
-        (supabase as any)
-          .from("support_leads")
-          .select("id, source"),
-        supabase
-          .from("articles")
-          .select("id", { count: "exact", head: true })
+    const load = async () => {
+      const today = startOfToday();
+      const db = supabase as any;
+      const count = (query: any) => query.select("id", { count: "exact", head: true });
+
+      const [
+        needsReview,
+        uncategorized,
+        reports,
+        openThreads,
+        publishedToday,
+        upcomingEvents,
+        instagramPending,
+        storiesPending,
+        liveblogs,
+        activeBanners,
+        champions,
+        users,
+        allLeads,
+      ] = await Promise.all([
+        count(db.from("articles")).neq("status", "published"),
+        count(db.from("articles")).is("category", null),
+        count(db.from("reports")).eq("status", "pending"),
+        db.from("support_threads").select("id, lead_id").eq("status", "open"),
+        count(db.from("articles")).eq("status", "published").gte("published_at", today),
+        count(db.from("events")).gte("start_date", today.slice(0, 10)),
+        count(db.from("articles"))
           .eq("status", "published")
           .eq("instagram_selected", true)
           .eq("instagram_published", false),
-        (supabase as any)
-          .from("social_sources")
-          .select("id", { count: "exact", head: true }),
-        (supabase as any)
-          .from("social_posts")
-          .select("id", { count: "exact", head: true })
-          .eq("format", "story")
-          .in("status", ["needs_approval", "draft"]),
-        (supabase as any).from("champions" as any).select("id", { count: "exact", head: true }),
+        count(db.from("social_posts")).eq("format", "story").in("status", ["needs_approval", "draft"]),
+        count(db.from("social_sources")),
+        count(db.from("home_banners")).eq("is_active", true),
+        count(db.from("champions")),
+        count(db.from("profiles")),
+        db.from("support_leads").select("id, source"),
       ]);
 
       const openLeadIds = new Set(
@@ -56,64 +107,130 @@ export default function AdminDashboard() {
           .map((thread) => thread.lead_id)
           .filter((leadId): leadId is string => Boolean(leadId)),
       );
+      const leadRows = (allLeads.data ?? []) as { id: string; source: string | null }[];
 
       setStats({
-        articles: a.count ?? 0,
-        events: e.count ?? 0,
-        reports: r.count ?? 0,
-        users: u.count ?? 0,
-        chats: openThreads.count ?? openThreads.data?.length ?? 0,
-        chatLeads: ((allLeads.data ?? []) as { id: string; source: string | null }[])
-          .filter((lead) => isChatLead(lead))
-          .length,
-        leads: ((allLeads.data ?? []) as { id: string; source: string | null }[])
-          .filter((lead) => isLandingLead(lead) && !openLeadIds.has(lead.id))
-          .length,
+        needsReview: needsReview.count ?? 0,
+        uncategorized: uncategorized.count ?? 0,
+        reports: reports.count ?? 0,
+        openChats: openThreads.data?.length ?? 0,
+        publishedToday: publishedToday.count ?? 0,
+        upcomingEvents: upcomingEvents.count ?? 0,
         instagramPending: instagramPending.count ?? 0,
-        liveblogs: liveblogs.count ?? 0,
         storiesPending: storiesPending.count ?? 0,
+        liveblogs: liveblogs.count ?? 0,
+        activeBanners: activeBanners.count ?? 0,
         champions: champions.count ?? 0,
+        users: users.count ?? 0,
+        leads: leadRows.filter((lead) => isLandingLead(lead) && !openLeadIds.has(lead.id)).length,
+        chatLeads: leadRows.filter((lead) => isChatLead(lead)).length,
       });
+      setLoading(false);
     };
-    fetch();
+
+    void load();
   }, []);
 
-  const cards = [
-    { label: "Artículos", value: stats.articles, icon: Newspaper, to: "/admin/noticias", color: "text-primary" },
-    { label: "Eventos", value: stats.events, icon: Calendar, to: "/admin/eventos", color: "text-accent" },
-    { label: "Insights", value: "12m", icon: BarChart3, to: "/admin/insights", color: "text-primary" },
-    { label: "Reportes pendientes", value: stats.reports, icon: Flag, to: "/admin/moderacion", color: "text-destructive" },
-    { label: "Chats abiertos", value: stats.chats, icon: MessageCircle, to: "/admin/moderacion", color: "text-primary" },
-    { label: "Usuarios", value: stats.users, icon: Users, to: "/admin/usuarios", color: "text-muted-foreground" },
-    { label: "Leads landing", value: stats.leads, icon: ContactRound, to: "/admin/leads", color: "text-primary" },
-    { label: "Leads chat", value: stats.chatLeads, icon: ContactRound, to: "/admin/chat-leads", color: "text-accent" },
-    { label: "IG noticias", value: stats.instagramPending, icon: Instagram, to: "/admin/noticias/instagram", color: "text-primary" },
-    { label: "Liveblogs", value: stats.liveblogs, icon: Radio, to: "/admin/liveblogs", color: "text-accent" },
-    { label: "Stories en cola", value: stats.storiesPending, icon: Sparkles, to: "/admin/stories", color: "text-primary" },
-    { label: "Sorteos IG", value: "IG", icon: Dice5, to: "/admin/sorteos", color: "text-accent" },
-    { label: "Banners home", value: 4, icon: Image, to: "/admin/banners", color: "text-primary" },
-    { label: "Campeones", value: stats.champions, icon: Trophy, to: "/admin/campeones", color: "text-accent" },
+  /** Lo que pide acción hoy. Si está en cero, deja de gritar. */
+  const pending: { label: string; value: number; hint: string; icon: LucideIcon; to: string }[] = [
+    {
+      label: "Notas por revisar",
+      value: stats.needsReview,
+      hint: "Borradores esperando aprobación",
+      icon: Inbox,
+      to: "/admin/noticias",
+    },
+    {
+      label: "Sin categoría",
+      value: stats.uncategorized,
+      hint: "No aparecen en las páginas de sección",
+      icon: Tags,
+      to: "/admin/noticias",
+    },
+    {
+      label: "Reportes",
+      value: stats.reports,
+      hint: "Contenido reportado sin resolver",
+      icon: Flag,
+      to: "/admin/moderacion",
+    },
+    {
+      label: "Chats abiertos",
+      value: stats.openChats,
+      hint: "Conversaciones sin cerrar",
+      icon: MessageCircle,
+      to: "/admin/chat-leads",
+    },
+  ];
+
+  const secondary: { label: string; value: number; icon: LucideIcon; to: string }[] = [
+    { label: "Publicadas hoy", value: stats.publishedToday, icon: Newspaper, to: "/admin/noticias" },
+    { label: "Próximos torneos", value: stats.upcomingEvents, icon: Calendar, to: "/admin/eventos" },
+    { label: "IG pendientes", value: stats.instagramPending, icon: Instagram, to: "/admin/noticias/instagram" },
+    { label: "Stories en cola", value: stats.storiesPending, icon: Sparkles, to: "/admin/stories" },
+    { label: "Liveblogs", value: stats.liveblogs, icon: Radio, to: "/admin/liveblogs" },
+    { label: "Banners activos", value: stats.activeBanners, icon: Image, to: "/admin/banners" },
+    { label: "Campeones", value: stats.champions, icon: Trophy, to: "/admin/campeones" },
+    { label: "Leads landing", value: stats.leads, icon: ContactRound, to: "/admin/leads" },
+    { label: "Leads chat", value: stats.chatLeads, icon: ContactRound, to: "/admin/chat-leads" },
+    { label: "Usuarios", value: stats.users, icon: Users, to: "/admin/usuarios" },
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-display font-bold mb-8">Panel de administración</h1>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {cards.map((c) => (
+    <>
+      <h1 className="font-display text-3xl font-bold">Resumen</h1>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {loading ? "Cargando…" : "Lo que necesita atención primero."}
+      </p>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {pending.map((card) => {
+          const needsAttention = card.value > 0;
+          return (
             <Link
-              key={c.label}
-              to={c.to}
-              className="bg-card border border-border rounded-lg p-6 hover:border-primary/30 transition-colors"
+              key={card.label}
+              to={card.to}
+              className={
+                needsAttention
+                  ? "rounded-xl border border-primary/30 bg-primary/5 p-5 transition-colors hover:border-primary/50"
+                  : "rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/30"
+              }
             >
-              <c.icon className={`h-8 w-8 ${c.color} mb-3`} />
-              <p className="text-3xl font-display font-bold text-foreground">{c.value}</p>
-              <p className="text-sm text-muted-foreground">{c.label}</p>
+              <card.icon
+                className={`mb-3 h-6 w-6 ${needsAttention ? "text-primary" : "text-muted-foreground"}`}
+              />
+              <p
+                className={`font-display text-4xl font-bold ${
+                  needsAttention ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                {card.value}
+              </p>
+              <p className="mt-1 text-sm font-medium text-foreground">{card.label}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{card.hint}</p>
             </Link>
-          ))}
-        </div>
+          );
+        })}
       </div>
-    </div>
+
+      <h2 className="mt-10 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+        El resto del panel
+      </h2>
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {secondary.map((card) => (
+          <Link
+            key={card.label}
+            to={card.to}
+            className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:border-primary/30"
+          >
+            <card.icon className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <div className="min-w-0">
+              <p className="font-display text-lg font-bold leading-none text-foreground">{card.value}</p>
+              <p className="truncate text-xs text-muted-foreground">{card.label}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </>
   );
 }

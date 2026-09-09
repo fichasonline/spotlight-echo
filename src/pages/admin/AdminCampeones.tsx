@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -322,16 +321,14 @@ export default function AdminCampeones() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white dark:bg-slate-950">
-        <Navbar />
+      <div className="min-h-screen bg-background">
         <div className="max-w-7xl mx-auto px-4 py-8 text-center">Cargando...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-950">
-      <Navbar />
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Gestionar Campeones</h1>
@@ -349,7 +346,7 @@ export default function AdminCampeones() {
               <DialogHeader>
                 <DialogTitle>{editId ? "Editar Campeón" : "Agregar Campeones"}</DialogTitle>
                 {!editId && (
-                  <p className="text-sm text-gray-500 mt-2">
+                  <p className="text-sm text-muted-foreground mt-2">
                     Semana actual: <span className="font-semibold">{getWeekInfo().yearWeek}</span>
                   </p>
                 )}
@@ -361,7 +358,7 @@ export default function AdminCampeones() {
                     {forms.length > 1 && (
                       <button
                         onClick={() => handleRemoveForm(index)}
-                        className="absolute top-2 right-2 text-gray-500 hover:text-red-600"
+                        className="absolute top-2 right-2 text-muted-foreground hover:text-red-600"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -429,7 +426,7 @@ export default function AdminCampeones() {
                           disabled={uploadingImage === String(index)}
                         />
                         {uploadingImage === String(index) && (
-                          <div className="flex items-center text-sm text-gray-500">Subiendo...</div>
+                          <div className="flex items-center text-sm text-muted-foreground">Subiendo...</div>
                         )}
                       </div>
                       {form.image_url && (
@@ -487,39 +484,39 @@ export default function AdminCampeones() {
               return acc;
             }, {} as Record<string, Champion[]>)
           ).map(([week, weekChampions]) => (
-            <div key={week} className="bg-white dark:bg-slate-900 rounded-lg shadow overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-700 px-6 py-4 border-b dark:border-slate-700">
-                <h3 className="text-lg font-semibold dark:text-white">Semana {week}</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">{weekChampions.length} campeón{weekChampions.length !== 1 ? "es" : ""}</p>
+            <div key={week} className="bg-card rounded-lg shadow overflow-hidden">
+              <div className="bg-secondary px-6 py-4 border-b border-border">
+                <h3 className="text-lg font-semibold text-foreground">Semana {week}</h3>
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground">{weekChampions.length} campeón{weekChampions.length !== 1 ? "es" : ""}</p>
               </div>
               <table className="w-full">
-                <tbody className="divide-y dark:divide-slate-800">
+                <tbody className="divide-y divide-border">
                   {weekChampions.map((champion) => (
-                    <tr key={champion.id} className="hover:bg-gray-50 dark:hover:bg-slate-800">
+                    <tr key={champion.id} className="hover:bg-muted dark:hover:bg-muted">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           {champion.image_url && (
                             <img src={champion.image_url} alt={champion.name} className="w-10 h-10 rounded object-cover" />
                           )}
                           <div className="flex-1">
-                            <div className="font-medium dark:text-white flex items-center gap-2 group">
+                            <div className="font-medium text-foreground flex items-center gap-2 group">
                               {champion.name}
                               <button
                                 onClick={() => handleCopyText(champion.name, "Nombre")}
                                 className="opacity-0 group-hover:opacity-100 transition-opacity"
                                 title="Copiar nombre"
                               >
-                                <Copy className="w-3 h-3 text-gray-500 hover:text-blue-600" />
+                                <Copy className="w-3 h-3 text-muted-foreground hover:text-primary" />
                               </button>
                             </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2 group">
+                            <div className="text-sm text-muted-foreground flex items-center gap-2 group">
                               {champion.tournament}
                               <button
                                 onClick={() => handleCopyText(champion.tournament, "Torneo")}
                                 className="opacity-0 group-hover:opacity-100 transition-opacity"
                                 title="Copiar torneo"
                               >
-                                <Copy className="w-3 h-3 text-gray-500 hover:text-blue-600" />
+                                <Copy className="w-3 h-3 text-muted-foreground hover:text-primary" />
                               </button>
                             </div>
                             {champion.post_url && (
@@ -528,7 +525,7 @@ export default function AdminCampeones() {
                                   href={champion.post_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                                 >
                                   <ExternalLink className="w-3 h-3" />
                                   Ver publicación
@@ -538,17 +535,17 @@ export default function AdminCampeones() {
                                   className="opacity-0 group-hover:opacity-100 transition-opacity"
                                   title="Copiar URL"
                                 >
-                                  <Copy className="w-3 h-3 text-gray-500 hover:text-blue-600" />
+                                  <Copy className="w-3 h-3 text-muted-foreground hover:text-primary" />
                                 </button>
                               </div>
                             )}
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-right font-semibold dark:text-white group cursor-pointer" onClick={() => handleCopyText(`${champion.currency === "USD" ? "USD " : ""}$${champion.amount.toLocaleString("es-UY")}`, "Monto")}>
+                      <td className="px-6 py-4 text-sm text-right font-semibold text-foreground group cursor-pointer" onClick={() => handleCopyText(`${champion.currency === "USD" ? "USD " : ""}$${champion.amount.toLocaleString("es-UY")}`, "Monto")}>
                         <div className="flex items-center justify-end gap-2">
                           <span>{champion.currency === "USD" ? "USD " : ""} ${champion.amount.toLocaleString("es-UY")}</span>
-                          <Copy className="w-3 h-3 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <Copy className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right space-x-2">
@@ -585,7 +582,7 @@ export default function AdminCampeones() {
             </div>
           ))}
           {champions.length === 0 && (
-            <div className="bg-white dark:bg-slate-900 rounded-lg shadow px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+            <div className="bg-card rounded-lg shadow px-6 py-8 text-center text-muted-foreground">
               No hay campeones registrados aún
             </div>
           )}

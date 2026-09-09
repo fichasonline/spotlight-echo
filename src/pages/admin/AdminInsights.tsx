@@ -4,7 +4,6 @@ import { es } from "date-fns/locale";
 import { BarChart3, CalendarDays, MessageSquare, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { Navbar } from "@/components/Navbar";
 import { supabase } from "@/integrations/supabase/client";
 
 interface MonthlyModerationMetric {
@@ -69,7 +68,6 @@ export default function AdminInsights() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
 
       <div className="container mx-auto space-y-6 px-4 py-8">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

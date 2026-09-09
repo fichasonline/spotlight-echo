@@ -9,6 +9,8 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AgeGate } from "@/components/AgeGate";
 import { ProtectedRoute, AdminRoute, StaffRoute } from "@/components/ProtectedRoute";
 import { RouteSeo } from "@/components/RouteSeo";
+import { AdminLayout } from "@/components/admin/AdminLayout";
+import { ARTICLE_CATEGORIES } from "@/lib/taxonomy";
 import Footer from "@/components/Footer";
 import { SHOW_FEED } from "@/lib/feature-flags";
 
@@ -18,12 +20,15 @@ const CalendarioPage = lazy(() => import("./pages/Calendario"));
 const EventoDetailPage = lazy(() => import("./pages/EventoDetail"));
 const NoticiasPage = lazy(() => import("./pages/Noticias"));
 const ArticleDetailPage = lazy(() => import("./pages/ArticleDetail"));
+const CategoriaPage = lazy(() => import("./pages/Categoria"));
+const TagPage = lazy(() => import("./pages/Tag"));
 const FeedPage = SHOW_FEED ? lazy(() => import("./pages/Feed")) : null;
 const SorteoTvPage = lazy(() => import("./pages/SorteoTv"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminInsights = lazy(() => import("./pages/admin/AdminInsights"));
 const AdminEventos = lazy(() => import("./pages/admin/AdminEventos"));
 const AdminNoticias = lazy(() => import("./pages/admin/AdminNoticias"));
+const AdminTaxonomia = lazy(() => import("./pages/admin/AdminTaxonomia"));
 const AdminNoticiasInstagram = lazy(() => import("./pages/admin/AdminNoticiasInstagram"));
 const AdminLiveblogs = lazy(() => import("./pages/admin/AdminLiveblogs"));
 const AdminStoriesQueue = lazy(() => import("./pages/admin/AdminStoriesQueue"));
@@ -59,6 +64,21 @@ const App = () => (
                   <Route path="/eventos/:id" element={<EventoDetailPage />} />
                   <Route path="/noticias" element={<NoticiasPage />} />
                   <Route path="/noticias/:slug" element={<ArticleDetailPage />} />
+                  {/*
+                    Las 5 categorías van en la raíz (son un conjunto fijo y
+                    conocido, no chocan con ninguna ruta existente). Las
+                    etiquetas van bajo /tag/ porque las crea el equipo desde el
+                    panel: una etiqueta llamada "calendario" o "salas" taparía
+                    una ruta real si vivieran en la raíz.
+                  */}
+                  {ARTICLE_CATEGORIES.map((category) => (
+                    <Route
+                      key={category.slug}
+                      path={`/${category.slug}`}
+                      element={<CategoriaPage slug={category.slug} />}
+                    />
+                  ))}
+                  <Route path="/tag/:slug" element={<TagPage />} />
                   <Route path="/salas" element={<SalasPage />} />
                   <Route path="/salas/:slug" element={<SalaDetailPage />} />
                   <Route path="/sorteotv" element={<SorteoTvPage />} />
@@ -74,118 +94,35 @@ const App = () => (
                       )
                     }
                   />
+                  {/*
+                    El layout se monta con StaffRoute (admin O moderador) para
+                    que un moderador siga llegando a /admin/moderacion. Cada
+                    pantalla mantiene su propia guarda: casi todas son AdminRoute.
+                  */}
                   <Route
                     path="/admin"
                     element={
-                      <AdminRoute>
-                        <AdminDashboard />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/eventos"
-                    element={
-                      <AdminRoute>
-                        <AdminEventos />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/insights"
-                    element={
-                      <AdminRoute>
-                        <AdminInsights />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/noticias"
-                    element={
-                      <AdminRoute>
-                        <AdminNoticias />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/noticias/instagram"
-                    element={
-                      <AdminRoute>
-                        <AdminNoticiasInstagram />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/liveblogs"
-                    element={
-                      <AdminRoute>
-                        <AdminLiveblogs />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/stories"
-                    element={
-                      <AdminRoute>
-                        <AdminStoriesQueue />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/sorteos"
-                    element={
-                      <AdminRoute>
-                        <AdminSorteos />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/moderacion"
-                    element={
                       <StaffRoute>
-                        <AdminModeracion />
+                        <AdminLayout />
                       </StaffRoute>
                     }
-                  />
-                  <Route
-                    path="/admin/leads"
-                    element={
-                      <AdminRoute>
-                        <AdminLeads />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/chat-leads"
-                    element={
-                      <AdminRoute>
-                        <AdminChatLeads />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/banners"
-                    element={
-                      <AdminRoute>
-                        <AdminBanners />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/usuarios"
-                    element={
-                      <AdminRoute>
-                        <AdminUsers />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/campeones"
-                    element={
-                      <AdminRoute>
-                        <AdminCampeones />
-                      </AdminRoute>
-                    }
-                  />
+                  >
+                    <Route index element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                    <Route path="eventos" element={<AdminRoute><AdminEventos /></AdminRoute>} />
+                    <Route path="insights" element={<AdminRoute><AdminInsights /></AdminRoute>} />
+                    <Route path="noticias" element={<AdminRoute><AdminNoticias /></AdminRoute>} />
+                    <Route path="taxonomia" element={<AdminRoute><AdminTaxonomia /></AdminRoute>} />
+                    <Route path="noticias/instagram" element={<AdminRoute><AdminNoticiasInstagram /></AdminRoute>} />
+                    <Route path="liveblogs" element={<AdminRoute><AdminLiveblogs /></AdminRoute>} />
+                    <Route path="stories" element={<AdminRoute><AdminStoriesQueue /></AdminRoute>} />
+                    <Route path="sorteos" element={<AdminRoute><AdminSorteos /></AdminRoute>} />
+                    <Route path="moderacion" element={<StaffRoute><AdminModeracion /></StaffRoute>} />
+                    <Route path="leads" element={<AdminRoute><AdminLeads /></AdminRoute>} />
+                    <Route path="chat-leads" element={<AdminRoute><AdminChatLeads /></AdminRoute>} />
+                    <Route path="banners" element={<AdminRoute><AdminBanners /></AdminRoute>} />
+                    <Route path="usuarios" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+                    <Route path="campeones" element={<AdminRoute><AdminCampeones /></AdminRoute>} />
+                  </Route>
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                 <Footer />

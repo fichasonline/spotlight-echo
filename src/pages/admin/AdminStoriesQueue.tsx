@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { ArrowLeft, ExternalLink, Loader2, RefreshCw, Send, Sparkles } from "lucide-react";
-import { Navbar } from "@/components/Navbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -151,7 +150,6 @@ export default function AdminStoriesQueue() {
   return (
     <>
       <div className="min-h-screen bg-background">
-        <Navbar />
         <div className="container mx-auto px-4 py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -270,7 +268,7 @@ export default function AdminStoriesQueue() {
                   className="max-h-[82vh] w-auto max-w-full rounded-md object-contain shadow-2xl"
                 />
               ) : (
-                <div className="flex aspect-[9/16] w-full max-w-[320px] items-center justify-center rounded-md border border-white/10 text-sm text-white/70">
+                <div className="flex aspect-[9/16] w-full max-w-[320px] items-center justify-center rounded-md border border-brand-light/10 text-sm text-brand-light/70">
                   Sin imagen asociada
                 </div>
               )}

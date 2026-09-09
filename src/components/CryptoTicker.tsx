@@ -130,13 +130,13 @@ export function CryptoTicker() {
         {items.map((coin, i) => (
           <div
             key={`${coin.binanceSymbol}-${i}`}
-            className="inline-flex items-center gap-2 px-5 py-2 border-r border-white/10 shrink-0"
+            className="inline-flex items-center gap-2 px-5 py-2 border-r border-brand-light/10 shrink-0"
           >
-            <span className="text-xs font-bold text-white/50">
+            <span className="text-xs font-bold text-brand-light/50">
               {coin.name}
-              <span className="text-white/30 ml-1">({coin.symbol})</span>
+              <span className="text-brand-light/30 ml-1">({coin.symbol})</span>
             </span>
-            <span className="text-xs font-bold text-white tabular-nums">
+            <span className="text-xs font-bold text-brand-light tabular-nums">
               {coin.price > 0 ? `$${formatPrice(coin.price)}` : "—"}
             </span>
             {coin.price > 0 && (

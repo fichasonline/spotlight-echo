@@ -290,7 +290,7 @@ export default function EventoDetailPage() {
           <span className="inline-flex justify-end">
             {openPdfButton}
           </span>
-          <span className="block overflow-hidden rounded-lg border border-border bg-white">
+          <span className="block overflow-hidden rounded-lg border border-border bg-brand-light">
             <iframe
               src={buildPdfPreviewUrl(pdfUrl)}
               title="Previsualización de PDF"

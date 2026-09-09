@@ -7,7 +7,8 @@ const ShinyText = ({
   speed = 2,
   className = '',
   color = '#b5b5b5',
-  shineColor = '#ffffff',
+  // Gris claro de marca: el manual prohíbe el blanco pleno.
+  shineColor = '#C5C5C5',
   spread = 120,
   yoyo = false,
   pauseOnHover = false,

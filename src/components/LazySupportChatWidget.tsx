@@ -45,7 +45,7 @@ export function LazySupportChatWidget({ triggerVariant = "floating" }: LazySuppo
           type="button"
           onClick={handleOpen}
           aria-label="Abrir chat de soporte"
-          className="group w-full rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(41,30,52,0.92),rgba(28,21,36,0.94))] p-[10px] text-left shadow-[0_14px_34px_rgba(0,0,0,0.34)] transition-all hover:border-primary/40 hover:shadow-[0_18px_40px_rgba(87,52,127,0.34)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          className="group w-full rounded-[20px] border border-brand-light/10 bg-[linear-gradient(180deg,rgba(41,30,52,0.92),rgba(28,21,36,0.94))] p-[10px] text-left shadow-[0_14px_34px_rgba(0,0,0,0.34)] transition-all hover:border-primary/40 hover:shadow-[0_18px_40px_rgba(87,52,127,0.34)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
         >
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
