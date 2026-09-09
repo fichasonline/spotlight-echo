@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,13 +9,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { Menu, X, LogOut, Shield } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Menu, X, LogOut, Shield, Search } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { LazySupportChatWidget } from "@/components/LazySupportChatWidget";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { useTheme } from "@/contexts/ThemeContext";
+import { ARTICLE_CATEGORIES } from "@/lib/taxonomy";
+import { getLocalDateISO } from "@/lib/date";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { SHOW_FEED } from "@/lib/feature-flags";
 
 const LOGO_URL = "/Group%20789.svg";
+
+/*
+ * El masthead vive siempre sobre violeta profundo (el manual lo trata como
+ * pieza de marca, no como superficie del tema), así que los controles que
+ * heredan color del tema — ThemeToggle y el disparador del chat — se fuerzan
+ * al gris claro desde acá en vez de duplicar esos componentes.
+ */
+const ON_VIOLET_ICON_BUTTON =
+  "[&_button]:h-9 [&_button]:w-9 [&_button]:text-brand-light/80 [&_button:hover]:bg-brand-light/10 [&_button:hover]:text-brand-light";
 
 function getInitial(name: string | null | undefined) {
   const cleanName = name?.trim();
@@ -23,140 +36,258 @@ function getInitial(name: string | null | undefined) {
   return cleanName[0]?.toUpperCase() ?? "U";
 }
 
+/** Evento en curso hoy, para la franja "EN VIVO" de la barra utilitaria. */
+function useLiveEvent() {
+  const [liveEvent, setLiveEvent] = useState<{ id: string; name: string } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const today = getLocalDateISO();
+
+    void (async () => {
+      const { data } = await supabase
+        .from("events")
+        .select("id, name, start_date, end_date")
+        .eq("status", "published")
+        .lte("start_date", today)
+        .or(`end_date.gte.${today},end_date.is.null`)
+        .order("start_date", { ascending: false })
+        .limit(1);
+
+      if (!cancelled && data?.[0]) setLiveEvent({ id: data[0].id, name: data[0].name });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return liveEvent;
+}
+
 export function Navbar() {
   const { user, profile, isAnonymous, isAdmin, isStaff, signOut } = useAuth();
-  const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const liveEvent = useLiveEvent();
+
   const staffLink = isAdmin
     ? { to: "/admin", label: "Admin" }
     : isStaff
       ? { to: "/admin/moderacion", label: "Moderación" }
       : null;
 
-  const links = [
-    { to: "/", label: "Inicio" },
+  /* Nav editorial: las 5 categorías del manual + calendario. */
+  const sectionLinks = [
+    ...ARTICLE_CATEGORIES.map((c) => ({ to: `/${c.slug}`, label: c.label })),
     { to: "/calendario", label: "Calendario" },
-    { to: "/noticias", label: "Noticias" },
-    ...(user && !isAnonymous ? [{ to: "/feed", label: "Feed" }] : []),
+  ];
+
+  const mobileLinks = [
+    { to: "/", label: "Inicio" },
+    ...sectionLinks,
+    { to: "/noticias", label: "Todas las noticias" },
+    ...(SHOW_FEED && user && !isAnonymous ? [{ to: "/feed", label: "Feed" }] : []),
     ...(staffLink ? [staffLink] : []),
   ];
 
   useEffect(() => {
     setMobileOpen(false);
+    setSearchOpen(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+
+  const submitSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const term = query.trim();
+    if (!term) return;
+    navigate(`/noticias?q=${encodeURIComponent(term)}`);
+    setSearchOpen(false);
+  };
+
   return (
-    <nav className="sticky top-0 z-50 border-b border-primary/25 bg-background/90 backdrop-blur-xl">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link to="/" className="group flex items-center">
-          <span className={cn(
-            "flex items-center transition-all duration-300",
-            theme === "light" && "rounded-lg bg-[#1a0f2e] px-2 py-1"
-          )}>
-            <img
-              src={LOGO_URL}
-              alt="Fichas Online"
-              className="h-8 w-auto object-contain drop-shadow-[0_0_14px_hsl(273_66%_66%_/_0.35)] transition-transform duration-300 group-hover:scale-[1.02] md:h-9"
-            />
-          </span>
-        </Link>
-
-        {/* Desktop links */}
-        <div className="hidden items-center gap-2 rounded-full border border-primary/20 bg-muted/40 p-1 md:flex">
-          {links.map((l) => (
-            <Link
-              key={l.to}
-              to={l.to}
-              className={cn(
-                "relative rounded-full px-4 py-2 text-sm font-medium transition-colors",
-                location.pathname === l.to ? "text-foreground" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {location.pathname === l.to && (
-                <span className="absolute inset-0 -z-10 rounded-full border border-primary/45 bg-primary/20 transition-all duration-200" />
-              )}
-              {l.label}
-            </Link>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <LazySupportChatWidget triggerVariant="header" />
-
-          <div className="hidden md:flex items-center gap-3">
-            {user && !isAnonymous ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={profile?.avatar_url ?? undefined} />
-                      <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
-                        {getInitial(profile?.display_name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm font-medium text-foreground">
-                      {profile?.display_name ?? "Usuario"}
-                    </span>
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {isAdmin && (
-                    <DropdownMenuItem onClick={() => navigate("/admin")}>
-                      <Shield className="mr-2 h-4 w-4" /> Admin
-                    </DropdownMenuItem>
-                  )}
-                  {isStaff && (
-                    <DropdownMenuItem onClick={() => navigate("/admin/moderacion")}>
-                      <Shield className="mr-2 h-4 w-4" /> Moderación
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={signOut}>
-                    <LogOut className="mr-2 h-4 w-4" /> Cerrar sesión
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button
-                size="sm"
-                onClick={() => navigate("/auth")}
-                className="bg-primary text-primary-foreground font-semibold shadow-[0_0_16px_hsl(273_66%_56%_/_0.32)] hover:bg-primary/90"
-              >
-                Iniciar sesión
-              </Button>
-            )}
-          </div>
-
-          {/* Mobile toggle */}
-          <button
-            className="md:hidden text-foreground"
-            onClick={() => setMobileOpen((prev) => !prev)}
-            aria-expanded={mobileOpen}
-            aria-controls="mobile-nav-menu"
-            aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
+    <header className="sticky top-0 z-50">
+      {/* ── Barra utilitaria ─────────────────────────────────────────── */}
+      <div className="hidden h-[34px] items-center justify-between bg-[hsl(273_100%_13%)] px-4 md:flex lg:px-10">
+        {liveEvent ? (
+          <Link
+            to={`/eventos/${liveEvent.id}`}
+            className="flex items-center gap-1.5 text-[11px] font-semibold leading-ui tracking-[0.05em] text-brand-light hover:underline"
           >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+            <span className="inline-block h-1.5 w-1.5 animate-pulse-glow rounded-full bg-red-500" />
+            EN VIVO: {liveEvent.name}
+          </Link>
+        ) : (
+          <span className="text-[11px] font-semibold leading-ui tracking-[0.05em] text-brand-light/70">
+            El portal del póker en Hispanoamérica
+          </span>
+        )}
+
+        <div className="flex items-center gap-4 text-[11px] font-medium text-brand-light/60">
+          <span className="first-letter:uppercase">
+            {format(new Date(), "EEEE d 'de' MMMM", { locale: es })}
+          </span>
+          <span className="opacity-50">|</span>
+          <span>Edición Hispanoamérica</span>
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* ── Masthead ─────────────────────────────────────────────────── */}
+      <div className="border-b border-brand-violet/40 bg-brand-violet-deep">
+        <div className="flex h-[68px] items-center justify-between gap-4 px-4 lg:h-[78px] lg:px-10">
+          <div className="flex min-w-0 items-center gap-6 xl:gap-10">
+            <Link to="/" className="flex shrink-0 items-center gap-2.5">
+              <img
+                src={LOGO_URL}
+                alt="Fichas News"
+                className="h-8 w-auto object-contain md:h-9"
+              />
+            </Link>
+
+            <nav className="hidden min-w-0 items-center gap-4 xl:flex xl:gap-6">
+              {sectionLinks.map((l) => (
+                <Link
+                  key={l.to}
+                  to={l.to}
+                  className={cn(
+                    "whitespace-nowrap text-[13px] font-semibold leading-ui transition-colors xl:text-sm",
+                    location.pathname === l.to
+                      ? "text-brand-light"
+                      : "text-brand-light/75 hover:text-brand-light",
+                  )}
+                >
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-2 lg:gap-3">
+            {searchOpen ? (
+              <form onSubmit={submitSearch} className="hidden items-center md:flex">
+                <input
+                  ref={searchInputRef}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onBlur={() => !query && setSearchOpen(false)}
+                  placeholder="Buscar noticias…"
+                  aria-label="Buscar noticias"
+                  className="h-9 w-[220px] rounded-md border border-brand-light/25 bg-brand-light/10 px-3 text-[13px] text-brand-light placeholder:text-brand-light/50 focus:outline-none focus:ring-2 focus:ring-brand-violet-bright"
+                />
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                aria-label="Buscar"
+                className="hidden h-9 w-9 items-center justify-center rounded-full text-brand-light/80 transition-colors hover:bg-brand-light/10 hover:text-brand-light md:flex"
+              >
+                <Search className="h-[18px] w-[18px]" />
+              </button>
+            )}
+
+            <span className={ON_VIOLET_ICON_BUTTON}>
+              <ThemeToggle />
+            </span>
+            <span className={ON_VIOLET_ICON_BUTTON}>
+              <LazySupportChatWidget triggerVariant="header" />
+            </span>
+
+            <div className="hidden items-center gap-3 md:flex">
+              {user && !isAnonymous ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-2 transition-opacity hover:opacity-80">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={profile?.avatar_url ?? undefined} />
+                        <AvatarFallback className="bg-brand-violet text-xs text-brand-light">
+                          {getInitial(profile?.display_name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="max-w-[140px] truncate text-sm font-medium text-brand-light">
+                        {profile?.display_name ?? "Usuario"}
+                      </span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {isAdmin && (
+                      <DropdownMenuItem onClick={() => navigate("/admin")}>
+                        <Shield className="mr-2 h-4 w-4" /> Admin
+                      </DropdownMenuItem>
+                    )}
+                    {isStaff && (
+                      <DropdownMenuItem onClick={() => navigate("/admin/moderacion")}>
+                        <Shield className="mr-2 h-4 w-4" /> Moderación
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onClick={signOut}>
+                      <LogOut className="mr-2 h-4 w-4" /> Cerrar sesión
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate("/auth")}
+                  className="h-9 rounded-md bg-brand-violet px-5 text-[13px] font-bold leading-ui text-brand-light transition-colors hover:bg-brand-violet-bright"
+                >
+                  Iniciar sesión
+                </button>
+              )}
+            </div>
+
+            <button
+              className="text-brand-light xl:hidden"
+              onClick={() => setMobileOpen((prev) => !prev)}
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-nav-menu"
+              aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
+            >
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Menú mobile ──────────────────────────────────────────────── */}
       {mobileOpen && (
         <div
           id="mobile-nav-menu"
-          className="mobile-nav-menu overflow-hidden border-b border-primary/20 bg-card md:hidden"
+          className="mobile-nav-menu overflow-hidden border-b border-border bg-card xl:hidden"
         >
-          <div className="px-4 pb-4 pt-2 space-y-1">
-            {links.map((l) => (
+          <div className="space-y-1 px-4 pb-4 pt-3">
+            <form onSubmit={submitSearch} className="mb-3 flex items-center gap-2">
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar noticias…"
+                aria-label="Buscar noticias"
+                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+              <button
+                type="submit"
+                aria-label="Buscar"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
+              >
+                <Search className="h-4 w-4" />
+              </button>
+            </form>
+
+            {mobileLinks.map((l) => (
               <div key={l.to} className="mobile-nav-item">
                 <Link
                   to={l.to}
                   className={cn(
-                    "block rounded-lg px-3 py-2 text-sm transition-colors",
+                    "block rounded-md px-3 py-2 text-sm transition-colors",
                     location.pathname === l.to
-                      ? "bg-primary/10 text-foreground border border-primary/30"
+                      ? "border border-primary/30 bg-primary/10 text-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >
@@ -164,17 +295,18 @@ export function Navbar() {
                 </Link>
               </div>
             ))}
+
             {user && !isAnonymous ? (
               <button
                 onClick={signOut}
-                className="mt-2 block w-full rounded-lg px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                className="mt-2 block w-full rounded-md px-3 py-2 text-left text-sm text-destructive transition-colors hover:bg-destructive/10"
               >
                 Cerrar sesión
               </button>
             ) : (
               <Link
                 to="/auth"
-                className="mt-2 block rounded-lg px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/10 transition-colors"
+                className="mt-2 block rounded-md px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
               >
                 Iniciar sesión
               </Link>
@@ -182,6 +314,6 @@ export function Navbar() {
           </div>
         </div>
       )}
-    </nav>
+    </header>
   );
 }

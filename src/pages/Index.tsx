@@ -1,23 +1,40 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject, type RefObject } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { HomeSplashScreen } from "@/components/HomeSplashScreen";
 import { Link } from "react-router-dom";
-import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
-import { LazySupportChatWidget } from "@/components/LazySupportChatWidget";
+import { BreakingTicker } from "@/components/BreakingTicker";
 import { CryptoTicker } from "@/components/CryptoTicker";
 import { BannerMedia } from "@/components/BannerMedia";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { PartnerMarquee } from "@/components/PartnerMarquee";
-import { Calendar, Newspaper, MessageSquare, ArrowRight, Send, Instagram, Copy, ExternalLink } from "lucide-react";
-import { format } from "date-fns";
+import {
+  ArrowRight,
+  Calendar,
+  Copy,
+  ExternalLink,
+  ImageIcon,
+  Instagram,
+  MessageSquare,
+  Send,
+  Trophy,
+  User,
+} from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { getLocalDateISO, parseDateValue } from "@/lib/date";
 import { getArticleImageStyle } from "@/lib/article-image";
+import { categoryLabel } from "@/lib/taxonomy";
+import { SOCIAL_URLS } from "@/lib/social";
 
-const NEWS_CAROUSEL_LIMIT = 10;
+/*
+ * Cuántas notas pide la home. El reparto por bloque está más abajo, en
+ * `layout`: 1 hero + 4 en la grilla de últimas + 2 destacados + 3 en "más
+ * noticias". Se pide una de más para tener margen si alguna viene sin datos.
+ */
+const HOME_ARTICLE_LIMIT = 11;
 
 /* ─── Types ────────────────────────────────────────────────────── */
 interface Article {
@@ -30,6 +47,7 @@ interface Article {
   image_position_y: number | null;
   created_at: string;
   published_at: string | null;
+  category: string | null;
 }
 
 interface Event {
@@ -40,6 +58,16 @@ interface Event {
   city: string | null;
   country: string | null;
   venue: string | null;
+  hero_image_url: string | null;
+}
+
+interface Champion {
+  id: string;
+  name: string;
+  tournament: string;
+  amount: number;
+  currency: "UYU" | "USD";
+  image_url: string | null;
 }
 
 interface HomeBanner {
@@ -59,85 +87,7 @@ interface PartnerRoom {
   href?: string;
 }
 
-function useAutoHorizontalScroll({
-  containerRef,
-  pauseRef,
-  enabled,
-  intervalMs = 4200,
-}: {
-  containerRef: RefObject<HTMLDivElement>;
-  pauseRef: MutableRefObject<boolean>;
-  enabled: boolean;
-  intervalMs?: number;
-}) {
-  useEffect(() => {
-    if (typeof window === "undefined" || !enabled) return;
-
-    const container = containerRef.current;
-    if (!container) return;
-
-    const reducedMotionMq = window.matchMedia("(prefers-reduced-motion: reduce)");
-
-    if (reducedMotionMq.matches) return;
-
-    const intervalId = window.setInterval(() => {
-      if (pauseRef.current || document.hidden) return;
-
-      const firstCard = container.querySelector<HTMLElement>("[data-carousel-card='true']");
-      const computedStyle = window.getComputedStyle(container);
-      const gapValue = computedStyle.columnGap !== "normal" ? computedStyle.columnGap : computedStyle.gap;
-      const gap = Number.parseFloat(gapValue || "0") || 0;
-      const step = firstCard ? firstCard.getBoundingClientRect().width + gap : container.clientWidth;
-      const maxScrollLeft = Math.max(container.scrollWidth - container.clientWidth, 0);
-
-      if (maxScrollLeft <= 0) return;
-
-      const nextLeft = container.scrollLeft + step;
-      if (nextLeft >= maxScrollLeft - 2) {
-        container.scrollTo({ left: 0, behavior: "smooth" });
-        return;
-      }
-
-      container.scrollTo({ left: nextLeft, behavior: "smooth" });
-    }, intervalMs);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [containerRef, pauseRef, enabled, intervalMs]);
-}
-
-function useVerticalScrollPassthrough(scrollerRef: RefObject<HTMLDivElement>) {
-  useEffect(() => {
-    const container = scrollerRef.current;
-    if (!container) return;
-    const handleWheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-        e.preventDefault();
-        window.scrollBy({ top: e.deltaY, behavior: "auto" });
-      }
-    };
-    container.addEventListener("wheel", handleWheel, { passive: false });
-    return () => container.removeEventListener("wheel", handleWheel);
-  }, [scrollerRef]);
-}
-
-function useScrollDots(scrollerRef: RefObject<HTMLDivElement>, count: number) {
-  const [activeIndex, setActiveIndex] = useState(0);
-  useEffect(() => {
-    const container = scrollerRef.current;
-    if (!container || count === 0) return;
-    const handleScroll = () => {
-      const itemWidth = container.scrollWidth / count;
-      const index = Math.round(container.scrollLeft / itemWidth);
-      setActiveIndex(Math.max(0, Math.min(index, count - 1)));
-    };
-    container.addEventListener("scroll", handleScroll, { passive: true });
-    return () => container.removeEventListener("scroll", handleScroll);
-  }, [scrollerRef, count]);
-  return activeIndex;
-}
-
+/* ─── Helpers ──────────────────────────────────────────────────── */
 async function copyToClipboard(text: string) {
   if (!text) return;
 
@@ -181,7 +131,205 @@ function buildCleanAdUrl(linkUrl: string | null, affiliateCode: string | null) {
   }
 }
 
-/* ─── Banner slot ─────────────────────────────────────────────── */
+/** "hace 2 horas" — la marca de tiempo que el diseño pone al pie de cada nota. */
+function relativeTime(article: Article) {
+  return formatDistanceToNow(parseDateValue(article.published_at || article.created_at), {
+    locale: es,
+    addSuffix: true,
+  });
+}
+
+/**
+ * "Del 04 al 08 de septiembre" cuando el evento no cruza de mes, y
+ * "Del 31 de agosto al 12 de septiembre" cuando sí — omitir el mes de
+ * arranque en ese caso daba rangos ilegibles ("Del 31 al 12 de septiembre").
+ */
+function formatEventRange(event: Event) {
+  const start = parseDateValue(event.start_date);
+  if (!event.end_date) return format(start, "d 'de' MMMM", { locale: es });
+
+  const end = parseDateValue(event.end_date);
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  const startLabel = sameMonth
+    ? format(start, "d", { locale: es })
+    : format(start, "d 'de' MMMM", { locale: es });
+
+  return `Del ${startLabel} al ${format(end, "d 'de' MMMM", { locale: es })}`;
+}
+
+function formatChampionAmount(champion: Champion) {
+  const symbol = champion.currency === "USD" ? "US$" : "$";
+  return `${symbol}${Math.round(champion.amount).toLocaleString("es-UY")}`;
+}
+
+/* ─── Piezas ───────────────────────────────────────────────────── */
+
+/** Marco de imagen con el fallback rayado del diseño cuando no hay foto. */
+function StoryImage({
+  src,
+  alt,
+  style,
+  className,
+}: {
+  src: string | null;
+  alt: string;
+  style?: CSSProperties;
+  className?: string;
+}) {
+  if (src) {
+    return (
+      <BannerMedia
+        src={src}
+        alt={alt}
+        style={style}
+        className={className ?? "h-full w-full object-cover"}
+        loading="lazy"
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-[repeating-linear-gradient(135deg,hsl(var(--muted))_0_14px,hsl(var(--card))_14px_28px)] text-muted-foreground">
+      <ImageIcon className="h-6 w-6" aria-hidden="true" />
+    </div>
+  );
+}
+
+/** Nota destacada a sangre: foto, degradé, categoría, título y bajada. */
+function StoryCard({
+  article,
+  heightClass,
+  titleClass,
+  delay = 0,
+}: {
+  article: Article;
+  heightClass: string;
+  titleClass: string;
+  delay?: number;
+}) {
+  return (
+    <Link
+      to={`/noticias/${article.slug}`}
+      style={{ "--card-reveal-delay": `${delay}ms` } as CSSProperties}
+      className={`card-reveal group relative flex min-w-0 overflow-hidden rounded-xl ${heightClass}`}
+    >
+      <div className="absolute inset-0">
+        <StoryImage
+          src={article.image_url}
+          alt={article.headline}
+          style={getArticleImageStyle(article)}
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+        />
+      </div>
+
+      <div className="absolute inset-0 bg-gradient-to-t from-brand-violet-deep/95 via-brand-violet-deep/35 to-transparent" />
+
+      <div className="relative mt-auto flex flex-col gap-2.5 p-6 lg:p-7">
+        {article.category && (
+          <span className="self-start rounded-sm bg-brand-light/20 px-2.5 py-1 text-[11px] font-bold uppercase leading-caption tracking-caption text-brand-light backdrop-blur-sm">
+            {categoryLabel(article.category)}
+          </span>
+        )}
+        <h3
+          className={`m-0 max-w-[22ch] font-bold leading-[1.06] tracking-h1 text-brand-light drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)] ${titleClass}`}
+        >
+          {article.headline}
+        </h3>
+        {article.summary && (
+          <p className="m-0 line-clamp-2 max-w-[52ch] text-[15px] leading-body text-brand-light/80">
+            {article.summary}
+          </p>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+/**
+ * Nota vertical con foto grande: la pieza del bloque "Últimas noticias".
+ * La grilla 2×2 tenía sólo miniaturas de 104px y dejaba la mitad de la caja
+ * vacía; acá la foto manda (16:9 a todo el ancho) y el titular entra en cuerpo
+ * de subtítulo, no de epígrafe.
+ */
+function StoryTile({ article, delay = 0 }: { article: Article; delay?: number }) {
+  return (
+    <Link
+      to={`/noticias/${article.slug}`}
+      style={{ "--card-reveal-delay": `${delay}ms` } as CSSProperties}
+      className="card-reveal group flex min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card transition-colors hover:border-primary/45"
+    >
+      <div className="aspect-[16/9] w-full overflow-hidden">
+        <StoryImage
+          src={article.image_url}
+          alt={article.headline}
+          style={getArticleImageStyle(article)}
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+        />
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col gap-2 p-4">
+        {article.category && (
+          <span className="self-start rounded-sm bg-brand-violet-deep px-2 py-0.5 text-[10px] font-bold uppercase leading-caption tracking-caption text-brand-light">
+            {categoryLabel(article.category)}
+          </span>
+        )}
+        <h4 className="m-0 line-clamp-3 text-[19px] font-bold leading-h2 tracking-h2 text-foreground transition-colors group-hover:text-primary">
+          {article.headline}
+        </h4>
+        <span className="mt-auto pt-1 text-[12.5px] leading-caption text-muted-foreground first-letter:uppercase">
+          {relativeTime(article)}
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+/** Nota horizontal: miniatura + categoría + título + tiempo. Bloques secundarios. */
+function StoryRow({ article, delay = 0 }: { article: Article; delay?: number }) {
+  return (
+    <Link
+      to={`/noticias/${article.slug}`}
+      style={{ "--card-reveal-delay": `${delay}ms` } as CSSProperties}
+      className="card-reveal group flex min-w-0 items-start gap-3.5 rounded-md border border-border bg-card p-3 transition-colors hover:border-primary/45"
+    >
+      <div className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-sm sm:h-[104px] sm:w-[104px]">
+        <StoryImage
+          src={article.image_url}
+          alt={article.headline}
+          style={getArticleImageStyle(article)}
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+      </div>
+
+      <div className="flex min-w-0 flex-col gap-1.5">
+        {article.category && (
+          <span className="self-start rounded-sm bg-brand-violet-deep px-2 py-0.5 text-[10px] font-bold uppercase leading-caption tracking-caption text-brand-light">
+            {categoryLabel(article.category)}
+          </span>
+        )}
+        <h4 className="m-0 line-clamp-4 text-[16px] font-bold leading-h2 tracking-h2 text-foreground transition-colors group-hover:text-primary sm:line-clamp-3 sm:text-[17px]">
+          {article.headline}
+        </h4>
+        <span className="text-[12.5px] leading-caption text-muted-foreground first-letter:uppercase">
+          {relativeTime(article)}
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+/** Encabezado de bloque: el rótulo violeta en versalitas del diseño. */
+function SectionLabel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <span
+      className={`text-[15px] font-bold uppercase leading-ui tracking-caption text-primary ${className}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+/* ─── Banners ──────────────────────────────────────────────────── */
 function BannerSlot({
   banner,
   className = "",
@@ -209,30 +357,24 @@ function BannerSlot({
       playsInline
     />
   ) : (
-    <div
-      className="flex h-full w-full flex-col items-center justify-center gap-2"
-      style={{
-        background:
-          "linear-gradient(135deg, rgba(88,28,135,0.15) 0%, rgba(15,12,22,0.55) 100%)",
-      }}
-    >
-      <div className="w-9 h-9 rounded-full border border-primary/25 flex items-center justify-center">
-        <span className="text-primary/40 text-xl font-light leading-none">+</span>
+    <div className="flex h-full w-full flex-col items-center justify-center gap-2 border border-dashed border-border bg-muted/50">
+      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/25">
+        <span className="text-xl font-light leading-none text-primary/50">+</span>
       </div>
-      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-light/20">
+      <span className="text-[10px] font-bold uppercase leading-caption tracking-caption text-muted-foreground">
         Espacio publicitario
       </span>
     </div>
   );
 
-  const base = `overflow-hidden rounded-[26px] border border-brand-light/10 bg-black/40 ${className}`;
+  const base = `overflow-hidden rounded-xl bg-muted/40 ${className}`;
 
   if (hasAction && shouldOpenModal && banner) {
     return (
       <button
         type="button"
         onClick={() => onAction?.(banner)}
-        className={`block w-full appearance-none border-0 bg-transparent p-0 text-left transition-opacity hover:opacity-90 ${base}`}
+        className={`block w-full appearance-none border-0 p-0 text-left transition-opacity hover:opacity-90 ${base}`}
       >
         {content}
       </button>
@@ -254,6 +396,7 @@ function BannerSlot({
   return <div className={base}>{content}</div>;
 }
 
+/** Banner vertical (231×411) — los dos que flanquean el bloque promocional. */
 function PortraitBannerSlot({
   banner,
   className = "",
@@ -263,97 +406,37 @@ function PortraitBannerSlot({
   className?: string;
   onAction?: (banner: HomeBanner) => void;
 }) {
-  const hasImage = !!(banner?.image_url && banner.is_active);
-  const hasAction = hasImage && Boolean(banner?.link_url || banner?.affiliate_code);
-  const shouldOpenModal = hasAction && Boolean(banner?.affiliate_code) && Boolean(onAction);
-
-  const content = hasImage ? (
-    <div className="h-[411px] w-[231px] overflow-hidden rounded-[24px] bg-[#100b15]">
-      <BannerMedia
-        src={banner!.image_url!}
-        alt={banner?.alt_text}
-        className="h-full w-full object-cover"
-        loading="lazy"
-        autoPlay
-        loop
-        muted
-        playsInline
-      />
-    </div>
-  ) : (
-    <div className="flex h-[411px] w-[231px] flex-col items-center justify-center gap-3 rounded-[24px] border border-brand-light/10 bg-[#120d18]">
-      <div className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/25">
-        <span className="text-xl font-light leading-none text-primary/40">+</span>
-      </div>
-      <span className="text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-light/20">
-        Espacio publicitario
-      </span>
-    </div>
+  return (
+    <BannerSlot
+      banner={banner}
+      className={`aspect-[231/411] w-full lg:h-[411px] lg:w-[231px] ${className}`}
+      onAction={onAction}
+    />
   );
-
-  const base = `flex h-[443px] w-[263px] shrink-0 items-center justify-center rounded-[38px] bg-black/95 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.48)] ${className}`;
-
-  if (hasAction && shouldOpenModal && banner) {
-    return (
-      <button
-        type="button"
-        onClick={() => onAction?.(banner)}
-        className={`${base} appearance-none border-0 bg-transparent text-left transition-transform duration-300 hover:-translate-y-1`}
-      >
-        {content}
-      </button>
-    );
-  }
-
-  if (hasImage && banner?.link_url) {
-    return (
-      <a
-        href={banner.link_url}
-        target="_blank"
-        rel="noreferrer noopener"
-        className={`${base} transition-transform duration-300 hover:-translate-y-1`}
-      >
-        {content}
-      </a>
-    );
-  }
-
-  return <div className={base}>{content}</div>;
 }
 
 /* ─── Page ────────────────────────────────────────────────────── */
 export default function HomePage() {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
-  const [articles, setArticles]           = useState<Article[]>([]);
-  const [events, setEvents]               = useState<Event[]>([]);
-  const [banners, setBanners]             = useState<Record<string, HomeBanner>>({});
-  const [activeBanner, setActiveBanner]   = useState<HomeBanner | null>(null);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [champions, setChampions] = useState<Champion[]>([]);
+  const [banners, setBanners] = useState<Record<string, HomeBanner>>({});
+  const [activeBanner, setActiveBanner] = useState<HomeBanner | null>(null);
   const [hasFetchedBanners, setHasFetchedBanners] = useState(false);
-  const [splashDone, setSplashDone] = useState(false);
-  const today                   = getLocalDateISO();
-  const articlesScrollerRef     = useRef<HTMLDivElement | null>(null);
-  const eventsScrollerRef       = useRef<HTMLDivElement | null>(null);
-  const newsAutoScrollPausedRef = useRef(false);
-  const eventsAutoScrollPausedRef = useRef(false);
-  const eventBannerInsertAfterIndex = 2;
-  const hasEventsBannerCard = events.length > eventBannerInsertAfterIndex;
-  const eventsCarouselCount = events.length + (hasEventsBannerCard ? 1 : 0);
-  const activeArticleIndex = useScrollDots(articlesScrollerRef, articles.length);
-  const activeEventIndex = useScrollDots(eventsScrollerRef, eventsCarouselCount);
-  useVerticalScrollPassthrough(articlesScrollerRef);
-  useVerticalScrollPassthrough(eventsScrollerRef);
+  const today = getLocalDateISO();
 
   const { toast } = useToast();
 
-  const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL?.trim() || "https://instagram.com/fichasonlineuy";
-  const telegramUrl  = import.meta.env.VITE_TELEGRAM_URL?.trim()  || "https://t.me/+59891856965";
-  const whatsappUrl  = import.meta.env.VITE_WHATSAPP_URL?.trim()  || "https://wa.me";
-
   const socialLinks = [
-    { label: "Instagram", href: instagramUrl, description: "Fotos, clips y anuncios",        icon: Instagram },
-    { label: "Telegram",  href: telegramUrl,  description: "Canal de novedades",              icon: Send },
-    { label: "WhatsApp",  href: whatsappUrl,  description: "Contacto directo (proximamente)", icon: MessageSquare, disabled: true },
+    { label: "Instagram", href: SOCIAL_URLS.instagram, description: "Fotos, clips y anuncios", icon: Instagram },
+    { label: "Telegram", href: SOCIAL_URLS.telegram, description: "Canal de novedades", icon: Send },
+    {
+      label: "WhatsApp",
+      href: SOCIAL_URLS.whatsapp,
+      description: "Contacto directo (proximamente)",
+      icon: MessageSquare,
+      disabled: true,
+    },
   ];
 
   const partnerRooms = useMemo<PartnerRoom[]>(
@@ -394,6 +477,20 @@ export default function HomePage() {
     });
   }, [partnerRooms]);
 
+  /* Reparto de las notas por bloque, en el orden del diseño. */
+  const layout = useMemo(() => {
+    const hero = articles[0] ?? null;
+    return {
+      hero,
+      latest: articles.slice(1, 5),
+      features: articles.slice(5, 7),
+      more: articles.slice(7, 10),
+      ticker: articles.slice(0, 5).map((a) => ({ slug: a.slug, headline: a.headline })),
+    };
+  }, [articles]);
+
+  const nextEvent = events[0] ?? null;
+
   const buildAffiliateMessage = (banner: HomeBanner) => {
     const parts = ["Mirá esta oferta que vi en Fichas.uy"];
     const cleanUrl = buildCleanAdUrl(banner.link_url, banner.affiliate_code);
@@ -424,59 +521,46 @@ export default function HomePage() {
     ? buildCleanAdUrl(activeBanner.link_url, activeBanner.affiliate_code)
     : null;
 
-  const newsScrollerInteractionProps = {
-    onMouseEnter: () => { newsAutoScrollPausedRef.current = true; },
-    onMouseLeave: () => { newsAutoScrollPausedRef.current = false; },
-    onPointerDown: () => { newsAutoScrollPausedRef.current = true; },
-    onPointerUp: () => { newsAutoScrollPausedRef.current = false; },
-    onPointerCancel: () => { newsAutoScrollPausedRef.current = false; },
-  };
-
-  const eventsScrollerInteractionProps = {
-    onMouseEnter: () => { eventsAutoScrollPausedRef.current = true; },
-    onMouseLeave: () => { eventsAutoScrollPausedRef.current = false; },
-    onPointerDown: () => { eventsAutoScrollPausedRef.current = true; },
-    onPointerUp: () => { eventsAutoScrollPausedRef.current = false; },
-    onPointerCancel: () => { eventsAutoScrollPausedRef.current = false; },
-  };
-
-  useEffect(() => {
-    const t = setTimeout(() => setSplashDone(true), 900);
-    return () => clearTimeout(t);
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
-    // Safety valve: if fetch takes > 1200ms, reveal banner slots anyway
-    // so the layout doesn't sit invisible forever.
+    // Válvula de seguridad: si la carga tarda más de 1200ms mostramos igual,
+    // para que el layout no quede invisible esperando.
     const timeout = setTimeout(() => {
       if (!cancelled) setHasFetchedBanners(true);
     }, 1200);
 
     (async () => {
       const today = getLocalDateISO();
-      const artResPromise = supabase
+      const artResPromise = (supabase as any)
         .from("articles")
-        .select("id, slug, headline, summary, image_url, image_position_x, image_position_y, created_at, published_at")
+        .select(
+          "id, slug, headline, summary, image_url, image_position_x, image_position_y, created_at, published_at, category"
+        )
         .eq("status", "published")
         .order("published_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
-        .limit(NEWS_CAROUSEL_LIMIT);
+        .limit(HOME_ARTICLE_LIMIT);
 
-      // News carousel should render as soon as this single query resolves.
-      void artResPromise.then((artRes) => {
+      // El bloque editorial se pinta apenas resuelve esta consulta.
+      void artResPromise.then((artRes: { data: Article[] | null }) => {
         if (cancelled) return;
         if (artRes.data) setArticles(artRes.data);
       });
 
-      const [evtRes, bannerRes] = await Promise.all([
+      const [evtRes, championRes, bannerRes] = await Promise.all([
         supabase
           .from("events")
-          .select("id, name, start_date, end_date, city, country, venue")
+          .select("id, name, start_date, end_date, city, country, venue, hero_image_url")
           .eq("status", "published")
           .or(`start_date.gte.${today},end_date.gte.${today}`)
           .order("start_date")
           .limit(5),
+        (supabase as any)
+          .from("champions")
+          .select("id, name, tournament, amount, currency, image_url")
+          .order("year_week", { ascending: false })
+          .order("created_at", { ascending: false })
+          .limit(3),
         supabase
           .from("home_banners")
           .select("position, image_url, link_url, affiliate_code, alt_text, is_active"),
@@ -485,7 +569,8 @@ export default function HomePage() {
       if (cancelled) return;
       clearTimeout(timeout);
 
-      if (evtRes.data) setEvents(evtRes.data);
+      if (evtRes.data) setEvents(evtRes.data as Event[]);
+      if (championRes.data) setChampions(championRes.data as Champion[]);
       if (bannerRes.data) {
         const map: Record<string, HomeBanner> = {};
         for (const b of bannerRes.data as HomeBanner[]) map[b.position] = b;
@@ -494,451 +579,256 @@ export default function HomePage() {
       setHasFetchedBanners(true);
     })();
 
-    return () => { cancelled = true; clearTimeout(timeout); };
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, []);
 
-  useAutoHorizontalScroll({
-    containerRef: articlesScrollerRef,
-    pauseRef: newsAutoScrollPausedRef,
-    enabled: articles.length > 3,
-    intervalMs: 4200,
-  });
-
-  useAutoHorizontalScroll({
-    containerRef: eventsScrollerRef,
-    pauseRef: eventsAutoScrollPausedRef,
-    enabled: eventsCarouselCount > 1,
-    intervalMs: 4600,
-  });
+  const bannerReveal = hasFetchedBanners ? "banner-reveal is-visible" : "banner-reveal";
 
   return (
     <div className="min-h-screen overflow-x-clip bg-background">
-      <HomeSplashScreen visible={!splashDone || !hasFetchedBanners} />
+      <HomeSplashScreen visible={!hasFetchedBanners} />
       <Navbar />
+      {/*
+        Dos franjas finas bajo el masthead: primero la de cripto (oscura, sigue
+        la masa violeta del encabezado) y después la de última hora, que ya
+        entrega al gris de la página.
+      */}
+      <CryptoTicker />
+      <BreakingTicker items={layout.ticker} />
 
-      {/* ══════════════════════════════════════════════════════════════
-          HERO — fills the full remaining viewport height
-      ══════════════════════════════════════════════════════════════ */}
-      <section
-        className="relative overflow-hidden flex flex-col"
-        style={{
-          minHeight: "calc(100vh - 64px)",
-          backgroundImage: "url('/fondo-1600.jpg')",
-          backgroundSize: "cover",
-          backgroundPosition: "center top",
-          backgroundRepeat: "no-repeat",
-        }}
-      >
-        {/* Gradient overlay encima del fondo */}
-        <div
-          className="pointer-events-none absolute inset-0 z-0"
-          style={{
-            background: isDark
-              ? "radial-gradient(circle at 50% 38%, rgba(86,49,116,0.45), rgba(14,9,19,0.82) 54%, #09060f 100%)"
-              : "rgba(255,255,255,0.78)",
-          }}
-        />
-        {/* Ambient glow blobs */}
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute left-1/2 top-20 h-[420px] w-[760px] -translate-x-1/2 rounded-full bg-purple-900/25 blur-[130px]" />
-          <div className="absolute left-[10%] top-[24%] h-[240px] w-[240px] rounded-full bg-fuchsia-950/20 blur-[110px]" />
-          <div className="absolute right-[10%] top-[20%] h-[280px] w-[280px] rounded-full bg-violet-950/20 blur-[120px]" />
-          <div className="absolute bottom-[18%] left-1/2 h-[220px] w-[680px] -translate-x-1/2 rounded-full bg-brand-light/5 blur-[120px]" />
-        </div>
-
-        <div className="relative z-10 mx-auto flex w-full max-w-[1360px] flex-1 flex-col px-4 pb-3 pt-5 lg:px-6">
-          <div className="flex flex-1 flex-col justify-center">
-            <div className="flex flex-col items-center gap-4 lg:flex-row lg:items-center lg:justify-center lg:gap-4 xl:gap-7">
-              <div className={hasFetchedBanners ? "banner-reveal is-visible" : "banner-reveal"}>
-                <PortraitBannerSlot
-                  banner={banners["top_left"]}
-                  className="hidden lg:flex"
-                  onAction={setActiveBanner}
-                />
-              </div>
-
-              <div className="flex w-full max-w-[720px] flex-1 flex-col items-center justify-center px-2 py-5 text-center sm:py-8 lg:min-h-[443px] lg:px-4 lg:py-4">
-                <h1
-                  className="font-display font-black uppercase leading-[0.9] tracking-[-0.05em] text-balance select-none"
-                  style={{ fontSize: "clamp(2.65rem, 5.2vw, 4.0625rem)" }}
-                >
-                  <span className="hero-line block text-accent lg:whitespace-nowrap">
-                    NOTICIAS, EVENTOS
-                  </span>
-                  <span className="hero-line block lg:whitespace-nowrap">
-                    <span className="text-accent">Y COMUNIDAD</span>{" "}
-                    <span className="text-foreground">EN UN</span>
-                  </span>
-                  <span className={`hero-line block lg:whitespace-nowrap text-foreground`}>
-                    SOLO LUGAR
-                  </span>
-                </h1>
-
-                <p className={`hero-sub mt-6 max-w-[560px] text-sm font-semibold uppercase tracking-[0.03em] md:text-[15px] text-muted-foreground`}>
-                  Todo el ecosistema de Fichas Online en un solo lugar
-                </p>
-
-                <div className="hero-cta">
-                  <LazySupportChatWidget triggerVariant="hero" />
-                </div>
-              </div>
-
-              <div className={hasFetchedBanners ? "banner-reveal is-visible" : "banner-reveal"}>
-                <PortraitBannerSlot
-                  banner={banners["top_right"]}
-                  className="hidden lg:flex"
-                  onAction={setActiveBanner}
-                />
-              </div>
+      <main className="mx-auto w-full max-w-[1440px] px-4 pt-7 lg:px-10 lg:pt-8">
+        {/* ── Fila 1: apertura + calendario ─────────────────────────── */}
+        <section className="grid gap-6 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_400px]">
+          {layout.hero ? (
+            <StoryCard
+              article={layout.hero}
+              heightClass="h-[320px] sm:h-[400px] lg:h-[460px]"
+              titleClass="text-[26px] sm:text-[30px] lg:text-[34px]"
+            />
+          ) : (
+            <div className="flex h-[320px] items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 lg:h-[460px]">
+              <p className="text-sm font-semibold uppercase tracking-caption text-muted-foreground">
+                No hay noticias publicadas aún.
+              </p>
             </div>
+          )}
 
-            <div className={`mt-3 hidden grid-cols-2 gap-3 sm:grid lg:hidden ${hasFetchedBanners ? "banner-reveal is-visible" : "banner-reveal"}`}>
-              <BannerSlot
-                banner={banners["top_left"]}
-                className="aspect-[231/411] rounded-[24px]"
-                onAction={setActiveBanner}
-              />
-              <BannerSlot
-                banner={banners["top_right"]}
-                className="aspect-[231/411] rounded-[24px]"
-                onAction={setActiveBanner}
-              />
-            </div>
-          </div>
-
-          <div className={`mt-5 hidden items-center justify-center gap-6 lg:flex ${hasFetchedBanners ? "banner-reveal is-visible" : "banner-reveal"}`}>
-            <BannerSlot
-              banner={banners["bottom_left"]}
-              className="h-[182px] w-[572px] shrink-0 rounded-[24px] shadow-[0_18px_40px_rgba(0,0,0,0.28)]"
-              onAction={setActiveBanner}
-            />
-            <BannerSlot
-              banner={banners["bottom_right"]}
-              className="h-[182px] w-[572px] shrink-0 rounded-[24px] shadow-[0_18px_40px_rgba(0,0,0,0.28)]"
-              onAction={setActiveBanner}
-            />
-          </div>
-
-          <div className={`mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 lg:hidden ${hasFetchedBanners ? "banner-reveal is-visible" : "banner-reveal"}`}>
-            <BannerSlot
-              banner={banners["bottom_left"]}
-              className="aspect-[572/182] rounded-[24px]"
-              onAction={setActiveBanner}
-            />
-            <BannerSlot
-              banner={banners["bottom_right"]}
-              className="aspect-[572/182] rounded-[24px]"
-              onAction={setActiveBanner}
-            />
-          </div>
-        </div>
-
-        {/* Ticker — always at the very bottom of the section */}
-        <CryptoTicker />
-      </section>
-
-      {/* ══════════════════════════════════════════════════════════════
-          CONTENT — only visible after scrolling past the hero
-      ══════════════════════════════════════════════════════════════ */}
-      <div className="container mx-auto px-4 pb-10 space-y-10 mt-8 lg:mt-14 lg:space-y-16 lg:pb-16">
-
-        {/* Latest articles */}
-        <section>
-          {articles.length > 3 && (
-            <div className="mb-3 flex items-center justify-center gap-2 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-muted-foreground lg:justify-end">
-              <span>Se mueve solo</span>
-              <span
-                aria-hidden="true"
-                className="nudge-x inline-flex items-center"
-              >
-                <ArrowRight className="h-3.5 w-3.5" />
+          <aside className="card-reveal flex min-w-0 flex-col gap-4 rounded-md border border-border bg-card p-5 lg:h-[460px]">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[15px] font-bold uppercase leading-ui tracking-caption text-foreground">
+                Calendario
               </span>
-              <span>También podés arrastrar</span>
-            </div>
-          )}
-          <div
-            className="card-reveal mb-5 flex items-center justify-between gap-4"
-          >
-            <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-foreground">
-              Ultimas noticias
-            </p>
-            <Link
-              to="/noticias"
-              className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/20 px-4 py-2 text-[0.72rem] font-black uppercase tracking-[0.08em] text-foreground transition-colors hover:border-primary/50 hover:bg-primary/30"
-            >
-              <Newspaper className="h-4 w-4" />
-              Fichas News
-            </Link>
-          </div>
-
-          <div className="relative">
-            {articles.length > 3 && (
-              <>
-                <div className="pointer-events-none absolute inset-y-0 left-0 z-10 hidden w-12 bg-gradient-to-r from-background via-background/78 to-transparent lg:block" />
-                <div className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-16 bg-gradient-to-l from-background via-background/84 to-transparent lg:block" />
-              </>
-            )}
-
-            <div
-              ref={articlesScrollerRef}
-              className="flex snap-x snap-mandatory gap-5 overflow-x-auto overscroll-x-contain [touch-action:pan-x_pan-y] pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              {...newsScrollerInteractionProps}
-            >
-            {articles.map((a, i) => (
-              <div
-                key={a.id}
-                style={{ "--card-reveal-delay": `${Math.min(i, 3) * 60}ms` } as CSSProperties}
-                data-carousel-card="true"
-                className="card-reveal min-w-0 shrink-0 snap-start basis-[84%] sm:basis-[68%] lg:basis-[371px]"
-              >
-                <Link
-                  to={`/noticias/${a.slug}`}
-                  className="group relative flex h-full min-h-[420px] overflow-hidden rounded-[24px] shadow-[0_8px_32px_rgba(0,0,0,0.18)] transition-shadow duration-300 hover:shadow-[0_16px_48px_rgba(0,0,0,0.26)] lg:h-[490px]"
-                >
-                  {/* Full-bleed image */}
-                  <div className="absolute inset-0">
-                    {a.image_url ? (
-                      <BannerMedia
-                        src={a.image_url}
-                        alt={a.headline}
-                        style={getArticleImageStyle(a)}
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="h-full w-full bg-[radial-gradient(circle_at_top,_rgba(157,78,221,0.55),_rgba(18,12,28,0.98)_72%)]" />
-                    )}
-                  </div>
-
-                  {/* Gradient overlay — texto legible siempre */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
-
-                  {/* Date badge top-right */}
-                  <span className="absolute right-4 top-4 z-10 rounded-full bg-black/50 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-brand-light/80 backdrop-blur-sm">
-                    {format(parseDateValue(a.published_at || a.created_at), "d MMM yyyy", { locale: es })}
-                  </span>
-
-                  {/* Text at bottom */}
-                  <div className="relative z-10 mt-auto p-5">
-                    <h3 className="font-display line-clamp-3 text-[1.25rem] font-black uppercase leading-[0.95] tracking-[-0.03em] text-brand-light drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] lg:text-[1.35rem]">
-                      {a.summary || a.headline}
-                    </h3>
-                    <span className="mt-3 inline-flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-[0.12em] text-brand-light/60 transition-colors group-hover:text-brand-light/90">
-                      Leer más <ArrowRight className="h-3 w-3" />
-                    </span>
-                  </div>
-                </Link>
-              </div>
-            ))}
-            {articles.length === 0 && (
-              <div className="w-full rounded-[30px] border border-dashed border-border bg-muted/30 px-6 py-14 text-center">
-                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  No hay noticias publicadas aun.
-                </p>
-              </div>
-            )}
-            </div>
-          </div>
-
-          {articles.length > 1 && (
-            <div className="mt-3 flex justify-center gap-1.5 lg:hidden">
-              {articles.map((_, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: i === activeArticleIndex ? 20 : 6,
-                    opacity: i === activeArticleIndex ? 1 : 0.3,
-                    backgroundColor: i === activeArticleIndex ? "rgb(143,60,249)" : "rgb(255,255,255)",
-                  }}
-                  className="h-1.5 rounded-full transition-all duration-300"
-                />
-              ))}
-            </div>
-          )}
-
-          {articles.length > 0 && (
-            <div className="mt-6 flex justify-center xl:hidden">
               <Link
-                to="/noticias"
-                className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-5 py-3 text-sm font-semibold text-foreground transition-colors hover:border-primary/35 hover:bg-primary/10"
+                to="/calendario"
+                className="text-[12px] font-bold uppercase leading-caption tracking-caption text-primary hover:underline"
               >
-                Ver todas las noticias <ArrowRight className="h-4 w-4" />
+                Ver calendario completo
               </Link>
             </div>
-          )}
-          {articles.length > 0 && (
-            <div className="mt-4 hidden justify-end xl:flex">
-              <Link
-                to="/noticias"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-primary/80"
-              >
-                Ver todas <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-          )}
-        </section>
 
-        {/* Upcoming events */}
-        <section className="relative">
-      
-          <div
-            className="card-reveal mb-3 flex items-center justify-between gap-4"
-          >
-            <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-foreground">
-              Calendario
-            </p>
-            <Link
-              to="/calendario"
-              className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-2 text-[0.72rem] font-black uppercase tracking-[0.08em] text-foreground transition-colors hover:border-accent/45 hover:bg-accent/15"
-            >
-              <Calendar className="h-4 w-4" />
-              Ver calendario
-            </Link>
-          </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-hidden">
+              {events.slice(0, 3).map((e, i) => {
+                const endDate = e.end_date ?? e.start_date;
+                const isLive = e.start_date <= today && endDate >= today;
+                const range = formatEventRange(e);
 
-          {eventsCarouselCount > 1 && (
-            <div className="mb-4 flex items-center justify-center gap-2 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-muted-foreground lg:justify-end">
-              <span className="hidden lg:inline">Se mueve solo</span>
-              <span className="hidden lg:inline">•</span>
-              <span>Deslizá para ver más eventos</span>
-              <span
-                aria-hidden="true"
-                className="nudge-x inline-flex items-center"
-              >
-                <ArrowRight className="h-3.5 w-3.5" />
-              </span>
-            </div>
-          )}
-
-          <div className="relative">
-            {eventsCarouselCount > 1 && (
-              <>
-                <div className="pointer-events-none absolute inset-y-0 left-0 z-10 hidden w-12 bg-gradient-to-r from-background via-background/80 to-transparent lg:block" />
-                <div className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-16 bg-gradient-to-l from-background via-background/84 to-transparent lg:block" />
-              </>
-            )}
-
-            <div
-              ref={eventsScrollerRef}
-              className="flex items-start snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain [touch-action:pan-x_pan-y] pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              {...eventsScrollerInteractionProps}
-            >
-            {events.map((e, i) => {
-              const eventEndDate = e.end_date ?? e.start_date;
-              const isLive = e.start_date <= today && eventEndDate >= today;
-              const location = [e.venue, e.city, e.country].filter(Boolean).join(" · ");
-              const monthLabel = format(parseDateValue(e.start_date), "MMM", { locale: es }).toUpperCase();
-              return (
-                <Fragment key={e.id}>
-                  <div
-                    style={{ "--card-reveal-delay": `${Math.min(i, 3) * 60}ms` } as CSSProperties}
-                    data-carousel-card="true"
-                    className="card-reveal min-w-0 shrink-0 snap-start basis-[88%] sm:basis-[72%] lg:basis-[500px]"
-                  >
-                    <Link
-                      to={`/eventos/${e.id}`}
-                      className="group flex min-h-[136px] items-center gap-4 rounded-[18px] border border-border bg-card p-3 shadow-[0_18px_36px_rgba(0,0,0,0.10)] transition-colors hover:border-accent/35"
-                    >
-                      <div className="flex h-[98px] w-[114px] shrink-0 flex-col items-center justify-center rounded-[18px] bg-gradient-to-b from-brand-violet-bright to-brand-violet text-brand-light shadow-[0_12px_30px_rgba(143,60,249,0.35)]">
-                        <span className="text-[3.15rem] font-black leading-none tracking-[-0.08em]">
-                          {format(parseDateValue(e.start_date), "dd")}
-                        </span>
-                        <span className="mt-1 text-[1rem] font-black uppercase leading-none tracking-[-0.04em]">
-                          {monthLabel}
-                        </span>
+                return (
+                  <div key={e.id} className="flex flex-col gap-3.5">
+                    {i > 0 && <div className="h-px w-full bg-border" />}
+                    <Link to={`/eventos/${e.id}`} className="group flex items-center gap-3">
+                      <div className="h-14 w-[78px] shrink-0 overflow-hidden rounded-md">
+                        <StoryImage src={e.hero_image_url} alt={e.name} />
                       </div>
-
-                      <div className="min-w-0 flex-1 pr-2">
-                        <div className="mb-2 flex items-start justify-between gap-3">
-                          <h3 className="font-display line-clamp-2 text-[1.05rem] font-black uppercase leading-[0.9] tracking-[-0.04em] text-foreground lg:text-[1.15rem]">
-                            {e.name}
-                          </h3>
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <span className="flex items-start gap-2 text-[16px] font-bold leading-h2 text-foreground transition-colors group-hover:text-primary">
+                          <span className="line-clamp-2">{e.name}</span>
                           {isLive && (
-                            <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full border border-red-500/35 bg-red-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-red-300">
-                              <span className="relative flex h-2 w-2">
-                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                                <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-                              </span>
+                            <span className="mt-0.5 shrink-0 rounded-full border border-red-500/40 bg-red-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-caption text-red-400">
                               En vivo
                             </span>
                           )}
-                        </div>
-
-                        <p className="line-clamp-2 text-[0.9rem] font-medium uppercase leading-[1.02] tracking-[0.01em] text-muted-foreground lg:text-[1rem]">
-                          {location || "Evento destacado en fichas online"}
-                        </p>
+                        </span>
+                        <span className="text-[12.5px] leading-caption text-muted-foreground">{range}</span>
                       </div>
                     </Link>
                   </div>
+                );
+              })}
 
-                  {i === eventBannerInsertAfterIndex && (
-                    <div
-                      style={{ "--card-reveal-delay": `${i * 70 + 40}ms` } as CSSProperties}
-                      data-carousel-card="true"
-                      className="card-reveal min-w-0 shrink-0 snap-start basis-[88%] sm:basis-[72%] lg:basis-[500px]"
-                    >
-                      <div className="h-[136px]">
-                        <BannerSlot
-                          banner={banners["content_vertical"]}
-                          className="h-full w-full rounded-[18px] border border-border bg-card shadow-[0_18px_36px_rgba(0,0,0,0.10)]"
-                          onAction={setActiveBanner}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </Fragment>
-              );
-            })}
-            {events.length === 0 && (
-              <div className="w-full rounded-[24px] border border-dashed border-border bg-muted/30 px-6 py-14 text-center">
-                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  No hay eventos en curso ni proximos.
+              {events.length === 0 && (
+                <p className="text-[13px] leading-body text-muted-foreground">
+                  No hay eventos en curso ni próximos.
                 </p>
-              </div>
-            )}
+              )}
             </div>
-          </div>
 
-          {eventsCarouselCount > 1 && (
-            <div className="mt-3 flex justify-center gap-1.5 lg:hidden">
-              {Array.from({ length: eventsCarouselCount }).map((_, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: i === activeEventIndex ? 20 : 6,
-                    opacity: i === activeEventIndex ? 1 : 0.3,
-                    backgroundColor: i === activeEventIndex ? "rgb(143,60,249)" : "rgb(255,255,255)",
-                  }}
-                  className="h-1.5 rounded-full transition-all duration-300"
-                />
-              ))}
-            </div>
-          )}
+            <Link
+              to="/calendario"
+              className="mt-auto inline-flex items-center justify-center gap-2 self-stretch rounded-md border border-primary/40 px-4 py-3 text-[12px] font-bold uppercase leading-caption tracking-caption text-primary transition-colors hover:bg-primary/10"
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              Ver agenda
+            </Link>
+          </aside>
         </section>
 
-        {/* Partner rooms */}
-        <section>
-          <div
-            className="card-reveal mb-5 flex items-center justify-between gap-4"
-          >
-            <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-foreground">
-              Consegui el mejor deal para tu sala
-            </p>
+        {/* ── Fila 2: últimas noticias + campeones ──────────────────── */}
+        <section className="mt-9 grid gap-6 lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_340px]">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-4">
+              <SectionLabel>Últimas noticias</SectionLabel>
+              <Link
+                to="/noticias"
+                className="inline-flex items-center gap-1.5 text-[12px] font-bold uppercase leading-caption tracking-caption text-muted-foreground transition-colors hover:text-primary"
+              >
+                Ver todas <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              {layout.latest.map((a, i) => (
+                <StoryTile key={a.id} article={a} delay={i * 60} />
+              ))}
+            </div>
           </div>
 
+          <aside className="flex flex-col gap-6">
+            <div className="card-reveal flex flex-col gap-4 rounded-md border border-border bg-card p-5">
+              <span className="text-[15px] font-bold uppercase leading-ui tracking-caption text-foreground">
+                Últimos campeones
+              </span>
+
+              <div className="flex flex-col gap-3.5">
+                {champions.map((c, i) => (
+                  <div key={c.id} className="flex flex-col gap-3.5">
+                    {i > 0 && <div className="h-px w-full bg-border" />}
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
+                        {c.image_url ? (
+                          <img src={c.image_url} alt={c.name} className="h-full w-full object-cover" />
+                        ) : (
+                          <User className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                        )}
+                      </div>
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="truncate text-[15px] font-bold leading-h3 text-foreground">{c.name}</span>
+                        <span className="truncate text-[12.5px] leading-caption text-muted-foreground">
+                          {c.tournament}
+                        </span>
+                      </div>
+                      <span className="shrink-0 text-[15px] font-bold text-primary">
+                        {formatChampionAmount(c)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+
+                {champions.length === 0 && (
+                  <p className="flex items-center gap-2 text-[13px] leading-body text-muted-foreground">
+                    <Trophy className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    Todavía no cargamos campeones de esta semana.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className={`flex-1 ${bannerReveal}`}>
+              <BannerSlot
+                banner={banners["content_vertical"]}
+                className="h-full min-h-[240px] w-full"
+                onAction={setActiveBanner}
+              />
+            </div>
+          </aside>
+        </section>
+
+        {/* ── Fila 3: banda de banners ──────────────────────────────── */}
+        <section className={`mt-9 grid gap-6 md:grid-cols-2 ${bannerReveal}`}>
+          <BannerSlot
+            banner={banners["bottom_left"]}
+            className="aspect-[572/182] w-full"
+            onAction={setActiveBanner}
+          />
+          <BannerSlot
+            banner={banners["bottom_right"]}
+            className="aspect-[572/182] w-full"
+            onAction={setActiveBanner}
+          />
+        </section>
+
+        {/* ── Fila 4: dos destacados ────────────────────────────────── */}
+        {layout.features.length > 0 && (
+          <section className="mt-9 grid gap-6 md:grid-cols-2">
+            {layout.features.map((a, i) => (
+              <StoryCard
+                key={a.id}
+                article={a}
+                heightClass="h-[300px] lg:h-[340px]"
+                titleClass="text-[22px] lg:text-[26px]"
+                delay={i * 70}
+              />
+            ))}
+          </section>
+        )}
+
+        {/* ── Fila 5: banners verticales + promo del próximo evento ─── */}
+        <section className="mt-9 flex flex-col items-center gap-6 lg:flex-row lg:justify-center">
+          <div className={`w-full max-w-[280px] lg:w-auto ${bannerReveal}`}>
+            <PortraitBannerSlot banner={banners["top_left"]} onAction={setActiveBanner} />
+          </div>
+
+          <Link
+            to={nextEvent ? `/eventos/${nextEvent.id}` : "/calendario"}
+            className="card-reveal relative flex h-[280px] w-full flex-1 items-end justify-center overflow-hidden rounded-xl bg-gradient-to-br from-brand-violet to-brand-violet-deep lg:h-[411px]"
+          >
+            <div className="absolute inset-0 bg-[repeating-linear-gradient(135deg,rgba(197,197,197,0.08)_0_18px,transparent_18px_36px)]" />
+            <div className="relative flex flex-col items-center gap-3 px-6 pb-9 text-center">
+              <span className="text-[12px] font-bold uppercase leading-caption tracking-caption text-brand-light/70">
+                {nextEvent ? "Próximo evento" : "Agenda del circuito"}
+              </span>
+              <span className="max-w-[18ch] text-[26px] font-bold uppercase leading-[1.05] tracking-h1 text-brand-light lg:text-[30px]">
+                {nextEvent ? nextEvent.name : "Mirá el calendario completo"}
+              </span>
+              {nextEvent && (
+                <span className="text-[15px] leading-body text-brand-light/80">
+                  Desde el {format(parseDateValue(nextEvent.start_date), "d 'de' MMMM", { locale: es })}
+                  {[nextEvent.city, nextEvent.country].filter(Boolean).length > 0 &&
+                    ` · ${[nextEvent.city, nextEvent.country].filter(Boolean).join(", ")}`}
+                </span>
+              )}
+            </div>
+          </Link>
+
+          <div className={`w-full max-w-[280px] lg:w-auto ${bannerReveal}`}>
+            <PortraitBannerSlot banner={banners["top_right"]} onAction={setActiveBanner} />
+          </div>
+        </section>
+
+        {/* ── Fila 6: más noticias ──────────────────────────────────── */}
+        {layout.more.length > 0 && (
+          <section className="mt-9 flex flex-col gap-4">
+            <SectionLabel>Más noticias</SectionLabel>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {layout.more.map((a, i) => (
+                <StoryRow key={a.id} article={a} delay={i * 60} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Salas asociadas ───────────────────────────────────────── */}
+        <section className="mt-11 flex flex-col gap-4">
+          <SectionLabel>Conseguí el mejor deal para tu sala</SectionLabel>
           <PartnerMarquee rooms={uniquePartnerRooms} />
         </section>
 
-        {/* Social links */}
-        <section>
-          <div
-            className="card-reveal mb-5 flex items-center justify-between gap-4"
-          >
-            <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-foreground">
-              Seguinos en redes
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* ── Redes ─────────────────────────────────────────────────── */}
+        <section className="mt-11 flex flex-col gap-4 pb-12">
+          <SectionLabel>Seguinos en redes</SectionLabel>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {socialLinks.map((social, i) => {
               const Icon = social.icon;
               const isDisabled = Boolean(social.disabled);
@@ -953,8 +843,8 @@ export default function HomePage() {
                   tabIndex={isDisabled ? -1 : undefined}
                   onClick={isDisabled ? (e) => e.preventDefault() : undefined}
                   style={{ "--card-reveal-delay": `${i * 80}ms` } as CSSProperties}
-                  className={`group flex items-center justify-between bg-card px-4 py-3 rounded-lg border border-border transition-colors sm:py-4 ${
-                    isDisabled ? "cursor-not-allowed opacity-60" : "hover:border-primary/40"
+                  className={`card-reveal group flex items-center justify-between rounded-md border border-border bg-card px-4 py-3.5 transition-colors ${
+                    isDisabled ? "cursor-not-allowed opacity-60" : "hover:border-primary/45"
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -966,15 +856,13 @@ export default function HomePage() {
                       <Icon className="h-5 w-5" />
                     </span>
                     <div>
-                      <p className="font-semibold text-foreground">{social.label}</p>
+                      <p className="font-semibold leading-h3 text-foreground">{social.label}</p>
                       <p className="text-xs text-muted-foreground">{social.description}</p>
                     </div>
                   </div>
                   <ArrowRight
                     className={`h-4 w-4 text-muted-foreground ${
-                      isDisabled
-                        ? ""
-                        : "transition-transform group-hover:translate-x-1 group-hover:text-primary"
+                      isDisabled ? "" : "transition-transform group-hover:translate-x-1 group-hover:text-primary"
                     }`}
                   />
                 </a>
@@ -982,7 +870,7 @@ export default function HomePage() {
             })}
           </div>
         </section>
-      </div>
+      </main>
 
       <Dialog open={!!activeBanner} onOpenChange={(open) => !open && setActiveBanner(null)}>
         <DialogContent className="sm:max-w-md">

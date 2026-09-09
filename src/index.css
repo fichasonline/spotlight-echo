@@ -321,6 +321,12 @@
     animation: nudge-x 1.2s ease-in-out infinite;
   }
 
+  /* La ruedita del velo de carga entra con retardo: una carga rápida no
+     alcanza a mostrarla y la home aparece sin destello. */
+  .splash-spinner-in {
+    animation: age-gate-fade-in 200ms ease-out 250ms both;
+  }
+
   .card-reveal {
     opacity: 0;
     animation: card-reveal-up 480ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
@@ -400,6 +406,7 @@
   .hero-sub,
   .hero-cta,
   .banner-reveal,
+  .splash-spinner-in,
   .age-gate-backdrop,
   .age-gate-panel,
   .mobile-nav-menu,
