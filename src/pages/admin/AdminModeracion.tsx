@@ -15,7 +15,6 @@ import {
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -466,7 +465,6 @@ export default function AdminModeracion() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
 
       <div className="container mx-auto space-y-10 px-4 py-8">
         <section>

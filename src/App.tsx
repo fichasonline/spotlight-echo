@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AgeGate } from "@/components/AgeGate";
 import { ProtectedRoute, AdminRoute, StaffRoute } from "@/components/ProtectedRoute";
 import { RouteSeo } from "@/components/RouteSeo";
+import { AdminLayout } from "@/components/admin/AdminLayout";
 import Footer from "@/components/Footer";
 import { SHOW_FEED } from "@/lib/feature-flags";
 
@@ -74,118 +75,34 @@ const App = () => (
                       )
                     }
                   />
+                  {/*
+                    El layout se monta con StaffRoute (admin O moderador) para
+                    que un moderador siga llegando a /admin/moderacion. Cada
+                    pantalla mantiene su propia guarda: casi todas son AdminRoute.
+                  */}
                   <Route
                     path="/admin"
                     element={
-                      <AdminRoute>
-                        <AdminDashboard />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/eventos"
-                    element={
-                      <AdminRoute>
-                        <AdminEventos />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/insights"
-                    element={
-                      <AdminRoute>
-                        <AdminInsights />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/noticias"
-                    element={
-                      <AdminRoute>
-                        <AdminNoticias />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/noticias/instagram"
-                    element={
-                      <AdminRoute>
-                        <AdminNoticiasInstagram />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/liveblogs"
-                    element={
-                      <AdminRoute>
-                        <AdminLiveblogs />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/stories"
-                    element={
-                      <AdminRoute>
-                        <AdminStoriesQueue />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/sorteos"
-                    element={
-                      <AdminRoute>
-                        <AdminSorteos />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/moderacion"
-                    element={
                       <StaffRoute>
-                        <AdminModeracion />
+                        <AdminLayout />
                       </StaffRoute>
                     }
-                  />
-                  <Route
-                    path="/admin/leads"
-                    element={
-                      <AdminRoute>
-                        <AdminLeads />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/chat-leads"
-                    element={
-                      <AdminRoute>
-                        <AdminChatLeads />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/banners"
-                    element={
-                      <AdminRoute>
-                        <AdminBanners />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/usuarios"
-                    element={
-                      <AdminRoute>
-                        <AdminUsers />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/campeones"
-                    element={
-                      <AdminRoute>
-                        <AdminCampeones />
-                      </AdminRoute>
-                    }
-                  />
+                  >
+                    <Route index element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                    <Route path="eventos" element={<AdminRoute><AdminEventos /></AdminRoute>} />
+                    <Route path="insights" element={<AdminRoute><AdminInsights /></AdminRoute>} />
+                    <Route path="noticias" element={<AdminRoute><AdminNoticias /></AdminRoute>} />
+                    <Route path="noticias/instagram" element={<AdminRoute><AdminNoticiasInstagram /></AdminRoute>} />
+                    <Route path="liveblogs" element={<AdminRoute><AdminLiveblogs /></AdminRoute>} />
+                    <Route path="stories" element={<AdminRoute><AdminStoriesQueue /></AdminRoute>} />
+                    <Route path="sorteos" element={<AdminRoute><AdminSorteos /></AdminRoute>} />
+                    <Route path="moderacion" element={<StaffRoute><AdminModeracion /></StaffRoute>} />
+                    <Route path="leads" element={<AdminRoute><AdminLeads /></AdminRoute>} />
+                    <Route path="chat-leads" element={<AdminRoute><AdminChatLeads /></AdminRoute>} />
+                    <Route path="banners" element={<AdminRoute><AdminBanners /></AdminRoute>} />
+                    <Route path="usuarios" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+                    <Route path="campeones" element={<AdminRoute><AdminCampeones /></AdminRoute>} />
+                  </Route>
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                 <Footer />
