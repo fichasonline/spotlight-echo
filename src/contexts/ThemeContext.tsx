@@ -8,16 +8,18 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: "dark",
+  theme: "light",
   toggle: () => {},
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  // El manual especifica el portal sobre gris de marca: el tema claro es el
+  // que corresponde por defecto. Quien ya haya elegido oscuro lo conserva.
   const [theme, setTheme] = useState<Theme>(() => {
     try {
-      return (localStorage.getItem("fichas-theme") as Theme) ?? "dark";
+      return (localStorage.getItem("fichas-theme") as Theme) ?? "light";
     } catch {
-      return "dark";
+      return "light";
     }
   });
 

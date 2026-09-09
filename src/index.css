@@ -126,18 +126,22 @@
    * (0 0% 100%), que es exactamente lo que el manual prohíbe.
    *
    * Los grises salen de los color-mix del manual, resueltos a HSL:
-   *   --portal-bg              gray-mid 46% + gray-light 54%  → 0 0% 67%
-   *   --portal-surface         gray-mid 16% + gray-light 84%  → 0 0% 74%
-   *   --portal-surface-strong  gray-light                     → 0 0% 77%
-   *   --portal-surface-sunken  gray-mid 62% + gray-light 38%  → 0 0% 63%
-   *   --portal-muted           violet-deep 42% + gray-mid 58% → 272 19% 39%
-   *   --portal-border          violet-deep 22% sobre el fondo → 272 8% 56%
+   * La escala del manual va de 63% (hundido) a 77% (gray-light, el claro más
+   * alto que define la marca). Se corre un escalón hacia arriba respecto del
+   * --portal-bg del manual: el fondo toma el valor de --portal-surface y las
+   * superficies el de gray-light, que es el techo — más claro que eso ya
+   * sería salirse de la paleta hacia el blanco que el manual prohíbe.
+   *
+   *   fondo        --portal-surface        → 0 0% 74%
+   *   superficies  gray-light              → 0 0% 77%
+   *   hundido      --portal-bg del manual  → 0 0% 67%
+   *   texto        violet-deep             → 273 100% 18%
    */
   .light {
-    --background: 0 0% 67%;
+    --background: 0 0% 74%;
     --foreground: 273 100% 18%;
 
-    --card: 0 0% 74%;
+    --card: 0 0% 77%;
     --card-foreground: 273 100% 18%;
 
     --popover: 0 0% 77%;
@@ -146,11 +150,13 @@
     --primary: 273 100% 37%;
     --primary-foreground: 0 0% 77%;
 
-    --secondary: 0 0% 63%;
+    --secondary: 0 0% 67%;
     --secondary-foreground: 273 100% 18%;
 
-    --muted: 0 0% 63%;
-    --muted-foreground: 272 19% 39%;
+    --muted: 0 0% 67%;
+    /* El 39% del manual daba 2.99:1 sobre el gris — por debajo del 4.5:1 de
+       WCAG AA. Mismo tono y saturación, sólo más oscuro: 4.6:1. */
+    --muted-foreground: 272 19% 33%;
 
     --accent: 273 100% 18%;
     --accent-foreground: 0 0% 77%;
@@ -158,22 +164,22 @@
     --destructive: 0 72% 42%;
     --destructive-foreground: 0 0% 77%;
 
-    --border: 272 8% 56%;
-    --input: 272 8% 56%;
+    --border: 273 10% 62%;
+    --input: 273 10% 62%;
     --ring: 273 100% 37%;
 
-    --sidebar-background: 0 0% 74%;
+    --sidebar-background: 0 0% 77%;
     --sidebar-foreground: 273 100% 18%;
     --sidebar-primary: 273 100% 37%;
     --sidebar-primary-foreground: 0 0% 77%;
-    --sidebar-accent: 0 0% 63%;
+    --sidebar-accent: 0 0% 67%;
     --sidebar-accent-foreground: 273 100% 18%;
-    --sidebar-border: 272 8% 56%;
+    --sidebar-border: 273 10% 62%;
     --sidebar-ring: 273 100% 37%;
 
     --gradient-primary: linear-gradient(135deg, hsl(273 100% 37%), hsl(273 100% 18%));
     --gradient-accent: linear-gradient(135deg, hsl(273 100% 18%), hsl(0 0% 77%));
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 77%), hsl(0 0% 71%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 77%), hsl(0 0% 74%));
     --shadow-glow: 0 0 26px hsl(273 100% 37% / 0.25);
     --shadow-card:
       0 1px 2px hsl(273 100% 18% / 0.1),
