@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getLocalDateISO, parseDateValue } from "@/lib/date";
-import { ARTICLE_CATEGORIES, categoryLabel, type ArticleCategory } from "@/lib/taxonomy";
+import { ARTICLE_CATEGORIES, TAG_TYPES, categoryLabel, type ArticleCategory, type Tag } from "@/lib/taxonomy";
 import { markdownToHtml, isMarkdown } from "@/lib/markdown";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import {
@@ -164,6 +164,12 @@ export default function AdminNoticias() {
   const [uploading, setUploading] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  /** Vocabulario completo de etiquetas y las aplicadas a la nota en edición. */
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
+  /** Snapshot de las etiquetas al abrir el editor, para calcular el diff. */
+  const [initialTagIds, setInitialTagIds] = useState<Set<string>>(new Set());
+
   const fetchArticles = async () => {
     const { data } = await supabase
       .from("articles")
@@ -178,6 +184,10 @@ export default function AdminNoticias() {
 
   useEffect(() => {
     void fetchArticles();
+    void (async () => {
+      const { data } = await (supabase as any).from("tags").select("id, slug, name, type").order("name");
+      if (data) setAllTags(data as Tag[]);
+    })();
   }, []);
 
   // Volver al principio del listado cada vez que cambia el recorte.
@@ -220,6 +230,32 @@ export default function AdminNoticias() {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
+  /** Deja el editor en blanco: formulario, etiquetas y nota en edición. */
+  const resetForm = () => {
+    setForm(createEmptyForm());
+    setEditId(null);
+    setSelectedTagIds(new Set());
+    setInitialTagIds(new Set());
+  };
+
+  /**
+   * Aplica sólo el diff contra las etiquetas que tenía la nota al abrirse.
+   * Evita borrar y reinsertar todo, que dejaría la nota sin etiquetas si el
+   * insert falla a mitad.
+   */
+  const syncArticleTags = async (articleId: string) => {
+    const toAdd = [...selectedTagIds].filter((id) => !initialTagIds.has(id));
+    const toRemove = [...initialTagIds].filter((id) => !selectedTagIds.has(id));
+    const db = supabase as any;
+
+    if (toAdd.length > 0) {
+      await db.from("article_tags").insert(toAdd.map((tagId) => ({ article_id: articleId, tag_id: tagId })));
+    }
+    if (toRemove.length > 0) {
+      await db.from("article_tags").delete().eq("article_id", articleId).in("tag_id", toRemove);
+    }
+  };
+
   const handleSaveArticle = async () => {
     if (!form.headline.trim()) {
       toast({ title: "Falta el titular", description: "Debes completar el titular.", variant: "destructive" });
@@ -243,18 +279,26 @@ export default function AdminNoticias() {
       published_at: toPublishedAtTimestamp(form.published_at),
     };
 
-    const { error } = editId
-      ? await supabase.from("articles").update(payload).eq("id", editId)
-      : await supabase.from("articles").insert({ ...payload, created_by: user?.id });
+    const { data: saved, error } = editId
+      ? await supabase.from("articles").update(payload).eq("id", editId).select("id").maybeSingle()
+      : await supabase
+          .from("articles")
+          .insert({ ...payload, created_by: user?.id })
+          .select("id")
+          .maybeSingle();
 
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       return;
     }
 
+    const articleId = editId ?? saved?.id;
+    if (articleId) {
+      await syncArticleTags(articleId);
+    }
+
     setOpen(false);
-    setForm(createEmptyForm());
-    setEditId(null);
+    resetForm();
     void fetchArticles();
   };
 
@@ -265,6 +309,14 @@ export default function AdminNoticias() {
       .select("body_markdown")
       .eq("id", article.id)
       .maybeSingle();
+
+    const { data: links } = await (supabase as any)
+      .from("article_tags")
+      .select("tag_id")
+      .eq("article_id", article.id);
+    const tagIds = new Set(((links ?? []) as { tag_id: string }[]).map((row) => row.tag_id));
+    setSelectedTagIds(tagIds);
+    setInitialTagIds(tagIds);
 
     const bodyContent = full?.body_markdown ?? "";
     const processedBody = isMarkdown(bodyContent) ? markdownToHtml(bodyContent) : bodyContent;
@@ -501,17 +553,13 @@ export default function AdminNoticias() {
               onOpenChange={(nextOpen) => {
                 setOpen(nextOpen);
                 if (!nextOpen) {
-                  setForm(createEmptyForm());
-                  setEditId(null);
+                  resetForm();
                 }
               }}
             >
               <SheetTrigger asChild>
                 <Button
-                  onClick={() => {
-                    setForm(createEmptyForm());
-                    setEditId(null);
-                  }}
+                  onClick={resetForm}
                 >
                   <Plus className="mr-1 h-4 w-4" />
                   Nuevo artículo
@@ -648,6 +696,59 @@ export default function AdminNoticias() {
                             <p className="text-xs text-muted-foreground">
                               Una sola por nota. El resto (circuito, país, sala) va como etiqueta.
                             </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Etiquetas</Label>
+                            {allTags.length === 0 ? (
+                              <p className="text-xs text-muted-foreground">
+                                No hay etiquetas cargadas todavía.
+                              </p>
+                            ) : (
+                              <div className="space-y-3 rounded-lg border border-border bg-background/60 p-3">
+                                {TAG_TYPES.map((type) => {
+                                  const group = allTags.filter((tag) => tag.type === type.value);
+                                  if (group.length === 0) return null;
+                                  return (
+                                    <div key={type.value}>
+                                      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+                                        {type.label}
+                                      </p>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {group.map((tag) => {
+                                          const active = selectedTagIds.has(tag.id);
+                                          return (
+                                            <button
+                                              key={tag.id}
+                                              type="button"
+                                              aria-pressed={active}
+                                              onClick={() =>
+                                                setSelectedTagIds((current) => {
+                                                  const next = new Set(current);
+                                                  if (next.has(tag.id)) next.delete(tag.id);
+                                                  else next.add(tag.id);
+                                                  return next;
+                                                })
+                                              }
+                                              className={
+                                                active
+                                                  ? "rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
+                                                  : "rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                                              }
+                                            >
+                                              {tag.name}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            <Link to="/admin/taxonomia" className="text-xs text-primary hover:underline">
+                              Administrar etiquetas →
+                            </Link>
                           </div>
 
                           <div className="space-y-2">

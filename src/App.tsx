@@ -25,6 +25,7 @@ const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminInsights = lazy(() => import("./pages/admin/AdminInsights"));
 const AdminEventos = lazy(() => import("./pages/admin/AdminEventos"));
 const AdminNoticias = lazy(() => import("./pages/admin/AdminNoticias"));
+const AdminTaxonomia = lazy(() => import("./pages/admin/AdminTaxonomia"));
 const AdminNoticiasInstagram = lazy(() => import("./pages/admin/AdminNoticiasInstagram"));
 const AdminLiveblogs = lazy(() => import("./pages/admin/AdminLiveblogs"));
 const AdminStoriesQueue = lazy(() => import("./pages/admin/AdminStoriesQueue"));
@@ -92,6 +93,7 @@ const App = () => (
                     <Route path="eventos" element={<AdminRoute><AdminEventos /></AdminRoute>} />
                     <Route path="insights" element={<AdminRoute><AdminInsights /></AdminRoute>} />
                     <Route path="noticias" element={<AdminRoute><AdminNoticias /></AdminRoute>} />
+                    <Route path="taxonomia" element={<AdminRoute><AdminTaxonomia /></AdminRoute>} />
                     <Route path="noticias/instagram" element={<AdminRoute><AdminNoticiasInstagram /></AdminRoute>} />
                     <Route path="liveblogs" element={<AdminRoute><AdminLiveblogs /></AdminRoute>} />
                     <Route path="stories" element={<AdminRoute><AdminStoriesQueue /></AdminRoute>} />

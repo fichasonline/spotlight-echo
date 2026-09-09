@@ -12,6 +12,7 @@ import {
   Newspaper,
   Radio,
   Sparkles,
+  Tags,
   Trophy,
   Users,
   type LucideIcon,
@@ -46,6 +47,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     items: [
       { to: "/admin", label: "Resumen", icon: LayoutDashboard, end: true },
       { to: "/admin/noticias", label: "Noticias", icon: Newspaper },
+      { to: "/admin/taxonomia", label: "Categorías y etiquetas", icon: Tags },
       { to: "/admin/eventos", label: "Calendario", icon: Calendar },
       { to: "/admin/campeones", label: "Campeones", icon: Trophy },
     ],
