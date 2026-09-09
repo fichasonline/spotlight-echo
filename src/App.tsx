@@ -10,6 +10,7 @@ import { AgeGate } from "@/components/AgeGate";
 import { ProtectedRoute, AdminRoute, StaffRoute } from "@/components/ProtectedRoute";
 import { RouteSeo } from "@/components/RouteSeo";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { ARTICLE_CATEGORIES } from "@/lib/taxonomy";
 import Footer from "@/components/Footer";
 import { SHOW_FEED } from "@/lib/feature-flags";
 
@@ -19,6 +20,8 @@ const CalendarioPage = lazy(() => import("./pages/Calendario"));
 const EventoDetailPage = lazy(() => import("./pages/EventoDetail"));
 const NoticiasPage = lazy(() => import("./pages/Noticias"));
 const ArticleDetailPage = lazy(() => import("./pages/ArticleDetail"));
+const CategoriaPage = lazy(() => import("./pages/Categoria"));
+const TagPage = lazy(() => import("./pages/Tag"));
 const FeedPage = SHOW_FEED ? lazy(() => import("./pages/Feed")) : null;
 const SorteoTvPage = lazy(() => import("./pages/SorteoTv"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
@@ -61,6 +64,21 @@ const App = () => (
                   <Route path="/eventos/:id" element={<EventoDetailPage />} />
                   <Route path="/noticias" element={<NoticiasPage />} />
                   <Route path="/noticias/:slug" element={<ArticleDetailPage />} />
+                  {/*
+                    Las 5 categorías van en la raíz (son un conjunto fijo y
+                    conocido, no chocan con ninguna ruta existente). Las
+                    etiquetas van bajo /tag/ porque las crea el equipo desde el
+                    panel: una etiqueta llamada "calendario" o "salas" taparía
+                    una ruta real si vivieran en la raíz.
+                  */}
+                  {ARTICLE_CATEGORIES.map((category) => (
+                    <Route
+                      key={category.slug}
+                      path={`/${category.slug}`}
+                      element={<CategoriaPage slug={category.slug} />}
+                    />
+                  ))}
+                  <Route path="/tag/:slug" element={<TagPage />} />
                   <Route path="/salas" element={<SalasPage />} />
                   <Route path="/salas/:slug" element={<SalaDetailPage />} />
                   <Route path="/sorteotv" element={<SorteoTvPage />} />

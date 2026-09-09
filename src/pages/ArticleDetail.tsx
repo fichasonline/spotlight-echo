@@ -10,6 +10,7 @@ import { ArticleComments } from "@/components/ArticleComments";
 import { ArticleMarkdown } from "@/components/ArticleMarkdown";
 import { ArticleHTML } from "@/components/ArticleHTML";
 import { getArticleImageStyle } from "@/lib/article-image";
+import { categoryLabel, categorySlug, type Tag } from "@/lib/taxonomy";
 import {
   SITE_NAME,
   SITE_URL,
@@ -30,27 +31,49 @@ interface Article {
   image_url: string | null;
   image_position_x: number | null;
   image_position_y: number | null;
+  category: string | null;
+  source_name: string | null;
+  source_url: string | null;
 }
 
 export default function ArticleDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const [article, setArticle] = useState<Article | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [tags, setTags] = useState<Tag[]>([]);
 
   useEffect(() => {
     if (!slug) return;
     setIsLoaded(false);
-    supabase
+    (supabase as any)
       .from("articles")
-      .select("id, created_at, headline, summary, body_markdown, published_at, image_url, image_position_x, image_position_y")
+      .select("id, created_at, headline, summary, body_markdown, published_at, image_url, image_position_x, image_position_y, category, source_name, source_url")
       .eq("slug", slug)
       .eq("status", "published")
       .maybeSingle()
-      .then(({ data }) => {
+      .then(({ data }: { data: Article | null }) => {
         setArticle(data);
         setIsLoaded(true);
       });
   }, [slug]);
+
+  // Etiquetas de la nota, en un segundo paso: no bloquean el render del cuerpo.
+  useEffect(() => {
+    if (!article) {
+      setTags([]);
+      return;
+    }
+    void (async () => {
+      const { data } = await (supabase as any)
+        .from("article_tags")
+        .select("tags(id, slug, name, type)")
+        .eq("article_id", article.id);
+      const rows = ((data ?? []) as { tags: Tag | null }[])
+        .map((row) => row.tags)
+        .filter((tag): tag is Tag => Boolean(tag));
+      setTags(rows);
+    })();
+  }, [article]);
 
   useEffect(() => {
     if (!slug) return;
@@ -183,10 +206,36 @@ export default function ArticleDetailPage() {
           </div>
         )}
 
-        <h1 className="text-3xl md:text-4xl font-display font-bold mb-4">{article.headline}</h1>
+        {categorySlug(article.category) && (
+          <Link
+            to={`/${categorySlug(article.category)}`}
+            className="text-xs font-semibold uppercase tracking-wider text-primary hover:underline"
+          >
+            {categoryLabel(article.category)}
+          </Link>
+        )}
 
-        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-8">
+        <h1 className="mb-4 mt-2 text-3xl font-display font-bold md:text-4xl">{article.headline}</h1>
+
+        <div className="mb-8 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
           <span>{format(parseDateValue(article.published_at || article.created_at), "d MMMM yyyy", { locale: es })}</span>
+          {article.source_name && (
+            <span>
+              Fuente:{" "}
+              {article.source_url ? (
+                <a
+                  href={article.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="text-primary hover:underline"
+                >
+                  {article.source_name}
+                </a>
+              ) : (
+                article.source_name
+              )}
+            </span>
+          )}
         </div>
 
         {article.summary && (
@@ -199,6 +248,25 @@ export default function ArticleDetailPage() {
           ) : (
             <ArticleMarkdown imageUrlToOmit={article.image_url}>{article.body_markdown}</ArticleMarkdown>
           )
+        )}
+
+        {tags.length > 0 && (
+          <div className="mt-10 border-t border-border pt-6">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Etiquetas
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <Link
+                  key={tag.id}
+                  to={`/tag/${tag.slug}`}
+                  className="rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                >
+                  {tag.name}
+                </Link>
+              ))}
+            </div>
+          </div>
         )}
 
         <ArticleComments articleId={article.id} />
