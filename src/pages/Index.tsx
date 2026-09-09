@@ -219,13 +219,13 @@ function BannerSlot({
       <div className="w-9 h-9 rounded-full border border-primary/25 flex items-center justify-center">
         <span className="text-primary/40 text-xl font-light leading-none">+</span>
       </div>
-      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/20">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-light/20">
         Espacio publicitario
       </span>
     </div>
   );
 
-  const base = `overflow-hidden rounded-[26px] border border-white/10 bg-black/40 ${className}`;
+  const base = `overflow-hidden rounded-[26px] border border-brand-light/10 bg-black/40 ${className}`;
 
   if (hasAction && shouldOpenModal && banner) {
     return (
@@ -281,11 +281,11 @@ function PortraitBannerSlot({
       />
     </div>
   ) : (
-    <div className="flex h-[411px] w-[231px] flex-col items-center justify-center gap-3 rounded-[24px] border border-white/10 bg-[#120d18]">
+    <div className="flex h-[411px] w-[231px] flex-col items-center justify-center gap-3 rounded-[24px] border border-brand-light/10 bg-[#120d18]">
       <div className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/25">
         <span className="text-xl font-light leading-none text-primary/40">+</span>
       </div>
-      <span className="text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-white/20">
+      <span className="text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-light/20">
         Espacio publicitario
       </span>
     </div>
@@ -543,7 +543,7 @@ export default function HomePage() {
           <div className="absolute left-1/2 top-20 h-[420px] w-[760px] -translate-x-1/2 rounded-full bg-purple-900/25 blur-[130px]" />
           <div className="absolute left-[10%] top-[24%] h-[240px] w-[240px] rounded-full bg-fuchsia-950/20 blur-[110px]" />
           <div className="absolute right-[10%] top-[20%] h-[280px] w-[280px] rounded-full bg-violet-950/20 blur-[120px]" />
-          <div className="absolute bottom-[18%] left-1/2 h-[220px] w-[680px] -translate-x-1/2 rounded-full bg-white/5 blur-[120px]" />
+          <div className="absolute bottom-[18%] left-1/2 h-[220px] w-[680px] -translate-x-1/2 rounded-full bg-brand-light/5 blur-[120px]" />
         </div>
 
         <div className="relative z-10 mx-auto flex w-full max-w-[1360px] flex-1 flex-col px-4 pb-3 pt-5 lg:px-6">
@@ -562,19 +562,19 @@ export default function HomePage() {
                   className="font-display font-black uppercase leading-[0.9] tracking-[-0.05em] text-balance select-none"
                   style={{ fontSize: "clamp(2.65rem, 5.2vw, 4.0625rem)" }}
                 >
-                  <span className="hero-line block text-[#8f3cf9] lg:whitespace-nowrap">
+                  <span className="hero-line block text-accent lg:whitespace-nowrap">
                     NOTICIAS, EVENTOS
                   </span>
                   <span className="hero-line block lg:whitespace-nowrap">
-                    <span className="text-[#8f3cf9]">Y COMUNIDAD</span>{" "}
-                    <span className={isDark ? "text-white" : "text-gray-900"}>EN UN</span>
+                    <span className="text-accent">Y COMUNIDAD</span>{" "}
+                    <span className="text-foreground">EN UN</span>
                   </span>
-                  <span className={`hero-line block lg:whitespace-nowrap ${isDark ? "text-white" : "text-gray-900"}`}>
+                  <span className={`hero-line block lg:whitespace-nowrap text-foreground`}>
                     SOLO LUGAR
                   </span>
                 </h1>
 
-                <p className={`hero-sub mt-6 max-w-[560px] text-sm font-semibold uppercase tracking-[0.03em] md:text-[15px] ${isDark ? "text-white/42" : "text-gray-500"}`}>
+                <p className={`hero-sub mt-6 max-w-[560px] text-sm font-semibold uppercase tracking-[0.03em] md:text-[15px] text-muted-foreground`}>
                   Todo el ecosistema de Fichas Online en un solo lugar
                 </p>
 
@@ -714,16 +714,16 @@ export default function HomePage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
 
                   {/* Date badge top-right */}
-                  <span className="absolute right-4 top-4 z-10 rounded-full bg-black/50 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-white/80 backdrop-blur-sm">
+                  <span className="absolute right-4 top-4 z-10 rounded-full bg-black/50 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-brand-light/80 backdrop-blur-sm">
                     {format(parseDateValue(a.published_at || a.created_at), "d MMM yyyy", { locale: es })}
                   </span>
 
                   {/* Text at bottom */}
                   <div className="relative z-10 mt-auto p-5">
-                    <h3 className="font-display line-clamp-3 text-[1.25rem] font-black uppercase leading-[0.95] tracking-[-0.03em] text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] lg:text-[1.35rem]">
+                    <h3 className="font-display line-clamp-3 text-[1.25rem] font-black uppercase leading-[0.95] tracking-[-0.03em] text-brand-light drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] lg:text-[1.35rem]">
                       {a.summary || a.headline}
                     </h3>
-                    <span className="mt-3 inline-flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-[0.12em] text-white/60 transition-colors group-hover:text-white/90">
+                    <span className="mt-3 inline-flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-[0.12em] text-brand-light/60 transition-colors group-hover:text-brand-light/90">
                       Leer más <ArrowRight className="h-3 w-3" />
                     </span>
                   </div>
@@ -839,7 +839,7 @@ export default function HomePage() {
                       to={`/eventos/${e.id}`}
                       className="group flex min-h-[136px] items-center gap-4 rounded-[18px] border border-border bg-card p-3 shadow-[0_18px_36px_rgba(0,0,0,0.10)] transition-colors hover:border-accent/35"
                     >
-                      <div className="flex h-[98px] w-[114px] shrink-0 flex-col items-center justify-center rounded-[18px] bg-[linear-gradient(180deg,#b956ff_0%,#8f3cf9_100%)] text-white shadow-[0_12px_30px_rgba(143,60,249,0.35)]">
+                      <div className="flex h-[98px] w-[114px] shrink-0 flex-col items-center justify-center rounded-[18px] bg-gradient-to-b from-brand-violet-bright to-brand-violet text-brand-light shadow-[0_12px_30px_rgba(143,60,249,0.35)]">
                         <span className="text-[3.15rem] font-black leading-none tracking-[-0.08em]">
                           {format(parseDateValue(e.start_date), "dd")}
                         </span>

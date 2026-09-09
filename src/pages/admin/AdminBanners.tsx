@@ -152,7 +152,7 @@ function BannerCard({ banner, onSave }: { banner: Banner; onSave: (updated: Bann
             <button
               type="button"
               onClick={clearMedia}
-              className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1 transition-colors"
+              className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-brand-light rounded-full p-1 transition-colors"
               title="Quitar media"
             >
               <X className="h-4 w-4" />
@@ -162,7 +162,7 @@ function BannerCard({ banner, onSave }: { banner: Banner; onSave: (updated: Bann
                 href={form.link_url}
                 target="_blank"
                 rel="noreferrer"
-                className="absolute bottom-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1 transition-colors"
+                className="absolute bottom-2 right-2 bg-black/60 hover:bg-black/80 text-brand-light rounded-full p-1 transition-colors"
                 title="Abrir enlace"
               >
                 <ExternalLink className="h-4 w-4" />

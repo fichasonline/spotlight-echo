@@ -268,7 +268,7 @@ export default function AdminStoriesQueue() {
                   className="max-h-[82vh] w-auto max-w-full rounded-md object-contain shadow-2xl"
                 />
               ) : (
-                <div className="flex aspect-[9/16] w-full max-w-[320px] items-center justify-center rounded-md border border-white/10 text-sm text-white/70">
+                <div className="flex aspect-[9/16] w-full max-w-[320px] items-center justify-center rounded-md border border-brand-light/10 text-sm text-brand-light/70">
                   Sin imagen asociada
                 </div>
               )}

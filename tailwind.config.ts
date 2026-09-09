@@ -14,10 +14,42 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-        display: ['Blauer', 'Inter', 'sans-serif'],
+        // Una sola familia en todo el sistema, como pide el manual.
+        // `display` se mantiene como alias para no tocar los cientos de
+        // `font-display` que ya hay repartidos por el código.
+        sans: ['"Clash Grotesk"', 'system-ui', 'sans-serif'],
+        display: ['"Clash Grotesk"', 'system-ui', 'sans-serif'],
+      },
+      lineHeight: {
+        display: 'var(--lh-display)',
+        h1: 'var(--lh-h1)',
+        h2: 'var(--lh-h2)',
+        h3: 'var(--lh-h3)',
+        body: 'var(--lh-body)',
+        ui: 'var(--lh-ui)',
+        caption: 'var(--lh-caption)',
+      },
+      letterSpacing: {
+        display: 'var(--tr-display)',
+        h1: 'var(--tr-h1)',
+        h2: 'var(--tr-h2)',
+        caption: 'var(--tr-caption)',
       },
       colors: {
+        /*
+         * Colores de marca crudos, para los casos en que hace falta el color
+         * exacto del manual y no el token semántico — sobre todo texto sobre
+         * fotos. `brand-light` (#C5C5C5) es el reemplazo de `white`: el manual
+         * prohíbe el blanco pleno.
+         */
+        brand: {
+          violet: "hsl(var(--brand-violet))",
+          "violet-deep": "hsl(var(--brand-violet-deep))",
+          "violet-bright": "hsl(var(--brand-violet-bright))",
+          light: "hsl(var(--brand-gray-light))",
+          mid: "hsl(var(--brand-gray-mid))",
+          black: "hsl(var(--brand-black-deep))",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

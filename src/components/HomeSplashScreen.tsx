@@ -50,7 +50,7 @@ export function HomeSplashScreen({ visible }: HomeSplashScreenProps) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.35, duration: 0.5 }}
-                className="mt-3 text-[0.62rem] font-bold uppercase tracking-[0.3em] text-white/30"
+                className="mt-3 text-[0.62rem] font-bold uppercase tracking-[0.3em] text-brand-light/30"
               >
                 Comunidad · Noticias · Eventos
               </motion.p>

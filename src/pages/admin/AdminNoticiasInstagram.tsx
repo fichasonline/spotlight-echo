@@ -799,7 +799,7 @@ export default function AdminNoticiasInstagram() {
 
                   <div className="mt-3">
                     <div className="mx-auto w-full max-w-[250px] sm:max-w-[270px]">
-                      <div className="relative aspect-[9/16] overflow-hidden rounded-xl border border-white/10 bg-[#09070d] shadow-[0_16px_36px_rgba(0,0,0,0.24)]">
+                      <div className="relative aspect-[9/16] overflow-hidden rounded-xl border border-brand-light/10 bg-[#09070d] shadow-[0_16px_36px_rgba(0,0,0,0.24)]">
                         {story ? (
                           <img
                             src={story.url}
@@ -807,7 +807,7 @@ export default function AdminNoticiasInstagram() {
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <div className="flex h-full items-center justify-center px-5 text-center text-sm text-white/70">
+                          <div className="flex h-full items-center justify-center px-5 text-center text-sm text-brand-light/70">
                             {isGenerating ? "Creando imagen..." : "Preparando preview..."}
                           </div>
                         )}
