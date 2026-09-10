@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -26,13 +27,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { COUNTRIES, countryFlag, countryName } from "@/lib/countries";
+import { CURRENCIES, DEFAULT_CURRENCY, formatAmount } from "@/lib/currencies";
+import { toPersonName } from "@/lib/names";
 
 interface Champion {
   id: string;
   name: string;
   tournament: string;
   amount: number;
-  currency: "UYU" | "USD";
+  currency: string;
+  country: string | null;
   image_url: string | null;
   post_url: string | null;
   week_number: number;
@@ -45,7 +50,8 @@ interface ChampionForm {
   name: string;
   tournament: string;
   amount: string;
-  currency: "UYU" | "USD";
+  currency: string;
+  country: string;
   image_url: string;
   post_url: string;
 }
@@ -55,7 +61,8 @@ function createEmptyForm(): ChampionForm {
     name: "",
     tournament: "",
     amount: "",
-    currency: "UYU",
+    currency: DEFAULT_CURRENCY,
+    country: "UY",
     image_url: "",
     post_url: "",
   };
@@ -151,11 +158,13 @@ export default function AdminCampeones() {
   const handleSaveChampions = async () => {
     const validForms = forms.filter((f) => {
       const amount = parseFloat(f.amount);
-      return f.name.trim() && f.tournament.trim() && f.amount.trim() && !isNaN(amount) && amount > 0;
+      return (
+        f.name.trim() && f.tournament.trim() && f.amount.trim() && !isNaN(amount) && amount > 0 && f.country
+      );
     });
 
     if (validForms.length === 0) {
-      toast({ title: "Falta información", description: "Completa al menos un campeón con nombre, torneo y monto válido (número positivo).", variant: "destructive" });
+      toast({ title: "Falta información", description: "Completa al menos un campeón con nombre, torneo, nacionalidad y monto válido (número positivo).", variant: "destructive" });
       return;
     }
 
@@ -170,10 +179,11 @@ export default function AdminCampeones() {
       const { error } = await (supabase as any)
         .from("champions")
         .update({
-          name: form.name,
+          name: toPersonName(form.name),
           tournament: form.tournament,
           amount: parseFloat(form.amount),
           currency: form.currency,
+          country: form.country || null,
           image_url: form.image_url || null,
           post_url: form.post_url || null,
           updated_at: new Date().toISOString(),
@@ -187,10 +197,11 @@ export default function AdminCampeones() {
     } else {
       // Insert mode
       const toInsert = validForms.map((f) => ({
-        name: f.name,
+        name: toPersonName(f.name),
         tournament: f.tournament,
         amount: parseFloat(f.amount),
         currency: f.currency,
+        country: f.country || null,
         image_url: f.image_url || null,
         post_url: f.post_url || null,
         created_by: user?.id,
@@ -219,6 +230,7 @@ export default function AdminCampeones() {
         tournament: champion.tournament,
         amount: champion.amount.toString(),
         currency: champion.currency,
+        country: champion.country || "",
         image_url: champion.image_url || "",
         post_url: champion.post_url || "",
       },
@@ -330,9 +342,10 @@ export default function AdminCampeones() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Gestionar Campeones</h1>
-          <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+        <AdminPageHeader
+          title="Campeones"
+          actions={
+            <Dialog open={open} onOpenChange={handleDialogOpenChange}>
             <DialogTrigger asChild>
               <Button onClick={() => {
                 setForms([createEmptyForm()]);
@@ -364,14 +377,41 @@ export default function AdminCampeones() {
                       </button>
                     )}
 
-                    <div>
-                      <Label htmlFor={`name-${index}`}>Nombre del Campeón *</Label>
-                      <Input
-                        id={`name-${index}`}
-                        placeholder="ej: Diego López"
-                        value={form.name}
-                        onChange={(e) => handleFormChange(index, "name", e.target.value)}
-                      />
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="col-span-2">
+                        <Label htmlFor={`name-${index}`}>Nombre del Campeón *</Label>
+                        <Input
+                          id={`name-${index}`}
+                          placeholder="ej: Diego López"
+                          value={form.name}
+                          onChange={(e) => handleFormChange(index, "name", e.target.value)}
+                          /*
+                            Se normaliza al salir del campo y no en cada tecla:
+                            corregir mientras se escribe pelea con el cursor y
+                            con el que quiere tipear una mayúscula a propósito.
+                          */
+                          onBlur={(e) => handleFormChange(index, "name", toPersonName(e.target.value))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`country-${index}`}>Nacionalidad *</Label>
+                        <Select
+                          value={form.country}
+                          onValueChange={(value) => handleFormChange(index, "country", value)}
+                        >
+                          <SelectTrigger id={`country-${index}`}>
+                            <SelectValue placeholder="Elegir país" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-72">
+                            {COUNTRIES.map((c) => (
+                              <SelectItem key={c.code} value={c.code}>
+                                <span className="mr-2">{countryFlag(c.code)}</span>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
 
                     <div>
@@ -403,8 +443,11 @@ export default function AdminCampeones() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="UYU">Pesos (UYU)</SelectItem>
-                            <SelectItem value="USD">Dólares (USD)</SelectItem>
+                            {CURRENCIES.map((c) => (
+                              <SelectItem key={c.code} value={c.code}>
+                                {c.label} ({c.code})
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -473,7 +516,8 @@ export default function AdminCampeones() {
               </div>
             </DialogContent>
           </Dialog>
-        </div>
+          }
+        />
 
         <div className="space-y-6">
           {Object.entries(
@@ -500,9 +544,14 @@ export default function AdminCampeones() {
                           )}
                           <div className="flex-1">
                             <div className="font-medium text-foreground flex items-center gap-2 group">
-                              {champion.name}
+                              {champion.country && (
+                                <span title={countryName(champion.country)} aria-label={countryName(champion.country)}>
+                                  {countryFlag(champion.country)}
+                                </span>
+                              )}
+                              {toPersonName(champion.name)}
                               <button
-                                onClick={() => handleCopyText(champion.name, "Nombre")}
+                                onClick={() => handleCopyText(toPersonName(champion.name), "Nombre")}
                                 className="opacity-0 group-hover:opacity-100 transition-opacity"
                                 title="Copiar nombre"
                               >
@@ -542,9 +591,9 @@ export default function AdminCampeones() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-right font-semibold text-foreground group cursor-pointer" onClick={() => handleCopyText(`${champion.currency === "USD" ? "USD " : ""}$${champion.amount.toLocaleString("es-UY")}`, "Monto")}>
+                      <td className="px-6 py-4 text-sm text-right font-semibold text-foreground group cursor-pointer" onClick={() => handleCopyText(formatAmount(champion.amount, champion.currency), "Monto")}>
                         <div className="flex items-center justify-end gap-2">
-                          <span>{champion.currency === "USD" ? "USD " : ""} ${champion.amount.toLocaleString("es-UY")}</span>
+                          <span>{formatAmount(champion.amount, champion.currency)}</span>
                           <Copy className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                       </td>

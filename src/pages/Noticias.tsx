@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { ArticleGrid, ARTICLE_CARD_COLUMNS, type ArticleCard } from "@/components/ArticleGrid";
-import { ARTICLE_CATEGORIES } from "@/lib/taxonomy";
 
 
 const PAGE_SIZE = 12;
@@ -53,42 +53,37 @@ export default function NoticiasPage() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-display font-bold mb-3">
-          {query ? `Resultados para “${query}”` : "Noticias de poker"}
-        </h1>
-        {query ? (
-          <p className="text-muted-foreground max-w-2xl mb-6">
-            {loading
-              ? "Buscando…"
-              : articles.length === 0
-                ? "No encontramos notas con ese término."
-                : "Notas que mencionan ese término en el titular o la bajada."}{" "}
-            <Link to="/noticias" className="text-primary hover:underline">
-              Ver todas las noticias
-            </Link>
-          </p>
-        ) : (
-          <p className="text-muted-foreground max-w-2xl mb-6">
-            Las últimas noticias del mundo del poker: torneos en vivo, resultados, novedades de salas online
-            como GG Poker, ACR y PokerStars, deals, y toda la actualidad del poker en Uruguay y el mundo.
-          </p>
-        )}
+        <PageHeader
+          title={query ? `Resultados para “${query}”` : "Noticias de poker"}
+          description={
+            query
+              ? loading
+                ? "Buscando…"
+                : articles.length === 0
+                  ? "No encontramos notas con ese término."
+                  : "Notas que mencionan ese término en el titular o la bajada."
+              : "Las últimas noticias del mundo del poker: torneos en vivo, resultados, novedades de salas online como GG Poker, ACR y PokerStars, deals, y toda la actualidad del poker en Uruguay y el mundo."
+          }
+          /*
+            En una búsqueda la salida hacia el listado completo tiene que verse
+            siempre, también en mobile — es la forma de deshacer la búsqueda.
+            Por eso va como acción y no dentro de la bajada, que se oculta en
+            pantallas angostas.
+          */
+          actions={
+            query ? (
+              <Link to="/noticias" className="text-[12.5px] leading-caption text-primary hover:underline">
+                Ver todas
+              </Link>
+            ) : undefined
+          }
+        />
 
-        <nav aria-label="Secciones" className="mb-8 flex flex-wrap gap-2">
-          <span className="rounded-full border border-primary bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
-            Todas
-          </span>
-          {ARTICLE_CATEGORIES.map((category) => (
-            <Link
-              key={category.value}
-              to={`/${category.slug}`}
-              className="rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-            >
-              {category.label}
-            </Link>
-          ))}
-        </nav>
-
+        {/*
+          Misma fila duplicada que había en Categoria: la sacamos porque el
+          header ya muestra las secciones en todos los anchos, con "Todas"
+          incluida y marcando la activa.
+        */}
         <ArticleGrid articles={articles} />
 
         {hasMore && articles.length > 0 && (

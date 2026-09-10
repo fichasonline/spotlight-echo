@@ -17,6 +17,7 @@ import {
   ExternalLink,
   ImageIcon,
   Instagram,
+  MapPin,
   MessageSquare,
   Send,
   Trophy,
@@ -28,6 +29,10 @@ import { getLocalDateISO, parseDateValue } from "@/lib/date";
 import { getArticleImageStyle } from "@/lib/article-image";
 import { categoryLabel } from "@/lib/taxonomy";
 import { SOCIAL_URLS } from "@/lib/social";
+import { countryFlag, countryName } from "@/lib/countries";
+import { TrendingCarousel, type TrendingArticle } from "@/components/TrendingCarousel";
+import { formatAmount } from "@/lib/currencies";
+import { toPersonName } from "@/lib/names";
 
 /*
  * Cuántas notas pide la home. El reparto por bloque está más abajo, en
@@ -66,7 +71,8 @@ interface Champion {
   name: string;
   tournament: string;
   amount: number;
-  currency: "UYU" | "USD";
+  currency: string;
+  country: string | null;
   image_url: string | null;
 }
 
@@ -157,9 +163,41 @@ function formatEventRange(event: Event) {
   return `Del ${startLabel} al ${format(end, "d 'de' MMMM", { locale: es })}`;
 }
 
+/** Lugar del evento: "Ciudad, País", o lo que haya de los dos. */
+function formatEventPlace(event: Event) {
+  return [event.city, event.country].filter(Boolean).join(", ");
+}
+
+/** Chip de fecha para la agenda compacta: día grande y mes abreviado. */
+function EventDateChip({ event }: { event: Event }) {
+  const start = parseDateValue(event.start_date);
+  return (
+    <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-md border border-primary/25 bg-primary/10">
+      <span className="text-[17px] font-bold leading-none text-primary">{format(start, "d")}</span>
+      <span className="mt-0.5 text-[9px] font-bold uppercase leading-none tracking-caption text-primary/70">
+        {format(start, "MMM", { locale: es })}
+      </span>
+    </div>
+  );
+}
+
+/** Pastilla "En vivo" con punto latiendo. Se usa sobre la foto y en la lista. */
+function LiveBadge({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border border-destructive/40 bg-destructive/20 px-2 py-0.5 text-[10px] font-bold uppercase leading-caption tracking-caption text-destructive backdrop-blur-sm ${className}`}
+    >
+      <span className="relative flex h-1.5 w-1.5">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-75" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-destructive" />
+      </span>
+      En vivo
+    </span>
+  );
+}
+
 function formatChampionAmount(champion: Champion) {
-  const symbol = champion.currency === "USD" ? "US$" : "$";
-  return `${symbol}${Math.round(champion.amount).toLocaleString("es-UY")}`;
+  return formatAmount(champion.amount, champion.currency);
 }
 
 /* ─── Piezas ───────────────────────────────────────────────────── */
@@ -213,12 +251,17 @@ function StoryCard({
       style={{ "--card-reveal-delay": `${delay}ms` } as CSSProperties}
       className={`card-reveal group relative flex min-w-0 overflow-hidden rounded-xl ${heightClass}`}
     >
-      <div className="absolute inset-0">
+      {/*
+        El zoom lento va sobre la imagen y el escalado de hover sobre este
+        contenedor: los dos usan `transform`, así que puestos en el mismo
+        elemento la animación pisaría al hover y viceversa.
+      */}
+      <div className="absolute inset-0 transition-transform duration-500 group-hover:scale-[1.03]">
         <StoryImage
           src={article.image_url}
-          alt={article.headline}
+          alt=""
           style={getArticleImageStyle(article)}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+          className="slow-zoom h-full w-full object-cover"
         />
       </div>
 
@@ -231,15 +274,19 @@ function StoryCard({
           </span>
         )}
         <h3
-          className={`m-0 max-w-[22ch] font-bold leading-[1.06] tracking-h1 text-brand-light drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)] ${titleClass}`}
+          className={`m-0 max-w-[20ch] font-bold uppercase leading-h1 tracking-h1 text-brand-light drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)] ${titleClass}`}
         >
           {article.headline}
         </h3>
-        {article.summary && (
-          <p className="m-0 line-clamp-2 max-w-[52ch] text-[15px] leading-body text-brand-light/80">
-            {article.summary}
-          </p>
-        )}
+
+        {/*
+          Reemplaza a la bajada. Va como <span>: la card entera ya es un
+          enlace y anidar otro sería HTML inválido.
+        */}
+        <span className="mt-1 inline-flex items-center gap-1.5 self-start text-[10.5px] font-semibold uppercase leading-caption tracking-caption text-brand-light/70 transition-colors group-hover:text-brand-light">
+          Leé la nota completa
+          <ArrowRight className="h-2.5 w-2.5" />
+        </span>
       </div>
     </Link>
   );
@@ -420,6 +467,7 @@ export default function HomePage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [champions, setChampions] = useState<Champion[]>([]);
+  const [trending, setTrending] = useState<TrendingArticle[]>([]);
   const [banners, setBanners] = useState<Record<string, HomeBanner>>({});
   const [activeBanner, setActiveBanner] = useState<HomeBanner | null>(null);
   const [hasFetchedBanners, setHasFetchedBanners] = useState(false);
@@ -557,10 +605,10 @@ export default function HomePage() {
           .limit(5),
         (supabase as any)
           .from("champions")
-          .select("id, name, tournament, amount, currency, image_url")
+          .select("id, name, tournament, amount, currency, country, image_url")
           .order("year_week", { ascending: false })
           .order("created_at", { ascending: false })
-          .limit(3),
+          .limit(6),
         supabase
           .from("home_banners")
           .select("position, image_url, link_url, affiliate_code, alt_text, is_active"),
@@ -570,6 +618,50 @@ export default function HomePage() {
       clearTimeout(timeout);
 
       if (evtRes.data) setEvents(evtRes.data as Event[]);
+      /*
+       * Lo más leído de la semana. Va en dos pasos porque el ranking vive en
+       * una vista agregada y las notas en otra tabla: primero los ids con más
+       * lecturas, después los datos de esas notas.
+       *
+       * Si todavía no hay lecturas registradas (la medición arranca en cero),
+       * cae a las últimas publicadas — una fila vacía en la home sería peor
+       * que una fila con las notas recientes.
+       */
+      void (async () => {
+        const { data: ranking } = await (supabase as any)
+          .from("article_views_last_week")
+          .select("article_id, views")
+          .order("views", { ascending: false })
+          .limit(8);
+
+        const ids = ((ranking ?? []) as { article_id: string }[]).map((r) => r.article_id);
+
+        const query = (supabase as any)
+          .from("articles")
+          .select("id, slug, headline, image_url, image_position_x, image_position_y")
+          .eq("status", "published");
+
+        const { data } = ids.length
+          ? await query.in("id", ids)
+          : await query
+              .order("published_at", { ascending: false, nullsFirst: false })
+              .order("created_at", { ascending: false })
+              .limit(8);
+
+        if (cancelled || !data) return;
+
+        // `in()` no respeta el orden de los ids: se reordena por ranking acá.
+        const rows = data as TrendingArticle[];
+        const ordered = ids.length
+          ? ids.map((id) => rows.find((a) => a.id === id)).filter(Boolean as unknown as (a: TrendingArticle | undefined) => a is TrendingArticle)
+          : rows;
+
+        setTrending(ordered);
+      })();
+
+      if (championRes.error) {
+        console.error("No se pudieron cargar los campeones:", championRes.error);
+      }
       if (championRes.data) setChampions(championRes.data as Champion[]);
       if (bannerRes.data) {
         const map: Record<string, HomeBanner> = {};
@@ -623,36 +715,81 @@ export default function HomePage() {
               </span>
               <Link
                 to="/calendario"
-                className="text-[12px] font-bold uppercase leading-caption tracking-caption text-primary hover:underline"
+                className="inline-flex shrink-0 items-center gap-1.5 text-[12px] font-bold uppercase leading-caption tracking-caption text-muted-foreground transition-colors hover:text-primary"
               >
-                Ver calendario completo
+                Ver todo <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-hidden">
-              {events.slice(0, 3).map((e, i) => {
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+              {events.slice(0, 4).map((e, i) => {
                 const endDate = e.end_date ?? e.start_date;
                 const isLive = e.start_date <= today && endDate >= today;
                 const range = formatEventRange(e);
+                const place = formatEventPlace(e);
 
-                return (
-                  <div key={e.id} className="flex flex-col gap-3.5">
-                    {i > 0 && <div className="h-px w-full bg-border" />}
-                    <Link to={`/eventos/${e.id}`} className="group flex items-center gap-3">
-                      <div className="h-14 w-[78px] shrink-0 overflow-hidden rounded-md">
-                        <StoryImage src={e.hero_image_url} alt={e.name} />
+                /* El primero va como banner: es el que la home quiere que mires. */
+                if (i === 0) {
+                  return (
+                    <Link
+                      key={e.id}
+                      to={`/eventos/${e.id}`}
+                      className="group flex min-h-0 flex-1 flex-col gap-2.5"
+                    >
+                      {/*
+                        `flex-1` sobre la foto en vez de un aspect fijo: con un
+                        solo evento el banner se come el espacio libre de la
+                        columna en lugar de dejar el hueco muerto bajo la ficha,
+                        y con la agenda llena se comprime hasta el mínimo.
+                      */}
+                      <div className="relative min-h-[170px] w-full flex-1 overflow-hidden rounded-md">
+                        <StoryImage
+                          src={e.hero_image_url}
+                          alt={e.name}
+                          className="h-full w-full object-cover transition-transform duration-[var(--dur-slow)] ease-[var(--ease-out)] group-hover:scale-[1.04]"
+                        />
+                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                        {isLive && <LiveBadge className="absolute left-2.5 top-2.5" />}
                       </div>
-                      <div className="flex min-w-0 flex-col gap-1">
-                        <span className="flex items-start gap-2 text-[16px] font-bold leading-h2 text-foreground transition-colors group-hover:text-primary">
-                          <span className="line-clamp-2">{e.name}</span>
-                          {isLive && (
-                            <span className="mt-0.5 shrink-0 rounded-full border border-red-500/40 bg-red-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-caption text-red-400">
-                              En vivo
+                      <div className="flex shrink-0 flex-col gap-1.5">
+                        <span className="line-clamp-2 text-[18px] font-bold leading-h2 text-foreground transition-colors group-hover:text-primary">
+                          {e.name}
+                        </span>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] leading-caption text-muted-foreground">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Calendar className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                            {range}
+                          </span>
+                          {place && (
+                            <span className="inline-flex min-w-0 items-center gap-1.5">
+                              <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                              <span className="truncate">{place}</span>
                             </span>
                           )}
-                        </span>
-                        <span className="text-[12.5px] leading-caption text-muted-foreground">{range}</span>
+                        </div>
                       </div>
+                    </Link>
+                  );
+                }
+
+                /* Los que siguen, en agenda compacta: el chip de fecha ordena la lectura. */
+                return (
+                  <div key={e.id} className="flex shrink-0 flex-col gap-4">
+                    <div className="h-px w-full bg-border" />
+                    <Link
+                      to={`/eventos/${e.id}`}
+                      className="group flex items-center gap-3 rounded-md transition-colors hover:bg-muted/40"
+                    >
+                      <EventDateChip event={e} />
+                      <div className="flex min-w-0 flex-1 flex-col gap-1">
+                        <span className="line-clamp-2 text-[14px] font-bold leading-ui text-foreground transition-colors group-hover:text-primary">
+                          {e.name}
+                        </span>
+                        <span className="truncate text-[12px] leading-caption text-muted-foreground">
+                          {place ? `${range} · ${place}` : range}
+                        </span>
+                      </div>
+                      {isLive && <LiveBadge className="shrink-0" />}
                     </Link>
                   </div>
                 );
@@ -701,27 +838,38 @@ export default function HomePage() {
                 Últimos campeones
               </span>
 
-              <div className="flex flex-col gap-3.5">
+              <div className="flex flex-col gap-3">
                 {champions.map((c, i) => (
-                  <div key={c.id} className="flex flex-col gap-3.5">
+                  <div key={c.id} className="flex flex-col gap-3">
                     {i > 0 && <div className="h-px w-full bg-border" />}
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
-                        {c.image_url ? (
-                          <img src={c.image_url} alt={c.name} className="h-full w-full object-cover" />
-                        ) : (
-                          <User className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                    <div className="flex items-center gap-3.5">
+                      <div className="relative shrink-0">
+                        <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-muted ring-2 ring-primary/25 ring-offset-2 ring-offset-card">
+                          {c.image_url ? (
+                            <img src={c.image_url} alt={toPersonName(c.name)} className="h-full w-full object-cover" />
+                          ) : (
+                            <User className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
+                          )}
+                        </div>
+                        {c.country && (
+                          <span
+                            className="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card text-[13px] leading-none shadow-sm"
+                            title={countryName(c.country)}
+                            aria-label={countryName(c.country)}
+                          >
+                            {countryFlag(c.country)}
+                          </span>
                         )}
                       </div>
-                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="truncate text-[15px] font-bold leading-h3 text-foreground">{c.name}</span>
+                      <div className="flex min-w-0 flex-1 flex-col gap-1">
+                        <span className="truncate text-[15px] font-bold leading-h3 text-foreground">{toPersonName(c.name)}</span>
                         <span className="truncate text-[12.5px] leading-caption text-muted-foreground">
                           {c.tournament}
                         </span>
+                        <span className="text-[17px] font-bold leading-none text-primary">
+                          {formatChampionAmount(c)}
+                        </span>
                       </div>
-                      <span className="shrink-0 text-[15px] font-bold text-primary">
-                        {formatChampionAmount(c)}
-                      </span>
                     </div>
                   </div>
                 ))}
@@ -729,7 +877,7 @@ export default function HomePage() {
                 {champions.length === 0 && (
                   <p className="flex items-center gap-2 text-[13px] leading-body text-muted-foreground">
                     <Trophy className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    Todavía no cargamos campeones de esta semana.
+                    Todavía no hay campeones cargados.
                   </p>
                 )}
               </div>
@@ -745,7 +893,23 @@ export default function HomePage() {
           </aside>
         </section>
 
-        {/* ── Fila 3: banda de banners ──────────────────────────────── */}
+        {/* ── Fila 3: lo más leído ─────────────────────────────────── */}
+        {trending.length > 0 && (
+          <section className="mt-9 flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-4">
+              <SectionLabel>Lo más leído</SectionLabel>
+              <Link
+                to="/noticias"
+                className="inline-flex items-center gap-1.5 text-[12px] font-bold uppercase leading-caption tracking-caption text-muted-foreground transition-colors hover:text-primary"
+              >
+                Ver todas <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+            <TrendingCarousel articles={trending} />
+          </section>
+        )}
+
+        {/* ── Fila 4: banda de banners ──────────────────────────────── */}
         <section className={`mt-9 grid gap-6 md:grid-cols-2 ${bannerReveal}`}>
           <BannerSlot
             banner={banners["bottom_left"]}

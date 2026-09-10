@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -11,7 +12,6 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   AlertCircle,
-  ArrowLeft,
   Copy,
   Dice5,
   ExternalLink,
@@ -275,18 +275,7 @@ export default function AdminSorteos() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-display font-bold">Sorteos</h1>
-            <p className="text-sm text-muted-foreground">Instagram comments giveaway</p>
-          </div>
-          <Button asChild variant="outline">
-            <Link to="/admin">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Dashboard
-            </Link>
-          </Button>
-        </div>
+        <AdminPageHeader title="Sorteos" backTo="/admin" />
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-6">

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -132,10 +133,7 @@ export default function AdminTaxonomia() {
 
   return (
     <>
-      <h1 className="font-display text-3xl font-bold">Categorías y etiquetas</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Cada nota lleva una sola categoría. Todo lo demás —circuito, país, sala— va como etiqueta.
-      </p>
+      <AdminPageHeader title="Categorías y etiquetas" />
 
       {/* ── Categorías ──────────────────────────────────────────────────── */}
       <section className="mt-8">

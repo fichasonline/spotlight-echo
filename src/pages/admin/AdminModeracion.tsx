@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -6,7 +7,6 @@ import {
   BellOff,
   Lock,
   Mail,
-  MessageSquare,
   Phone,
   Send,
   Unlock,
@@ -468,10 +468,7 @@ export default function AdminModeracion() {
 
       <div className="container mx-auto space-y-10 px-4 py-8">
         <section>
-          <div className="mb-6 flex items-center gap-2">
-            <MessageSquare className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-display font-bold">Soporte y moderacion</h1>
-          </div>
+          <AdminPageHeader title="Soporte y moderación" />
 
           <div className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
             <div className={`rounded-lg border border-border bg-card ${mobileView === "thread" ? "hidden lg:block" : "block"}`}>

@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
@@ -23,14 +24,10 @@ export default function SalasPage() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-display font-bold mb-3">
-          Salas de Poker en Uruguay
-        </h1>
-        <p className="text-muted-foreground max-w-2xl mb-8">
-          Comparativa de las mejores salas de poker online y casinos en vivo para jugadores uruguayos.
-          Encontrá deals exclusivos, bonos de bienvenida, rakeback y toda la información sobre
-          GG Poker, ACR, PokerStars, Enjoy y más.
-        </p>
+        <PageHeader
+          title="Salas de Poker en Uruguay"
+          description="Comparativa de salas online y casinos en vivo para jugadores uruguayos: deals, bonos de bienvenida, rakeback y más sobre GG Poker, ACR, PokerStars y Enjoy."
+        />
 
         {salas.length === 0 && (
           <p className="text-muted-foreground text-center py-12">Próximamente.</p>

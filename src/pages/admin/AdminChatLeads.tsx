@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { isChatLead } from "@/lib/support-leads";
-import { ArrowLeft, Eye, Pencil, MessageCircle, Check, X } from "lucide-react";
+import { Eye, Pencil, MessageCircle, Check, X } from "lucide-react";
 
 type LeadStatus = "nuevo" | "contactado" | "en_seguimiento" | "cerrado";
 
@@ -177,17 +178,11 @@ export default function AdminChatLeads() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex items-center gap-3">
-          <Link to="/admin">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-display font-bold">Leads de chat</h1>
-            <p className="text-sm text-muted-foreground">{leads.length} contactos originados en el chat</p>
-          </div>
-        </div>
+        <AdminPageHeader
+          title="Leads de chat"
+          backTo="/admin"
+          actions={<span className="text-sm leading-ui text-muted-foreground">{leads.length} contactos</span>}
+        />
 
         <div className="mb-4 flex flex-wrap gap-3">
           <Input

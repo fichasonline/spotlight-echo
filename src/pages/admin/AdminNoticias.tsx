@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -159,6 +160,7 @@ export default function AdminNoticias() {
   const [form, setForm] = useState<ArticleForm>(() => createEmptyForm());
   const [editId, setEditId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [deleteTarget, setDeleteTarget] = useState<Article | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -337,6 +339,34 @@ export default function AdminNoticias() {
     setEditId(article.id);
     setOpen(true);
   };
+
+  /*
+   * Entrada desde el portal: /admin/noticias?edit=<id> abre esa nota.
+   *
+   * El ref evita reabrir el editor si el efecto vuelve a correr — `articles`
+   * se recarga después de cada guardado, y sin la guarda el editor se
+   * reabriría solo apenas cerrás.
+   *
+   * El parámetro se limpia con `replace` para no ensuciar el historial: si no,
+   * el botón "atrás" del navegador volvería a abrir el editor.
+   */
+  const openedFromUrl = useRef<string | null>(null);
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (!editId || openedFromUrl.current === editId) return;
+
+    const target = articles.find((a) => a.id === editId);
+    if (!target) return;
+
+    openedFromUrl.current = editId;
+    void handleEdit(target);
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("edit");
+    setSearchParams(next, { replace: true });
+    // handleEdit se recrea en cada render; el ref ya garantiza una sola apertura.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, articles]);
 
   const handleApprove = async (article: Article) => {
     await supabase
@@ -533,14 +563,10 @@ export default function AdminNoticias() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-3xl font-display font-bold">Gestión de noticias</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Aquí gestionás artículos y marcás cuáles van a Instagram. El generador vive en una vista separada.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+        <AdminPageHeader
+          title="Gestión de noticias"
+          actions={
+            <>
             <Button variant="outline" asChild>
               <Link to="/admin/noticias/instagram">
                 <Instagram className="mr-2 h-4 w-4" />
@@ -569,13 +595,19 @@ export default function AdminNoticias() {
                 side="bottom"
                 onPointerDownOutside={(event) => event.preventDefault()}
                 onInteractOutside={(event) => event.preventDefault()}
-                className="inset-x-auto left-1/2 right-auto top-auto h-[calc(100vh-1.5rem)] max-h-[920px] w-[min(1180px,calc(100vw-1rem))] max-w-none -translate-x-1/2 overflow-hidden rounded-t-2xl border border-border bg-background p-0 shadow-2xl sm:max-w-none"
+                /*
+                  Full frame: el editor toma toda la ventana. `inset-0` con
+                  `h-full w-full` pisa el ancho acotado y el centrado que traía
+                  la variante `bottom`; sin bordes ni radio porque ya no hay
+                  fondo detrás contra el que recortarse.
+                */
+                className="inset-0 h-full w-full max-w-none overflow-hidden rounded-none border-0 bg-background p-0 sm:max-w-none"
               >
                 <div className="flex h-full flex-col overflow-hidden">
                   <SheetHeader className="border-b border-border bg-background/95 px-5 py-4 pr-14 text-left backdrop-blur">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <SheetTitle className="font-display text-2xl">
+                        <SheetTitle className="font-display text-2xl leading-h3">
                           {editId ? "Editar noticia" : "Nueva noticia"}
                         </SheetTitle>
                         <SheetDescription>
@@ -608,7 +640,7 @@ export default function AdminNoticias() {
                           ) : (
                             <div className="flex h-full flex-col items-center justify-center gap-2 bg-muted/50 px-6 text-center text-muted-foreground">
                               <ImageIcon className="h-8 w-8" />
-                              <span className="text-sm">Agregá una URL de portada en el panel derecho.</span>
+                              <span className="text-sm leading-ui">Agregá una URL de portada en el panel derecho.</span>
                             </div>
                           )}
                         </div>
@@ -619,11 +651,11 @@ export default function AdminNoticias() {
                             value={form.headline}
                             onChange={(value) => updateForm("headline", value)}
                             placeholder="Titular de la noticia"
-                            className="font-display text-3xl font-bold leading-tight tracking-[0.01em] md:text-4xl"
+                            className="font-display text-3xl font-bold leading-h2 tracking-h2 md:text-4xl"
                           />
                         </div>
 
-                        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm leading-ui text-muted-foreground">
                           <span className="inline-flex items-center gap-1.5">
                             <CalendarDays className="h-4 w-4" />
                             {format(parseDateValue(previewDate), "d MMMM yyyy", { locale: es })}
@@ -638,7 +670,7 @@ export default function AdminNoticias() {
                             onChange={(value) => updateForm("summary", value)}
                             placeholder="Bajada o resumen de la noticia"
                             minRows={2}
-                            className="text-lg italic leading-8 text-foreground/80"
+                            className="text-lg italic leading-body text-foreground/80"
                           />
                         </div>
 
@@ -654,7 +686,7 @@ export default function AdminNoticias() {
                       <aside className="h-fit rounded-xl border border-border bg-card/70 p-4 shadow-sm lg:sticky lg:top-5">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-primary" />
-                          <h3 className="font-display text-lg font-bold">Ajustes</h3>
+                          <h3 className="font-display text-lg font-bold leading-h3">Ajustes</h3>
                         </div>
 
                         <div className="mt-4 space-y-4">
@@ -670,7 +702,7 @@ export default function AdminNoticias() {
                                 className="pl-9"
                               />
                             </div>
-                            <p className="break-all text-xs text-muted-foreground">/noticias/{previewSlug}</p>
+                            <p className="break-all text-xs leading-caption text-muted-foreground">/noticias/{previewSlug}</p>
                           </div>
 
                           <div className="space-y-2">
@@ -693,7 +725,7 @@ export default function AdminNoticias() {
                                 ))}
                               </SelectContent>
                             </Select>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs leading-caption text-muted-foreground">
                               Una sola por nota. El resto (circuito, país, sala) va como etiqueta.
                             </p>
                           </div>
@@ -701,7 +733,7 @@ export default function AdminNoticias() {
                           <div className="space-y-2">
                             <Label>Etiquetas</Label>
                             {allTags.length === 0 ? (
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs leading-caption text-muted-foreground">
                                 No hay etiquetas cargadas todavía.
                               </p>
                             ) : (
@@ -711,7 +743,7 @@ export default function AdminNoticias() {
                                   if (group.length === 0) return null;
                                   return (
                                     <div key={type.value}>
-                                      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+                                      <p className="mb-1.5 text-xs leading-caption font-semibold uppercase tracking-wider text-muted-foreground/70">
                                         {type.label}
                                       </p>
                                       <div className="flex flex-wrap gap-1.5">
@@ -732,8 +764,8 @@ export default function AdminNoticias() {
                                               }
                                               className={
                                                 active
-                                                  ? "rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
-                                                  : "rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                                                  ? "rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs leading-caption font-medium text-primary"
+                                                  : "rounded-full border border-border px-2.5 py-1 text-xs leading-caption text-muted-foreground hover:border-primary/40 hover:text-foreground"
                                               }
                                             >
                                               {tag.name}
@@ -746,7 +778,7 @@ export default function AdminNoticias() {
                                 })}
                               </div>
                             )}
-                            <Link to="/admin/taxonomia" className="text-xs text-primary hover:underline">
+                            <Link to="/admin/taxonomia" className="text-xs leading-caption text-primary hover:underline">
                               Administrar etiquetas →
                             </Link>
                           </div>
@@ -765,7 +797,7 @@ export default function AdminNoticias() {
                               value={form.source_url}
                               onChange={(event) => updateForm("source_url", event.target.value)}
                               placeholder="https://…"
-                              className="text-xs"
+                              className="text-xs leading-caption"
                             />
                           </div>
 
@@ -779,7 +811,7 @@ export default function AdminNoticias() {
                                 value={form.image_url}
                                 onChange={(event) => updateForm("image_url", event.target.value)}
                                 onPaste={handleImagePaste}
-                                className="text-xs"
+                                className="text-xs leading-caption"
                               />
                               {form.image_url.trim() && (
                                 <div className="rounded-lg overflow-hidden border border-border h-24 bg-muted/50">
@@ -823,7 +855,7 @@ export default function AdminNoticias() {
                                 </Button>
                               )}
                             </div>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs leading-caption text-muted-foreground">
                               Pega una URL directa o sube un archivo (JPG, PNG, WebP. Máximo 50MB).
                             </p>
                           </div>
@@ -832,8 +864,8 @@ export default function AdminNoticias() {
                             <div className="space-y-4 rounded-lg border border-border bg-background/60 p-3">
                               <div className="flex items-center justify-between gap-3">
                                 <div>
-                                  <p className="text-sm font-medium">Encuadre de portada</p>
-                                  <p className="text-xs text-muted-foreground">Mové la imagen hasta que el corte quede bien.</p>
+                                  <p className="text-sm leading-ui font-medium">Encuadre de portada</p>
+                                  <p className="text-xs leading-caption text-muted-foreground">Mové la imagen hasta que el corte quede bien.</p>
                                 </div>
                                 <Button
                                   type="button"
@@ -849,7 +881,7 @@ export default function AdminNoticias() {
                               </div>
 
                               <div className="space-y-2">
-                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <div className="flex items-center justify-between text-xs leading-caption text-muted-foreground">
                                   <span>Horizontal</span>
                                   <span>{clampArticleImagePosition(form.image_position_x)}%</span>
                                 </div>
@@ -861,14 +893,14 @@ export default function AdminNoticias() {
                                   onValueChange={([value]) => updateForm("image_position_x", value)}
                                   aria-label="Encuadre horizontal de portada"
                                 />
-                                <div className="flex justify-between text-[11px] text-muted-foreground">
+                                <div className="flex justify-between text-[11px] leading-caption text-muted-foreground">
                                   <span>Izquierda</span>
                                   <span>Derecha</span>
                                 </div>
                               </div>
 
                               <div className="space-y-2">
-                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <div className="flex items-center justify-between text-xs leading-caption text-muted-foreground">
                                   <span>Vertical</span>
                                   <span>{clampArticleImagePosition(form.image_position_y)}%</span>
                                 </div>
@@ -880,7 +912,7 @@ export default function AdminNoticias() {
                                   onValueChange={([value]) => updateForm("image_position_y", value)}
                                   aria-label="Encuadre vertical de portada"
                                 />
-                                <div className="flex justify-between text-[11px] text-muted-foreground">
+                                <div className="flex justify-between text-[11px] leading-caption text-muted-foreground">
                                   <span>Arriba</span>
                                   <span>Abajo</span>
                                 </div>
@@ -889,7 +921,7 @@ export default function AdminNoticias() {
                           )}
 
                           <div className="rounded-lg border border-border bg-background/60 p-3">
-                            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Fecha visible</p>
+                            <p className="text-xs leading-caption font-medium uppercase tracking-[0.12em] text-muted-foreground">Fecha visible</p>
                             <p className="mt-1 font-medium">
                               {format(parseDateValue(previewDate), "d MMM yyyy", { locale: es })}
                             </p>
@@ -903,13 +935,13 @@ export default function AdminNoticias() {
                               value={form.published_at}
                               onChange={(event) => updateForm("published_at", event.target.value)}
                             />
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs leading-caption text-muted-foreground">
                               Esta fecha se muestra en las tarjetas, la noticia y los feeds SEO.
                             </p>
                           </div>
 
                           <div className="rounded-lg border border-border bg-background/60 p-3">
-                            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Estado</p>
+                            <p className="text-xs leading-caption font-medium uppercase tracking-[0.12em] text-muted-foreground">Estado</p>
                             <Badge className={`mt-2 ${statusColors[previewStatus]}`}>
                               {statusLabels[previewStatus] ?? previewStatus}
                             </Badge>
@@ -935,8 +967,9 @@ export default function AdminNoticias() {
                 </div>
               </SheetContent>
             </Sheet>
-          </div>
-        </div>
+            </>
+          }
+        />
 
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -44,18 +45,17 @@ export default function AdminUsers() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-display font-bold">Usuarios</h1>
-            <p className="text-sm text-muted-foreground">Lista de usuarios registrados y su información básica.</p>
-          </div>
-          <Link
-            to="/admin"
-            className="inline-flex items-center rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground transition-colors hover:border-primary/30"
-          >
-            Volver al dashboard
-          </Link>
-        </div>
+        <AdminPageHeader
+          title="Usuarios"
+          actions={
+            <Link
+              to="/admin"
+              className="inline-flex items-center rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground transition-colors hover:border-primary/30"
+            >
+              Volver al dashboard
+            </Link>
+          }
+        />
 
         <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
           {loading ? (

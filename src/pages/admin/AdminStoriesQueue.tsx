@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { ArrowLeft, ExternalLink, Loader2, RefreshCw, Send, Sparkles } from "lucide-react";
+import { ExternalLink, Loader2, RefreshCw, Send, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -151,18 +152,11 @@ export default function AdminStoriesQueue() {
     <>
       <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <Link to="/admin" className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-              Volver al panel
-            </Link>
-            <h1 className="text-3xl font-display font-bold">Stories en cola</h1>
-            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-              Revisión final de stories generadas antes de pasarlas al publisher.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+        <AdminPageHeader
+          title="Stories en cola"
+          backTo="/admin"
+          actions={
+            <>
             <Badge variant="outline" className="border-primary/25 bg-primary/10 text-primary">
               Pendientes: {stories.length}
             </Badge>
@@ -170,8 +164,9 @@ export default function AdminStoriesQueue() {
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               Actualizar
             </Button>
-          </div>
-        </div>
+            </>
+          }
+        />
 
         {loading ? (
           <div className="flex min-h-60 items-center justify-center rounded-xl border border-border bg-card/90 text-sm text-muted-foreground">

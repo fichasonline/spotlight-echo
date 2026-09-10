@@ -1,4 +1,6 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -6,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Pencil, Trash2, CalendarDays, MapPin, ImageIcon } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseDateValue } from "@/lib/date";
@@ -105,9 +108,38 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
-function parseLinksFromText(text: string): { links: EventLink[]; invalid: string[] } {
+/**
+ * Motivo por el que una línea no se puede guardar.
+ *
+ * Distinguir "le falta la URL" de "la URL está mal escrita" importa: son dos
+ * arreglos distintos, y el segundo mensaje no ayuda cuando el problema es el
+ * primero — que es el caso de las líneas sueltas tipo "Te puede interesar" que
+ * quedan al pegar contenido copiado de otra página.
+ */
+type InvalidLine = { line: string; motivo: string };
+
+/**
+ * Líneas que son texto y no intentos de URL: títulos que se cuelan al pegar
+ * contenido de otra página ("Te puede interesar", "Compartir en Facebook").
+ *
+ * Se descartan al guardar en vez de bloquear. Bloquear por esto obligaba a
+ * cazar la línea a mano para poder guardar el resto del evento, cuando la
+ * intención es evidente: eso no es un link. Se avisa cuáles se ignoraron, así
+ * que no es una pérdida silenciosa.
+ */
+function esTextoSuelto(value: string): boolean {
+  return !/^https?:\/\//i.test(value) && !value.includes("/") && !/\.[a-z]{2,}/i.test(value);
+}
+
+/** Una URL escrita a medias (`https://` sin host) se avisa distinto que un texto suelto. */
+function motivoDeUrl(value: string): string {
+  return /^https?:\/\//i.test(value) ? "la URL está mal escrita" : "no empieza con http:// o https://";
+}
+
+function parseLinksFromText(text: string): { links: EventLink[]; invalid: InvalidLine[]; ignored: string[] } {
   const links: EventLink[] = [];
-  const invalid: string[] = [];
+  const invalid: InvalidLine[] = [];
+  const ignored: string[] = [];
 
   for (const rawLine of text.split("\n")) {
     const line = rawLine.trim();
@@ -118,27 +150,42 @@ function parseLinksFromText(text: string): { links: EventLink[]; invalid: string
     const label = hasLabel ? possibleLabel.trim() : "";
     const url = (hasLabel ? rest.join("|") : possibleLabel).trim();
 
+    if (!url) {
+      invalid.push({ line, motivo: "le falta la URL" });
+      continue;
+    }
+
     if (!isHttpUrl(url)) {
-      invalid.push(line);
+      /*
+       * Una línea sin `|` y que no se parece a una dirección es texto suelto,
+       * no una URL rota: pasa al pegar contenido de otra página, donde se
+       * cuelan títulos como "Te puede interesar". Decirle "no empieza con
+       * http://" a eso confunde — lo que hay que hacer es borrar la línea.
+       */
+      if (!hasLabel && esTextoSuelto(url)) {
+        ignored.push(line);
+        continue;
+      }
+      invalid.push({ line, motivo: motivoDeUrl(url) });
       continue;
     }
 
     links.push(label ? { label, url } : { url });
   }
 
-  return { links, invalid };
+  return { links, invalid, ignored };
 }
 
-function parseGalleryFromText(text: string): { images: string[]; invalid: string[] } {
+function parseGalleryFromText(text: string): { images: string[]; invalid: InvalidLine[] } {
   const images: string[] = [];
-  const invalid: string[] = [];
+  const invalid: InvalidLine[] = [];
 
   for (const rawLine of text.split("\n")) {
     const line = rawLine.trim();
     if (!line) continue;
 
     if (!isHttpUrl(line)) {
-      invalid.push(line);
+      invalid.push({ line, motivo: motivoDeUrl(line) });
       continue;
     }
 
@@ -180,6 +227,7 @@ export default function AdminEventos() {
   const [form, setForm] = useState<EventForm>(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [uploadingHero, setUploadingHero] = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const heroFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -302,12 +350,48 @@ export default function AdminEventos() {
 
     const parsedLinks = parseLinksFromText(form.links_text);
     const parsedGallery = parseGalleryFromText(form.gallery_text);
-    const invalidEntries = [...parsedLinks.invalid, ...parsedGallery.invalid];
+
+    /*
+     * El mensaje nombra la línea que falla y en qué campo está.
+     *
+     * Antes decía "revisá links e imágenes" sin más: con dos textareas de
+     * varias líneas cada una, eso obliga a revisar todo a ojo para encontrar
+     * un carácter de más. El error tiene que decir qué arreglar.
+     */
+    const invalidEntries = [
+      ...parsedLinks.invalid.map((entry) => ({ campo: "Links", ...entry })),
+      ...parsedGallery.invalid.map((entry) => ({ campo: "Galería", ...entry })),
+    ];
+
+    /*
+     * Las líneas de texto suelto no frenan el guardado: se descartan y se
+     * avisa cuáles. Las URLs mal escritas sí frenan, porque ahí probablemente
+     * había un link real con un error de tipeo y descartarlo lo perdería.
+     */
+    if (parsedLinks.ignored.length > 0) {
+      toast({
+        title: `Se ignoraron ${parsedLinks.ignored.length} línea${parsedLinks.ignored.length > 1 ? "s" : ""} de Links`,
+        description: `No son direcciones web:\n${parsedLinks.ignored
+          .slice(0, 3)
+          .map((l) => `· ${l.length > 45 ? `${l.slice(0, 45)}…` : l}`)
+          .join("\n")}`,
+      });
+    }
 
     if (invalidEntries.length > 0) {
+      const detalle = invalidEntries
+        .slice(0, 3)
+        .map(
+          ({ campo, line, motivo }) =>
+            `· ${campo} — "${line.length > 45 ? `${line.slice(0, 45)}…` : line}": ${motivo}.`,
+        )
+        .join("\n");
+      const resto = invalidEntries.length > 3 ? `\n…y ${invalidEntries.length - 3} más.` : "";
+      const plural = invalidEntries.length > 1;
+
       toast({
-        title: "Hay URLs inválidas",
-        description: "Revisa links e imágenes. Deben comenzar con http:// o https://",
+        title: `Hay ${invalidEntries.length} línea${plural ? "s" : ""} que no se puede${plural ? "n" : ""} guardar`,
+        description: `${detalle}${resto}\nBorrá esa línea o completala con su URL.`,
         variant: "destructive",
       });
       return;
@@ -385,6 +469,24 @@ export default function AdminEventos() {
     setOpen(true);
   };
 
+  /* Entrada desde el portal: /admin/eventos?edit=<id> abre ese evento. */
+  const openedFromUrl = useRef<string | null>(null);
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (!editId || openedFromUrl.current === editId) return;
+
+    const target = events.find((e) => e.id === editId);
+    if (!target) return;
+
+    openedFromUrl.current = editId;
+    handleEdit(target);
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("edit");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, events]);
+
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from("events").delete().eq("id", id);
     if (error) {
@@ -397,184 +499,319 @@ export default function AdminEventos() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-display font-bold">Gestión de eventos</h1>
-          <Dialog
-            open={open}
-            onOpenChange={(isOpen) => {
-              setOpen(isOpen);
-              if (!isOpen) {
-                setForm(emptyForm);
-                setEditId(null);
-              }
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-1" /> Nuevo evento
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editId ? "Editar evento" : "Nuevo evento"}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label>Nombre</Label>
-                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <Label>Fecha inicio</Label>
-                    <Input
-                      type="date"
-                      value={form.start_date}
-                      onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label>Fecha fin</Label>
-                    <Input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <Label>País</Label>
-                    <Input value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label>Ciudad</Label>
-                    <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label>Venue</Label>
-                    <Input value={form.venue} onChange={(e) => setForm({ ...form, venue: e.target.value })} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <Label>Estado</Label>
-                    <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      value={form.status}
-                      onChange={(e) => setForm({ ...form, status: e.target.value })}
-                    >
-                      <option value="draft">Borrador (Draft)</option>
-                      <option value="needs_review">Pendiente de Revisión</option>
-                      <option value="published">Publicado</option>
-                    </select>
-                  </div>
-                  <div>
-                    <Label>URL Fuente</Label>
-                    <Input value={form.source_url} onChange={(e) => setForm({ ...form, source_url: e.target.value })} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <Label>Buy In</Label>
-                    <Input value={form.buy_in} onChange={(e) => setForm({ ...form, buy_in: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label>Garantizado (GTD)</Label>
-                    <Input value={form.guaranteed} onChange={(e) => setForm({ ...form, guaranteed: e.target.value })} />
-                  </div>
-                </div>
-
-                <div>
-                  <Label>Descripción corta</Label>
-                  <Textarea
-                    value={form.description}
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    rows={3}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Admite Markdown (ej: `**negrita**`, listas, links).</p>
-                </div>
-
-                <div>
-                  <Label>Información completa</Label>
-                  <Textarea value={form.details} onChange={(e) => setForm({ ...form, details: e.target.value })} rows={7} />
-                  <p className="text-xs text-muted-foreground mt-1">Admite Markdown.</p>
-                </div>
-
-                <div>
-                  <Label>Imagen principal</Label>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Input
-                      placeholder="https://... (o subir desde PC)"
-                      value={form.hero_image_url}
-                      onChange={(e) => setForm({ ...form, hero_image_url: e.target.value })}
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => heroFileInputRef.current?.click()}
-                      disabled={uploadingHero}
-                    >
-                      {uploadingHero ? "Subiendo..." : "Subir desde PC"}
-                    </Button>
-                  </div>
-                  <input
-                    ref={heroFileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(event) => void handleHeroImageUpload(event)}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Puedes pegar URL o subir una imagen local.
-                  </p>
-                </div>
-
-                <div>
-                  <Label>Links (uno por línea)</Label>
-                  <Textarea
-                    value={form.links_text}
-                    onChange={(e) => setForm({ ...form, links_text: e.target.value })}
-                    rows={4}
-                    placeholder={"Sitio oficial | https://... \nInscripciones | https://..."}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Formato: `Etiqueta | URL` o solo `URL`.</p>
-                </div>
-
-                <div>
-                  <Label>Galería de imágenes (una URL por línea)</Label>
-                  <div className="mb-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => galleryFileInputRef.current?.click()}
-                      disabled={uploadingGallery}
-                    >
-                      {uploadingGallery ? "Subiendo imágenes..." : "Subir imágenes desde PC"}
-                    </Button>
-                    <input
-                      ref={galleryFileInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={(event) => void handleGalleryUpload(event)}
-                    />
-                  </div>
-                  <Textarea
-                    value={form.gallery_text}
-                    onChange={(e) => setForm({ ...form, gallery_text: e.target.value })}
-                    rows={4}
-                    placeholder={"https://.../imagen-1.jpg\nhttps://.../imagen-2.jpg"}
-                  />
-                </div>
-
-                <Button onClick={() => void handleSave()} className="w-full">
-                  {editId ? "Guardar cambios" : "Crear evento"}
+        <AdminPageHeader
+          title="Gestión de eventos"
+          actions={
+            <Sheet
+              open={open}
+              onOpenChange={(isOpen) => {
+                setOpen(isOpen);
+                if (!isOpen) {
+                  setForm(emptyForm);
+                  setEditId(null);
+                }
+              }}
+            >
+              <SheetTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-1" /> Nuevo evento
                 </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+              </SheetTrigger>
+              <SheetContent
+                side="bottom"
+                onPointerDownOutside={(event) => event.preventDefault()}
+                onInteractOutside={(event) => event.preventDefault()}
+                className="inset-0 h-full w-full max-w-none overflow-hidden rounded-none border-0 bg-background p-0 sm:max-w-none"
+              >
+                <div className="flex h-full flex-col overflow-hidden">
+                  <SheetHeader className="border-b border-border bg-background/95 px-5 py-4 pr-14 text-left backdrop-blur">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <SheetTitle className="font-display text-2xl leading-h3">
+                          {editId ? "Editar evento" : "Nuevo evento"}
+                        </SheetTitle>
+                        <SheetDescription>
+                          La ficha como se va a ver: portada, nombre, bajada e información, con los ajustes al costado.
+                        </SheetDescription>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button variant="outline" onClick={() => setOpen(false)}>
+                          Cerrar
+                        </Button>
+                        <Button onClick={() => void handleSave()}>
+                          {editId ? "Guardar cambios" : "Crear evento"}
+                        </Button>
+                      </div>
+                    </div>
+                  </SheetHeader>
+
+                  <div className="flex-1 overflow-y-auto bg-gradient-to-b from-background via-background to-muted/20">
+                    <div className="grid gap-6 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+                      {/* ── Hoja: lo que el lector va a ver ──────────────── */}
+                      <article className="mx-auto w-full max-w-3xl pb-10">
+                        <div className="aspect-[21/9] w-full overflow-hidden rounded-lg border border-border bg-card md:aspect-[21/8]">
+                          {form.hero_image_url.trim() ? (
+                            <img
+                              src={form.hero_image_url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full flex-col items-center justify-center gap-2 bg-muted/50 px-6 text-center text-muted-foreground">
+                              <ImageIcon className="h-8 w-8" />
+                              <span className="text-sm leading-ui">Agregá una portada en el panel derecho.</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-6">
+                          <Input
+                            aria-label="Nombre del evento"
+                            placeholder="Nombre del evento"
+                            value={form.name}
+                            onChange={(e) => setForm({ ...form, name: e.target.value })}
+                            className="h-auto border-0 bg-transparent px-0 font-display text-3xl font-bold leading-h2 tracking-h2 shadow-none focus-visible:ring-0 md:text-4xl"
+                          />
+                        </div>
+
+                        {/*
+                          Fechas y lugar se muestran, no se editan acá: se cargan
+                          en el panel derecho. Repetir los campos en los dos lados
+                          sería dos fuentes para el mismo dato.
+                        */}
+                        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm leading-ui text-muted-foreground">
+                          <span className="inline-flex items-center gap-1.5">
+                            <CalendarDays className="h-4 w-4" />
+                            {form.start_date
+                              ? format(parseDateValue(form.start_date), "d MMM yyyy", { locale: es })
+                              : "Sin fecha"}
+                            {form.end_date &&
+                              ` — ${format(parseDateValue(form.end_date), "d MMM yyyy", { locale: es })}`}
+                          </span>
+                          {[form.venue, form.city, form.country].some(Boolean) && (
+                            <span className="inline-flex items-center gap-1.5">
+                              <MapPin className="h-4 w-4" />
+                              {[form.venue, form.city, form.country].filter(Boolean).join(", ")}
+                            </span>
+                          )}
+                          {form.buy_in && <Badge variant="outline">Buy-in: {form.buy_in}</Badge>}
+                          {form.guaranteed && <Badge variant="outline">GTD: {form.guaranteed}</Badge>}
+                        </div>
+
+                        <div className="mt-8 border-l-2 border-primary pl-4">
+                          <Textarea
+                            aria-label="Descripción corta"
+                            placeholder="Bajada del evento"
+                            value={form.description}
+                            onChange={(e) => setForm({ ...form, description: e.target.value })}
+                            rows={3}
+                            className="resize-none border-0 bg-transparent px-0 text-lg italic leading-body text-foreground/80 shadow-none focus-visible:ring-0"
+                          />
+                        </div>
+
+                        <section className="mt-8">
+                          <Label className="text-xs uppercase leading-caption tracking-caption text-muted-foreground">
+                            Información completa
+                          </Label>
+                          {/*
+                            Sigue siendo Markdown en un textarea y no el editor
+                            rico de noticias: la ficha pública renderiza este
+                            campo con ReactMarkdown, así que guardar HTML acá
+                            lo mostraría como texto plano.
+                          */}
+                          <Textarea
+                            value={form.details}
+                            onChange={(e) => setForm({ ...form, details: e.target.value })}
+                            rows={16}
+                            placeholder="Agenda, estructura, premios… (Markdown)"
+                            className="mt-2 leading-ui"
+                          />
+                          <p className="mt-1 text-xs leading-caption text-muted-foreground">
+                            Admite Markdown: `**negrita**`, listas, links.
+                          </p>
+                        </section>
+                      </article>
+
+                      {/* ── Ajustes ───────────────────────────────────────── */}
+                      <aside className="h-fit rounded-xl border border-border bg-card/70 p-4 shadow-sm lg:sticky lg:top-5">
+                        <div className="flex items-center gap-2">
+                          <CalendarDays className="h-4 w-4 text-primary" />
+                          <h3 className="font-display text-lg font-bold leading-h3">Ajustes</h3>
+                        </div>
+
+                        <div className="mt-4 space-y-4">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label htmlFor="ev-start">Fecha inicio</Label>
+                              <Input
+                                id="ev-start"
+                                type="date"
+                                value={form.start_date}
+                                onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="ev-end">Fecha fin</Label>
+                              <Input
+                                id="ev-end"
+                                type="date"
+                                value={form.end_date}
+                                onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="ev-venue">Venue</Label>
+                            <Input
+                              id="ev-venue"
+                              value={form.venue}
+                              onChange={(e) => setForm({ ...form, venue: e.target.value })}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label htmlFor="ev-city">Ciudad</Label>
+                              <Input
+                                id="ev-city"
+                                value={form.city}
+                                onChange={(e) => setForm({ ...form, city: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="ev-country">País</Label>
+                              <Input
+                                id="ev-country"
+                                value={form.country}
+                                onChange={(e) => setForm({ ...form, country: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label htmlFor="ev-buyin">Buy In</Label>
+                              <Input
+                                id="ev-buyin"
+                                value={form.buy_in}
+                                onChange={(e) => setForm({ ...form, buy_in: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="ev-gtd">Garantizado</Label>
+                              <Input
+                                id="ev-gtd"
+                                value={form.guaranteed}
+                                onChange={(e) => setForm({ ...form, guaranteed: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="ev-status">Estado</Label>
+                            <select
+                              id="ev-status"
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-ui ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              value={form.status}
+                              onChange={(e) => setForm({ ...form, status: e.target.value })}
+                            >
+                              <option value="draft">Borrador (Draft)</option>
+                              <option value="needs_review">Pendiente de Revisión</option>
+                              <option value="published">Publicado</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="ev-hero">Imagen principal</Label>
+                            <Input
+                              id="ev-hero"
+                              placeholder="https://… (o subir desde PC)"
+                              value={form.hero_image_url}
+                              onChange={(e) => setForm({ ...form, hero_image_url: e.target.value })}
+                            />
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => heroFileInputRef.current?.click()}
+                              disabled={uploadingHero}
+                            >
+                              {uploadingHero ? "Subiendo..." : "Subir desde PC"}
+                            </Button>
+                            <input
+                              ref={heroFileInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(event) => void handleHeroImageUpload(event)}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="ev-source">URL Fuente</Label>
+                            <Input
+                              id="ev-source"
+                              value={form.source_url}
+                              onChange={(e) => setForm({ ...form, source_url: e.target.value })}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="ev-links">Links</Label>
+                            <Textarea
+                              id="ev-links"
+                              value={form.links_text}
+                              onChange={(e) => setForm({ ...form, links_text: e.target.value })}
+                              rows={4}
+                              className="text-xs leading-ui"
+                              placeholder={"Sitio oficial | https://…\nInscripciones | https://…"}
+                            />
+                            <p className="text-xs leading-caption text-muted-foreground">
+                              Uno por línea. Formato: `Etiqueta | URL` o sólo `URL`.
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="ev-gallery">Galería</Label>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => galleryFileInputRef.current?.click()}
+                              disabled={uploadingGallery}
+                            >
+                              {uploadingGallery ? "Subiendo imágenes..." : "Subir imágenes desde PC"}
+                            </Button>
+                            <input
+                              ref={galleryFileInputRef}
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              onChange={(event) => void handleGalleryUpload(event)}
+                            />
+                            <Textarea
+                              id="ev-gallery"
+                              value={form.gallery_text}
+                              onChange={(e) => setForm({ ...form, gallery_text: e.target.value })}
+                              rows={4}
+                              className="text-xs leading-ui"
+                              placeholder={"https://.../imagen-1.jpg\nhttps://.../imagen-2.jpg"}
+                            />
+                            <p className="text-xs leading-caption text-muted-foreground">Una URL por línea.</p>
+                          </div>
+                        </div>
+                      </aside>
+                    </div>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+          }
+        />
 
         <div className="space-y-3">
           {events.map((e) => (

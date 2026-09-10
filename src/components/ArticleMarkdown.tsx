@@ -86,8 +86,8 @@ export function ArticleMarkdown({ children, className, imageUrlToOmit }: Article
       className={cn(
         "prose prose-base max-w-none dark:prose-invert",
         "prose-headings:font-display prose-headings:tracking-tight prose-headings:text-foreground",
-        "prose-p:leading-7 prose-p:text-foreground/90",
-        "prose-li:leading-7 prose-li:text-foreground/90",
+        "prose-p:text-foreground/90",
+        "prose-li:text-foreground/90",
         "prose-a:text-primary hover:prose-a:text-accent",
         "prose-strong:text-foreground",
         "prose-blockquote:border-primary/40 prose-blockquote:text-foreground/80",

@@ -1,4 +1,5 @@
 import { Navbar } from "@/components/Navbar";
+import { BRAND_LOGO_URL, BRAND_NAME } from "@/lib/brand";
 import { Button } from "@/components/ui/button";
 import {
   CalendarClock,
@@ -58,7 +59,7 @@ export default function SorteoTv() {
               Sorteamos una TV 65&quot; 4K
             </h1>
 
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-brand-light/82 sm:text-xl">
+            <p className="mt-6 max-w-2xl text-lg leading-body text-brand-light/82 sm:text-xl">
               Se viene el Mundial y vuelve la WSOP completa por ESPN. En Fichas Online
               lo festejamos a lo grande para que vivas cada gol y cada mano en pantalla gigante.
             </p>
@@ -110,7 +111,7 @@ export default function SorteoTv() {
             <div className="rounded-[2rem] border border-brand-light/18 bg-[#08050d]/82 p-5 shadow-[0_30px_90px_hsl(0_0%_0%_/_0.48)] backdrop-blur-xl">
               <div className="rounded-[1.35rem] border border-brand-light/10 bg-gradient-to-b from-[#251131] to-[#09060d] p-5">
                 <div className="flex items-center justify-between">
-                  <img src="/logo_fichas.png" alt="Fichas Online" className="h-9 w-auto object-contain" />
+                  <img src={BRAND_LOGO_URL} alt={BRAND_NAME} className="h-14 w-auto object-contain" />
                   <span className="rounded-full bg-red-500 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-brand-light">
                     Live
                   </span>
@@ -160,7 +161,7 @@ export default function SorteoTv() {
                     Paso {index + 1}
                   </p>
                   <h3 className="mt-2 text-2xl font-black text-foreground">{step.title}</h3>
-                  <p className="mt-3 leading-7 text-muted-foreground">{step.text}</p>
+                  <p className="mt-3 leading-body text-muted-foreground">{step.text}</p>
                 </article>
               );
             })}
@@ -188,7 +189,7 @@ export default function SorteoTv() {
           <div className="rounded-lg border border-primary/20 bg-[#f4eafa] p-6 shadow-[0_14px_34px_hsl(273_30%_25%_/_0.08)] dark:border-primary/25 dark:bg-primary/10 dark:shadow-none">
             <Gift className="h-9 w-9 text-primary" />
             <h2 className="mt-4 text-3xl font-black">El sorteo</h2>
-            <p className="mt-4 leading-7 text-muted-foreground">
+            <p className="mt-4 leading-body text-muted-foreground">
               El cierre es el miércoles 10/06/2026 a las 18:00 hs. El sorteo se realiza ese mismo día.
             </p>
           </div>

@@ -5,8 +5,7 @@ import ShinyText from "./ShinyText";
 import { ARTICLE_CATEGORIES } from "@/lib/taxonomy";
 import { SOCIAL_URLS } from "@/lib/social";
 import { openSupportChat } from "@/lib/supportChat";
-
-const LOGO_URL = "/Group%20789.svg";
+import { BRAND_LOGO_URL, BRAND_NAME } from "@/lib/brand";
 
 const PORTAL_LINKS = [
   { to: "/", label: "Inicio" },
@@ -26,7 +25,7 @@ const Footer: React.FC = () => {
       <div className="mx-auto w-full max-w-[1440px] px-4 pt-11 lg:px-10">
         <div className="grid gap-10 border-b border-border pb-9 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div className="flex flex-col gap-3.5">
-            <img src={LOGO_URL} alt="Fichas News" className="h-7 w-auto self-start object-contain" />
+            <img src={BRAND_LOGO_URL} alt={BRAND_NAME} className="h-12 w-auto self-start object-contain" />
             <p className="max-w-[300px] text-xs leading-body text-muted-foreground">
               El portal de noticias del póker en Hispanoamérica: torneos en vivo, resultados,
               entrevistas y la agenda regional en un solo lugar.

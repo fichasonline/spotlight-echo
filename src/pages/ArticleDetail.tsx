@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AdminEditLink } from "@/components/AdminEditLink";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
@@ -20,6 +21,7 @@ import {
   stripMarkdown,
   truncateText,
 } from "@/lib/seo";
+import { BRAND_LOGO_URL } from "@/lib/brand";
 
 interface Article {
   id: string;
@@ -75,6 +77,22 @@ export default function ArticleDetailPage() {
     })();
   }, [article]);
 
+  /*
+   * Registra la lectura para el ranking de "lo más leído".
+   *
+   * Depende de `article?.id` y no de `article`: el objeto se vuelve a crear en
+   * cada fetch aunque sea la misma nota, y con el objeto como dependencia esto
+   * dispararía de más y contaría lecturas que no ocurrieron.
+   *
+   * Falla en silencio a propósito. Un contador que no suma no es motivo para
+   * romperle la lectura a nadie ni para llenarle la consola de errores.
+   */
+  const articleId = article?.id;
+  useEffect(() => {
+    if (!articleId) return;
+    void (supabase as any).rpc("record_article_view", { p_article_id: articleId });
+  }, [articleId]);
+
   useEffect(() => {
     if (!slug) return;
 
@@ -129,7 +147,7 @@ export default function ArticleDetailPage() {
             name: SITE_NAME,
             logo: {
               "@type": "ImageObject",
-              url: buildAbsoluteUrl("/logo_fichas.png", SITE_URL),
+              url: buildAbsoluteUrl(BRAND_LOGO_URL, SITE_URL),
             },
           },
         },
@@ -215,7 +233,10 @@ export default function ArticleDetailPage() {
           </Link>
         )}
 
-        <h1 className="mb-4 mt-2 text-3xl font-display font-bold md:text-4xl">{article.headline}</h1>
+        <div className="mb-4 mt-2 flex flex-wrap items-start justify-between gap-3">
+          <h1 className="min-w-0 text-3xl font-display font-bold md:text-4xl">{article.headline}</h1>
+          <AdminEditLink to={`/admin/noticias?edit=${article.id}`} label="Editar nota" className="mt-1" />
+        </div>
 
         <div className="mb-8 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
           <span>{format(parseDateValue(article.published_at || article.created_at), "d MMMM yyyy", { locale: es })}</span>

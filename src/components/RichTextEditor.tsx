@@ -61,7 +61,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
     editorProps: {
       attributes: {
         class:
-          "prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[420px] px-4 py-3 text-base leading-8",
+          "prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[420px] px-4 py-3 text-base",
       },
       handlePaste(view, event) {
         const items = event.clipboardData?.items;

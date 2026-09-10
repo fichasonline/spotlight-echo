@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { Link, Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
@@ -100,30 +101,13 @@ export default function CategoriaPage({ slug: categoria }: { slug: string }) {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
-        <nav aria-label="Secciones" className="mb-6 flex flex-wrap gap-2">
-          <Link
-            to="/noticias"
-            className="rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-          >
-            Todas
-          </Link>
-          {ARTICLE_CATEGORIES.map((entry) => (
-            <Link
-              key={entry.value}
-              to={`/${entry.slug}`}
-              className={
-                entry.value === category
-                  ? "rounded-full border border-primary bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary"
-                  : "rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-              }
-            >
-              {entry.label}
-            </Link>
-          ))}
-        </nav>
-
-        <h1 className="font-display text-3xl font-bold">{meta.label}</h1>
-        <p className="mb-8 mt-3 max-w-2xl text-muted-foreground">{DESCRIPTIONS[category]}</p>
+        {/*
+          Acá había una segunda fila de categorías, idéntica a la del header.
+          Se sacó cuando el header pasó a mostrarlas en todos los anchos: eran
+          dos barras iguales una encima de la otra, y además dos <nav> con el
+          mismo aria-label, que para un lector de pantalla es ambiguo.
+        */}
+        <PageHeader title={meta.label} description={DESCRIPTIONS[category]} />
 
         {loading ? (
           <p className="py-12 text-center text-muted-foreground">Cargando…</p>

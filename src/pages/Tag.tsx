@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
@@ -131,15 +132,11 @@ export default function TagPage() {
 
         {state === "ready" && tag && (
           <>
-            {typeLabel && (
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {typeLabel}
-              </p>
-            )}
-            <h1 className="mt-1 font-display text-3xl font-bold">{tag.name}</h1>
-            <p className="mb-8 mt-2 text-muted-foreground">
-              Noticias etiquetadas con {tag.name}.
-            </p>
+            <PageHeader
+              eyebrow={typeLabel}
+              title={tag.name}
+              description={`Noticias etiquetadas con ${tag.name}.`}
+            />
 
             {articles.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border py-16 text-center">

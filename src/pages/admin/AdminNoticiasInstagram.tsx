@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,6 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   ArrowDown,
-  ArrowLeft,
   ArrowUp,
   CheckCircle2,
   Copy,
@@ -706,21 +706,15 @@ export default function AdminNoticiasInstagram() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <Link to="/admin/noticias" className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-              Volver a noticias
-            </Link>
-            <h1 className="text-3xl font-display font-bold">Instagram de noticias</h1>
-            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-              Descargá las stories pendientes y marcalas como publicadas desde un solo lugar.
-            </p>
-          </div>
-          <Badge variant="outline" className="border-primary/25 bg-primary/10 text-primary">
-            Listas: {instagramPendingArticles.length}
-          </Badge>
-        </div>
+        <AdminPageHeader
+          title="Instagram de noticias"
+          backTo="/admin/noticias"
+          actions={
+            <Badge variant="outline" className="border-primary/25 bg-primary/10 text-primary">
+              Listas: {instagramPendingArticles.length}
+            </Badge>
+          }
+        />
 
         <section>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

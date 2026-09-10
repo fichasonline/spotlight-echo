@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { isChatLead, isLandingLead } from "@/lib/support-leads";
@@ -178,10 +179,7 @@ export default function AdminDashboard() {
 
   return (
     <>
-      <h1 className="font-display text-3xl font-bold">Resumen</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {loading ? "Cargando…" : "Lo que necesita atención primero."}
-      </p>
+      <AdminPageHeader title="Resumen" />
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {pending.map((card) => {

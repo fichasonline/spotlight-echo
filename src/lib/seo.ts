@@ -1,3 +1,5 @@
+import { BRAND_LOGO_URL } from "@/lib/brand";
+
 const SITE_NAME = "Fichas Online";
 const SITE_URL = "https://www.fichasonline.uy";
 const DEFAULT_DESCRIPTION = "Noticias, calendario de eventos y comunidad de Fichas Online.";
@@ -141,7 +143,7 @@ function buildGlobalStructuredData(siteUrl: string) {
       url: siteUrl,
       logo: {
         "@type": "ImageObject",
-        url: buildAbsoluteUrl("/logo_fichas.png", siteUrl),
+        url: buildAbsoluteUrl(BRAND_LOGO_URL, siteUrl),
       },
     },
   };

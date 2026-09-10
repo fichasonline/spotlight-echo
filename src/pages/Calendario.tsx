@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
@@ -65,11 +66,10 @@ export default function CalendarioPage() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-display font-bold mb-3">Calendario de eventos de poker</h1>
-        <p className="text-muted-foreground max-w-2xl mb-6">
-          Todos los torneos y eventos de poker en Uruguay y la región: fechas, venues, buy-ins y garantizados.
-          Encontrá eventos en Enjoy Punta del Este, Conrad, casinos en vivo y series online.
-        </p>
+        <PageHeader
+          title="Calendario de eventos"
+          description="Torneos y eventos de poker en Uruguay y la región: fechas, venues, buy-ins y garantizados. Enjoy Punta del Este, Conrad, casinos en vivo y series online."
+        />
 
         <div className="flex flex-wrap gap-3 mb-8">
           <Select value={monthFilter} onValueChange={setMonthFilter}>

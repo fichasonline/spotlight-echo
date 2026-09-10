@@ -46,10 +46,26 @@
     --lh-h1: 0.98;
     --lh-h2: 1.15;
     --lh-h3: 1.25;
+    /* OJO: la prosa del portal NO usa este valor, usa --lh-prose (ver abajo).
+       --lh-body queda como el número que fija el manual y como interlineado
+       heredado del <body>. La utilidad `leading-body` apunta a --lh-prose. */
     --lh-body: 1.5;
     --lh-ui: 1.4;
     --lh-caption: 1.3;
     --lh-tight: 1;
+
+    /*
+     * Interlineado de la prosa larga (cuerpo de nota, editor, descripciones).
+     *
+     * DECISIÓN EDITORIAL, no del manual: el manual fija 1.5 para cuerpo largo
+     * y acá se usa 1.4 porque a Fede el bloque de texto le lee más compacto y
+     * más armado. Es un apartamiento deliberado y por eso vive en su propio
+     * token en lugar de tocar --lh-body, que queda como lo que el manual dice.
+     *
+     * Es el único lugar donde se cambia: lo consume `typography` en
+     * tailwind.config.ts, que gobierna toda la prosa del portal.
+     */
+    --lh-prose: 1.4;
 
     /* Tracking por rol, también del manual. */
     --tr-display: -0.02em;
@@ -198,6 +214,54 @@
     @apply border-border;
   }
 
+  /*
+   * ── Barras de scroll ────────────────────────────────────────────────────
+   *
+   * Sin `color-scheme` el navegador asume claro y dibuja la barra nativa en
+   * blanco, que sobre el violeta profundo del portal aparece como una franja
+   * clara pegada al borde. Declararlo por tema alcanza para que la barra, los
+   * controles de formulario y el autofill sigan al tema activo.
+   *
+   * Encima va un estilo propio para que la barra use los grises de la marca
+   * en vez del gris del sistema: riel transparente (se ve el fondo real) y
+   * pulgar en `--border`, que se levanta a `--muted-foreground` al pasar por
+   * encima. Firefox toma `scrollbar-color`; el resto, las reglas -webkit-.
+   */
+  :root {
+    color-scheme: dark;
+    scrollbar-color: hsl(var(--border)) transparent;
+    scrollbar-width: thin;
+  }
+
+  :root.light {
+    color-scheme: light;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border: 2px solid transparent;
+    border-radius: 999px;
+    /* El borde transparente sólo adelgaza el pulgar si el fondo se recorta. */
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground));
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
   html,
   body,
   #root {
@@ -286,6 +350,24 @@
   }
 }
 
+/*
+ * Respiración de la foto de apertura.
+ *
+ * El recorrido va de 1 a 1.09 en un ciclo de 18s. El ciclo se mantiene largo
+ * aunque el recorrido creció: lo que marea no es cuánto se agranda sino a qué
+ * velocidad cambia, y con más recorrido en el mismo tiempo la velocidad ya
+ * sube sola. Acortar además el ciclo lo volvería inquieto debajo del titular.
+ */
+@keyframes slow-zoom {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.09);
+  }
+}
+
 @keyframes nudge-x {
   0%,
   100% {
@@ -319,6 +401,125 @@
 
   .nudge-x {
     animation: nudge-x 1.2s ease-in-out infinite;
+  }
+
+  /*
+   * Pastilla de sección del masthead.
+   *
+   * El hover se arma con dos capas detrás del contenido (`z-index: -1` dentro
+   * del `isolation: isolate`, así no se escapan detrás del header):
+   *
+   *   ::before  el "líquido" — un degradé violeta que sube desde abajo.
+   *   ::after   el destello — una franja clara que barre en diagonal, un poco
+   *             más lenta, para que se lea como reflejo sobre vidrio.
+   *
+   * Van en CSS y no en clases sueltas de Tailwind porque son pseudo-elementos
+   * con estado; repetir esto inline en cada link sería ilegible.
+   *
+   * La pastilla activa tiene fondo propio y opaco, que al pintarse por encima
+   * de las dos capas las tapa: el estado activo queda quieto a propósito.
+   */
+  .nav-pill {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border: 1px solid hsl(var(--brand-gray-light) / 0.16);
+    transition:
+      border-color var(--dur-base) var(--ease-out),
+      color var(--dur-base) var(--ease-out);
+  }
+
+  .nav-pill::before,
+  .nav-pill::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .nav-pill::before {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--brand-violet-bright) / 0.62),
+      hsl(var(--brand-violet) / 0.5)
+    );
+    transform: translateY(101%);
+    transition: transform var(--dur-base) var(--ease-out);
+  }
+
+  .nav-pill::after {
+    background: linear-gradient(
+      105deg,
+      transparent 38%,
+      hsl(var(--brand-gray-light) / 0.28) 50%,
+      transparent 62%
+    );
+    transform: translateX(-130%);
+    transition: transform var(--dur-slow) var(--ease-out);
+  }
+
+  .nav-pill:hover,
+  .nav-pill:focus-visible {
+    border-color: hsl(var(--brand-gray-light) / 0.34);
+  }
+
+  .nav-pill:hover::before,
+  .nav-pill:focus-visible::before {
+    transform: translateY(0);
+  }
+
+  .nav-pill:hover::after,
+  .nav-pill:focus-visible::after {
+    transform: translateX(130%);
+  }
+
+  /* Activa: el recuadro se apaga porque el fondo lleno ya la separa sola. */
+  .nav-pill[aria-current="page"] {
+    border-color: transparent;
+  }
+
+  /*
+   * Logo del masthead.
+   *
+   * El rebote sale del easing, no de un keyframe: `--ease-spring` pasa de 1
+   * (sobrepasa el valor final y vuelve), así que un simple `scale` ya entra
+   * rebotando.
+   *
+   * El click no anima hacia arriba sino hacia abajo — se hunde a 0.94 rápido y
+   * con easing lineal. El "pop" aparece al soltar, cuando vuelve al scale del
+   * hover con el spring: ese rebote de salida es más contundente que agrandarlo
+   * en el momento del click, y además da sensación de botón físico.
+   */
+  /*
+   * Foto de apertura con respiración. El hover la acelera y la agranda un poco
+   * más — el `animation-play-state` no alcanza porque queremos que siga
+   * moviéndose, no que se congele.
+   */
+  .slow-zoom {
+    animation: slow-zoom 18s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  .group:hover .slow-zoom {
+    animation-duration: 9s;
+  }
+
+  .logo-pop {
+    transform-origin: center;
+    transition: transform var(--dur-slow) var(--ease-spring);
+    will-change: transform;
+  }
+
+  .logo-pop:hover,
+  .logo-pop:focus-visible {
+    transform: scale(1.07);
+  }
+
+  .logo-pop:active {
+    transform: scale(0.94);
+    transition-duration: var(--dur-fast);
+    transition-timing-function: var(--ease-out);
   }
 
   /* La ruedita del velo de carga entra con retardo: una carga rápida no
@@ -416,5 +617,38 @@
     transform: none;
     animation: none;
     transition: none;
+  }
+
+  /* La foto de apertura deja de respirar. */
+  .slow-zoom,
+  .group:hover .slow-zoom {
+    animation: none;
+    transform: none;
+  }
+
+  /* El logo no rebota ni se hunde: queda quieto. */
+  .logo-pop,
+  .logo-pop:hover,
+  .logo-pop:focus-visible,
+  .logo-pop:active {
+    transform: none;
+    transition: none;
+  }
+
+  /* Sin movimiento el hover no barre: la pastilla sólo se aclara. */
+  .nav-pill::after {
+    display: none;
+  }
+
+  .nav-pill::before,
+  .nav-pill:hover::before {
+    transition: none;
+    transform: translateY(0);
+    opacity: 0;
+  }
+
+  .nav-pill:hover::before,
+  .nav-pill:focus-visible::before {
+    opacity: 1;
   }
 }

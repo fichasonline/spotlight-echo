@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -297,12 +298,7 @@ export default function AdminBanners() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-display font-bold mb-1">Banners de la home</h1>
-          <p className="text-sm text-muted-foreground">
-            Gestioná los 5 anuncios (hero + contenido vertical). Cada slot acepta imágenes, GIFs y videos cortos.
-          </p>
-        </div>
+        <AdminPageHeader title="Banners de la home" />
 
         {loading ? (
           <div className="flex justify-center py-16">

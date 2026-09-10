@@ -18,8 +18,7 @@ import { getLocalDateISO } from "@/lib/date";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { SHOW_FEED } from "@/lib/feature-flags";
-
-const LOGO_URL = "/Group%20789.svg";
+import { BRAND_LOGO_URL, BRAND_NAME } from "@/lib/brand";
 
 /*
  * El masthead vive siempre sobre violeta profundo (el manual lo trata como
@@ -81,17 +80,28 @@ export function Navbar() {
       ? { to: "/admin/moderacion", label: "Moderación" }
       : null;
 
-  /* Nav editorial: las 5 categorías del manual + calendario. */
+  /*
+   * Nav editorial: las 5 categorías del manual + calendario + el archivo.
+   * Va en su propia fila y siempre visible — antes estaba dentro del masthead
+   * en `xl:flex`, así que abajo de 1280px las categorías desaparecían y sólo
+   * se llegaba a ellas por el menú hamburguesa.
+   */
   const sectionLinks = [
     ...ARTICLE_CATEGORIES.map((c) => ({ to: `/${c.slug}`, label: c.label })),
     { to: "/calendario", label: "Calendario" },
+    { to: "/noticias", label: "Todas" },
+    ...(SHOW_FEED && user && !isAnonymous ? [{ to: "/feed", label: "Feed" }] : []),
   ];
 
+  /*
+   * El menú desplegable queda sólo para mobile (abajo de `md`), que es donde
+   * la búsqueda y el login no entran en la barra. De `md` para arriba esos dos
+   * ya están en el masthead y las secciones en su propia fila, así que el
+   * botón de hamburguesa no tendría nada que ofrecer.
+   */
   const mobileLinks = [
     { to: "/", label: "Inicio" },
     ...sectionLinks,
-    { to: "/noticias", label: "Todas las noticias" },
-    ...(SHOW_FEED && user && !isAnonymous ? [{ to: "/feed", label: "Feed" }] : []),
     ...(staffLink ? [staffLink] : []),
   ];
 
@@ -142,25 +152,43 @@ export function Navbar() {
       {/* ── Masthead ─────────────────────────────────────────────────── */}
       <div className="border-b border-brand-violet/40 bg-brand-violet-deep">
         <div className="flex h-[68px] items-center justify-between gap-4 px-4 lg:h-[78px] lg:px-10">
-          <div className="flex min-w-0 items-center gap-6 xl:gap-10">
-            <Link to="/" className="flex shrink-0 items-center gap-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-3 xl:gap-5">
+            <Link to="/" className="logo-pop flex shrink-0 items-center gap-2.5" aria-label="Fichas News — ir al inicio">
+              {/*
+                El lockup nuevo apila "FICHAS / NEWS" en dos líneas (relación
+                ~2.2:1 contra ~4:1 del anterior), así que necesita más alto
+                para que la tipografía quede al mismo tamaño óptico que antes.
+              */}
               <img
-                src={LOGO_URL}
-                alt="Fichas News"
-                className="h-8 w-auto object-contain md:h-9"
+                src={BRAND_LOGO_URL}
+                alt={BRAND_NAME}
+                className="h-11 w-auto object-contain xl:h-16"
               />
             </Link>
 
-            <nav className="hidden min-w-0 items-center gap-4 xl:flex xl:gap-6">
+            {/*
+              En escritorio las secciones van en la misma línea que el logo.
+              La fila se encoge (`flex-1 min-w-0`) y scrollea cuando no entra,
+              en vez de desbordar sobre los controles de la derecha. Medir un
+              ancho mínimo y elegir breakpoint era frágil: dependía de cuántas
+              secciones haya y de si el usuario tiene sesión (el nombre al lado
+              del avatar ocupa más que el botón "Iniciar sesión"). Así entra en
+              cualquier ancho. Abajo de `md` sigue la fila propia de más abajo.
+            */}
+            <nav
+              aria-label="Secciones"
+              className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto md:flex [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
               {sectionLinks.map((l) => (
                 <Link
                   key={l.to}
                   to={l.to}
+                  aria-current={location.pathname === l.to ? "page" : undefined}
                   className={cn(
-                    "whitespace-nowrap text-[13px] font-semibold leading-ui transition-colors xl:text-sm",
+                    "nav-pill shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[12.5px] font-medium leading-ui transition-colors xl:px-3 xl:text-[13px]",
                     location.pathname === l.to
-                      ? "text-brand-light"
-                      : "text-brand-light/75 hover:text-brand-light",
+                      ? "bg-brand-light text-brand-violet-deep"
+                      : "text-brand-light/75 hover:bg-brand-light/10 hover:text-brand-light",
                   )}
                 >
                   {l.label}
@@ -169,7 +197,7 @@ export function Navbar() {
             </nav>
           </div>
 
-          <div className="flex items-center gap-2 lg:gap-3">
+          <div className="flex shrink-0 items-center gap-2 lg:gap-3">
             {searchOpen ? (
               <form onSubmit={submitSearch} className="hidden items-center md:flex">
                 <input
@@ -211,7 +239,7 @@ export function Navbar() {
                           {getInitial(profile?.display_name)}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="max-w-[140px] truncate text-sm font-medium text-brand-light">
+                      <span className="hidden max-w-[140px] truncate text-sm font-medium text-brand-light xl:inline">
                         {profile?.display_name ?? "Usuario"}
                       </span>
                     </button>
@@ -244,7 +272,7 @@ export function Navbar() {
             </div>
 
             <button
-              className="text-brand-light xl:hidden"
+              className="text-brand-light md:hidden"
               onClick={() => setMobileOpen((prev) => !prev)}
               aria-expanded={mobileOpen}
               aria-controls="mobile-nav-menu"
@@ -256,11 +284,41 @@ export function Navbar() {
         </div>
       </div>
 
+      {/* ── Fila de secciones ────────────────────────────────────────── */}
+      <div className="border-b border-brand-violet/40 bg-brand-violet-deep md:hidden">
+        {/*
+          Scroll horizontal en vez de menú desplegable: en mobile las siete
+          pastillas no entran, pero arrastrando se llegan a todas sin abrir
+          nada. La barra de scroll se oculta porque el corte de la última
+          pastilla ya avisa que hay más.
+        */}
+        <nav
+          aria-label="Secciones"
+          className="flex gap-1 overflow-x-auto px-4 pb-2 lg:px-10 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {sectionLinks.map((l) => (
+            <Link
+              key={l.to}
+              to={l.to}
+              aria-current={location.pathname === l.to ? "page" : undefined}
+              className={cn(
+                "nav-pill shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] font-medium leading-ui transition-colors",
+                location.pathname === l.to
+                  ? "bg-brand-light text-brand-violet-deep"
+                  : "text-brand-light/75 hover:bg-brand-light/10 hover:text-brand-light",
+              )}
+            >
+              {l.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
+
       {/* ── Menú mobile ──────────────────────────────────────────────── */}
       {mobileOpen && (
         <div
           id="mobile-nav-menu"
-          className="mobile-nav-menu overflow-hidden border-b border-border bg-card xl:hidden"
+          className="mobile-nav-menu overflow-hidden border-b border-border bg-card md:hidden"
         >
           <div className="space-y-1 px-4 pb-4 pt-3">
             <form onSubmit={submitSearch} className="mb-3 flex items-center gap-2">

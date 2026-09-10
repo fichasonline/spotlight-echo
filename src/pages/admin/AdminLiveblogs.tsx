@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { ArrowLeft, ExternalLink, Loader2, Plus, Radio, RefreshCw } from "lucide-react";
+import { ExternalLink, Loader2, Plus, Radio, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -142,24 +143,18 @@ export default function AdminLiveblogs() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <Link to="/admin" className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-              Volver al panel
-            </Link>
-            <h1 className="text-3xl font-display font-bold">Liveblogs</h1>
-            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-              Fuentes configurables para que el servicio externo de ingesta detecte novedades y genere piezas sociales.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+        <AdminPageHeader
+          title="Liveblogs"
+          backTo="/admin"
+          actions={
+            <>
             <Badge variant="outline" className="border-primary/25 bg-primary/10 text-primary">
               Activos: {activeCount}
             </Badge>
             <Badge variant="outline">{sources.length} fuentes</Badge>
-          </div>
-        </div>
+            </>
+          }
+        />
 
         <section className="mb-5 rounded-xl border border-border bg-card/90 p-5 shadow-[var(--shadow-card)]">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { BarChart3, CalendarDays, MessageSquare, Users } from "lucide-react";
@@ -70,24 +71,10 @@ export default function AdminInsights() {
     <div className="min-h-screen bg-background">
 
       <div className="container mx-auto space-y-6 px-4 py-8">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-primary">
-              <BarChart3 className="h-4 w-4" />
-              Insights
-            </div>
-            <h1 className="text-3xl font-display font-bold">Metricas de crecimiento</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Chats iniciados por visitantes y registros reales de usuarios en Auth.
-            </p>
-          </div>
-          <Link
-            to="/admin"
-            className="inline-flex items-center rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground transition-colors hover:border-primary/30"
-          >
-            Volver al dashboard
-          </Link>
-        </div>
+        <AdminPageHeader
+          title="Métricas de crecimiento"
+          backTo="/admin"
+        />
 
         {metricsError ? (
           <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">

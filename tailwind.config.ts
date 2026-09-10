@@ -25,7 +25,7 @@ export default {
         h1: 'var(--lh-h1)',
         h2: 'var(--lh-h2)',
         h3: 'var(--lh-h3)',
-        body: 'var(--lh-body)',
+        body: 'var(--lh-prose)',
         ui: 'var(--lh-ui)',
         caption: 'var(--lh-caption)',
       },
@@ -127,6 +127,34 @@ export default {
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
         "slide-up": "slide-up 0.3s ease-out",
         ticker: "ticker 35s linear infinite",
+      },
+      /*
+       * El plugin `typography` trae su propio interlineado (1.75 en `prose`,
+       * 1.71 en `prose-sm`) y lo aplica sobre el `<p>` directamente, así que
+       * le gana a cualquier `leading-*` puesto en el contenedor: por eso el
+       * `leading-8` del editor no hacía nada. Se ata acá a la escala del
+       * manual, una sola vez, y valen lo mismo el editor y la nota publicada.
+       */
+      typography: {
+        DEFAULT: {
+          css: {
+            lineHeight: "var(--lh-prose)",
+            p: { lineHeight: "var(--lh-prose)" },
+            li: { lineHeight: "var(--lh-prose)" },
+            blockquote: { lineHeight: "var(--lh-prose)" },
+            h1: { lineHeight: "var(--lh-h1)" },
+            h2: { lineHeight: "var(--lh-h2)" },
+            h3: { lineHeight: "var(--lh-h3)" },
+            h4: { lineHeight: "var(--lh-h3)" },
+          },
+        },
+        /*
+         * Los modificadores de tamaño (`prose-sm`, `prose-base`…) redefinen el
+         * interlineado por su cuenta y pisarían el DEFAULT, así que hay que
+         * repetirlo en cada uno que el proyecto usa.
+         */
+        sm: { css: { lineHeight: "var(--lh-prose)", p: { lineHeight: "var(--lh-prose)" }, li: { lineHeight: "var(--lh-prose)" } } },
+        base: { css: { lineHeight: "var(--lh-prose)", p: { lineHeight: "var(--lh-prose)" }, li: { lineHeight: "var(--lh-prose)" } } },
       },
     },
   },

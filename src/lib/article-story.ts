@@ -2,10 +2,11 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseDateValue } from "@/lib/date";
 import { buildAbsoluteUrl, SITE_URL, stripMarkdown, truncateText } from "@/lib/seo";
+import { BRAND_LOGO_URL } from "@/lib/brand";
 
 const STORY_WIDTH = 1080;
 const STORY_HEIGHT = 1920;
-const STORY_BRAND_LOGO_URL = "/Group%20789.svg";
+const STORY_BRAND_LOGO_URL = BRAND_LOGO_URL;
 const STORY_VECTOR_URL = "/Vector.png";
 const STORY_STOP_WORDS = new Set([
   "actualidad",

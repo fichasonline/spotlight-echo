@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AdminEditLink } from "@/components/AdminEditLink";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
@@ -314,8 +315,8 @@ export default function EventoDetailPage() {
   const markdownClassName = `
     prose prose-base max-w-none dark:prose-invert
     prose-headings:font-display prose-headings:tracking-tight prose-headings:text-foreground
-    prose-p:leading-7 prose-p:text-foreground/90
-    prose-li:leading-7 prose-li:text-foreground/90
+    prose-p:text-foreground/90
+    prose-li:text-foreground/90
     prose-a:text-primary hover:prose-a:text-accent
     prose-strong:text-foreground
     prose-blockquote:border-primary/40 prose-blockquote:text-foreground/80
@@ -331,7 +332,10 @@ export default function EventoDetailPage() {
           <ArrowLeft className="h-4 w-4" /> Volver al calendario
         </Link>
 
-        <h1 className="text-3xl font-display font-bold mb-4">{event.name}</h1>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <h1 className="min-w-0 text-3xl font-display font-bold">{event.name}</h1>
+          <AdminEditLink to={`/admin/eventos?edit=${event.id}`} label="Editar evento" className="mt-1" />
+        </div>
 
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-6">
           <span className="flex items-center gap-1">
